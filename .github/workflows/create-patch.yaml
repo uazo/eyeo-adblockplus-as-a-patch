@@ -64,6 +64,7 @@ jobs:
         uses: peter-evans/create-pull-request@dcd5fd746d53dd8de555c0f10bca6c35628be47a #v3.12.0
         with:
           path: eyeo-adblockplus-as-a-patch
+          base: main
           commit-message: 'AUTOMATED - autoupdate'
           title: AUTOMATED - autoupdate
           delete-branch: true
