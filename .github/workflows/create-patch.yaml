@@ -1,0 +1,70 @@
+name: Create Patch
+  
+on:
+  workflow_dispatch:
+    inputs:
+      EYEO_TREE:
+        description: 'Eyeo TREE name'
+        required: true
+        default: 'eyeo-105-rc'
+
+env:
+  EYEO_SRC: https://gitlab.com/eyeo/adblockplus/chromium-sdk/
+  EYEO_TREE: ${{ github.event.inputs.EYEO_TREE }}
+  PATCH_NAME: adblockplus.patch
+  CHR_SOURCE: https://github.com/chromium/chromium.git
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:        
+      - name: Create container
+        run: |
+          HOME=$GITHUB_WORKSPACE
+          cd ~
+          
+          git config --global user.email "uazo@users.noreply.github.com"
+          git config --global user.name "AUTOMATED"
+
+          git clone https://github.com/uazo/bromite-buildtools
+          mkdir -p ~/bromite/build/patches-new/
+
+          wget $EYEO_SRC-/raw/$EYEO_TREE/chrome/VERSION
+          VERSION=$(echo $(cat VERSION | cut -d'=' -f2) | sed 's/ /./g')
+
+          mkdir ~/eyeo-adblockplus-as-a-patch && cd ~/eyeo-adblockplus-as-a-patch
+          git init
+          git remote add origin https://github.com/uazo/eyeo-adblockplus-as-a-patch
+          git fetch --depth 1
+          git checkout FETCH_HEAD
+          rm -rf $(find . -maxdepth 1 ! -name .git ! -name LICENSE ! -name . ! -name .github)
+
+          mkdir ~/chromium-sdk/ && cd ~/chromium-sdk/
+          git init
+          git remote add origin $EYEO_SRC
+          git fetch --depth 1 $EYEO_SRC $EYEO_TREE
+          git checkout FETCH_HEAD
+
+          mkdir -p ~/chromium/src && cd ~/chromium/src
+          git init
+          git remote add origin $CHR_SOURCE
+          git fetch --depth 2 $CHR_SOURCE +refs/tags/$VERSION:chromium_$VERSION
+          git checkout $VERSION
+
+          cp -r ~/chromium-sdk/* .
+          git add .
+
+          cp --parents $(git diff --name-only --cached) ~/eyeo-adblockplus-as-a-patch
+
+          git commit -m "Diff from $VERSION" -m "FILE:$PATCH_NAME"
+          bash ~/bromite-buildtools/export-single-patch.sh $(git rev-parse HEAD) $PATCH_NAME
+          cp ~/bromite/build/patches-new/$PATCH_NAME ~/eyeo-adblockplus-as-a-patch
+          
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@dcd5fd746d53dd8de555c0f10bca6c35628be47a #v3.12.0
+        with:
+          path: eyeo-adblockplus-as-a-patch
+          commit-message: 'AUTOMATED - autoupdate'
+          title: AUTOMATED - autoupdate
+          delete-branch: true
+          branch-suffix: short-commit-hash
