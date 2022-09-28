@@ -1,7 +1,18 @@
 # Release Notes
 
-## eyeo Chromium SDK 105.1
-* Fixed faulty handling URL redirection by creating AdblockURLLoaderFactory as the last proxy
+## eyeo Chromium SDK 106.0
+* Updated to Chromium 106.0.5249.38
+* Updated snippets library from v0.5.1 to v0.5.5
+* Fixed faulty handling URL redirection by creating AdblockURLLoaderFactory as the last proxy (DPD-1492). Backported into 105.1.
+* Fixed SiteKey validation for redirected urls (DPD-1452).
+* Improved logging related to subscription update (DPD-1359)
+* Simplified subscription first run update (DPD-1389).
+
+Known issues:
+* The following browser tests are failing and will be fixed in future releases:
+  - OutOfProcessPPAPITest.URLLoader3
+  - PasswordDialogViewTest.PopupAccountChooserWithMultipleCredentialsReturnEmpty
+  - CredentialManagerAvatarTest.AvatarFetchIsolatedPerOrigin
 
 ## eyeo Chromium SDK 105.0
 * Updated to Chromium 105.0.5195.68

@@ -58,19 +58,21 @@ class AdblockURLLoaderFactory::InProgressRequest
 
   void OnReceiveEarlyHints(
       ::network::mojom::EarlyHintsPtr early_hints) override;
-  void OnReceiveResponse(::network::mojom::URLResponseHeadPtr head,
-                         ::mojo::ScopedDataPipeConsumerHandle body) override;
+  void OnReceiveResponse(
+      ::network::mojom::URLResponseHeadPtr head,
+      ::mojo::ScopedDataPipeConsumerHandle body,
+      absl::optional<mojo_base::BigBuffer> cached_metadata) override;
   void OnReceiveRedirect(const ::net::RedirectInfo& redirect_info,
                          ::network::mojom::URLResponseHeadPtr head) override;
   void OnUploadProgress(int64_t current_position,
                         int64_t total_size,
                         OnUploadProgressCallback callback) override;
-  void OnReceiveCachedMetadata(::mojo_base::BigBuffer data) override;
   void OnTransferSizeUpdated(int32_t transfer_size_diff) override;
   void OnComplete(const ::network::URLLoaderCompletionStatus& status) override;
 
  private:
   void OnBindingsClosed();
+  void OnClientDisconnected();
   void Start(int32_t request_id,
              uint32_t options,
              network::ResourceRequest request,
@@ -86,13 +88,15 @@ class AdblockURLLoaderFactory::InProgressRequest
       ::mojo::PendingRemote<network::mojom::URLLoaderClient> client,
       const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
       adblock::mojom::FilterMatchResult result);
-  void OnProcessHeadersResult(::network::mojom::URLResponseHeadPtr head,
-                              ::mojo::ScopedDataPipeConsumerHandle body,
-                              adblock::mojom::FilterMatchResult result,
-                              network::mojom::ParsedHeadersPtr parsed_headers);
+  void OnProcessHeadersResult(
+      ::network::mojom::URLResponseHeadPtr head,
+      ::mojo::ScopedDataPipeConsumerHandle body,
+      absl::optional<mojo_base::BigBuffer> cached_metadata,
+      adblock::mojom::FilterMatchResult result,
+      network::mojom::ParsedHeadersPtr parsed_headers);
   void OnRequestError(int error_code);
 
-  const GURL request_url_;
+  GURL request_url_;
   const std::string& user_agent_string_;
   const raw_ptr<AdblockURLLoaderFactory> factory_;
   // There are the mojo pipe endpoints between this proxy and the renderer.
@@ -133,9 +137,11 @@ AdblockURLLoaderFactory::InProgressRequest::InProgressRequest(
   // Calls |OnBindingsClosed| only after both disconnect handlers have been run.
   base::RepeatingClosure closure = base::BarrierClosure(
       2, base::BindOnce(&InProgressRequest::OnBindingsClosed,
-                        base::Unretained(this)));
+                        weak_factory_.GetWeakPtr()));
   loader_receiver_.set_disconnect_handler(closure);
   client_receiver_.set_disconnect_handler(closure);
+  target_client_.set_disconnect_handler(base::BindOnce(
+      &InProgressRequest::OnClientDisconnected, weak_factory_.GetWeakPtr()));
 }
 
 void AdblockURLLoaderFactory::InProgressRequest::FollowRedirect(
@@ -176,13 +182,15 @@ void AdblockURLLoaderFactory::InProgressRequest::OnReceiveEarlyHints(
 
 void AdblockURLLoaderFactory::InProgressRequest::OnReceiveResponse(
     network::mojom::URLResponseHeadPtr head,
-    mojo::ScopedDataPipeConsumerHandle body) {
+    mojo::ScopedDataPipeConsumerHandle body,
+    absl::optional<mojo_base::BigBuffer> cached_metadata) {
   if (net::IsLocalhost(request_url_) || (!request_url_.SchemeIsHTTPOrHTTPS() &&
                                          !request_url_.SchemeIsWSOrWSS())) {
     VLOG(1)
         << "[eyeo] Ignoring URL (local url or unsupported scheme), allowing "
            "load.";
-    target_client_->OnReceiveResponse(std::move(head), std::move(body));
+    target_client_->OnReceiveResponse(std::move(head), std::move(body),
+                                      std::move(cached_metadata));
     return;
   }
 
@@ -190,16 +198,16 @@ void AdblockURLLoaderFactory::InProgressRequest::OnReceiveResponse(
   client_receiver_.Pause();
   const scoped_refptr<net::HttpResponseHeaders>& headers = head->headers;
   factory_->adblock_interface_->ProcessResponseHeaders(
-      request_url_, factory_->frame_tree_node_id_, headers,
-      user_agent_string_,
+      request_url_, factory_->frame_tree_node_id_, headers, user_agent_string_,
       base::BindOnce(&InProgressRequest::OnProcessHeadersResult,
                      weak_factory_.GetWeakPtr(), std::move(head),
-                     std::move(body)));
+                     std::move(body), std::move(cached_metadata)));
 }
 
 void AdblockURLLoaderFactory::InProgressRequest::OnProcessHeadersResult(
     ::network::mojom::URLResponseHeadPtr head,
     ::mojo::ScopedDataPipeConsumerHandle body,
+    absl::optional<mojo_base::BigBuffer> cached_metadata,
     adblock::mojom::FilterMatchResult result,
     network::mojom::ParsedHeadersPtr parsed_headers) {
   if (result == adblock::mojom::FilterMatchResult::kBlockRule) {
@@ -214,7 +222,8 @@ void AdblockURLLoaderFactory::InProgressRequest::OnProcessHeadersResult(
     head->parsed_headers = std::move(parsed_headers);
   }
 
-  target_client_->OnReceiveResponse(std::move(head), std::move(body));
+  target_client_->OnReceiveResponse(std::move(head), std::move(body),
+                                    std::move(cached_metadata));
   client_receiver_.Resume();
 }
 
@@ -227,6 +236,7 @@ void AdblockURLLoaderFactory::InProgressRequest::OnRequestError(
 void AdblockURLLoaderFactory::InProgressRequest::OnReceiveRedirect(
     const net::RedirectInfo& redirect_info,
     network::mojom::URLResponseHeadPtr head) {
+  request_url_ = redirect_info.new_url;
   target_client_->OnReceiveRedirect(redirect_info, std::move(head));
 }
 
@@ -236,11 +246,6 @@ void AdblockURLLoaderFactory::InProgressRequest::OnUploadProgress(
     OnUploadProgressCallback callback) {
   target_client_->OnUploadProgress(current_position, total_size,
                                    std::move(callback));
-}
-
-void AdblockURLLoaderFactory::InProgressRequest::OnReceiveCachedMetadata(
-    mojo_base::BigBuffer data) {
-  target_client_->OnReceiveCachedMetadata(std::move(data));
 }
 
 void AdblockURLLoaderFactory::InProgressRequest::OnTransferSizeUpdated(
@@ -255,6 +260,10 @@ void AdblockURLLoaderFactory::InProgressRequest::OnComplete(
 
 void AdblockURLLoaderFactory::InProgressRequest::OnBindingsClosed() {
   factory_->RemoveRequest(this);
+}
+
+void AdblockURLLoaderFactory::InProgressRequest::OnClientDisconnected() {
+  OnRequestError(net::ERR_ABORTED);
 }
 
 void AdblockURLLoaderFactory::InProgressRequest::Start(
@@ -298,6 +307,9 @@ void AdblockURLLoaderFactory::InProgressRequest::Start(
   }
 
   if (!factory_->target_factory_.is_bound()) {
+    DLOG(WARNING)
+        << "[eyeo] AdblockURLLoaderFactory::InProgressRequest::Start: "
+           "target_factory_ not bound";
     return;
   }
 
@@ -332,6 +344,9 @@ void AdblockURLLoaderFactory::InProgressRequest::OnFilterMatchResult(
     const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
     adblock::mojom::FilterMatchResult result) {
   if (!factory_->target_factory_.is_bound()) {
+    DLOG(WARNING) << "[eyeo] "
+                     "AdblockURLLoaderFactory::InProgressRequest::"
+                     "OnFilterMatchResult: target_factory_ not bound";
     return;
   }
   if (result == adblock::mojom::FilterMatchResult::kBlockRule) {
@@ -388,8 +403,6 @@ void AdblockURLLoaderFactory::OnTargetFactoryError() {
 }
 
 void AdblockURLLoaderFactory::OnProxyBindingError() {
-  if (proxy_receivers_.empty())
-    target_factory_.reset();
   MaybeDestroySelf();
 }
 
@@ -401,7 +414,7 @@ void AdblockURLLoaderFactory::RemoveRequest(InProgressRequest* request) {
 }
 
 void AdblockURLLoaderFactory::MaybeDestroySelf() {
-  if (!target_factory_.is_bound() && requests_.empty())
+  if (proxy_receivers_.empty() && requests_.empty())
     std::move(on_disconnect_).Run(this);
 }
 

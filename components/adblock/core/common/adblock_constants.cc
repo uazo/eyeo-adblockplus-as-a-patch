@@ -25,6 +25,8 @@ namespace adblock {
 
 const char kSiteKeyHeaderKey[] = "x-adblock-key";
 
+const char kAllowlistEverythingFilter[] = "@@*$document";
+
 const char kBlankHtml[] =
     "data:text/html,<!DOCTYPE html><html><head></head><body></body></html>";
 
@@ -129,7 +131,7 @@ const GURL& DefaultSubscriptionUrl() {
 
 const GURL& TestPagesSubscriptionUrl() {
   static GURL kTestPagesUrl(
-      "https://testpages.adblockplus.org/en/abp-testcase-subscription.txt");
+      "https://abptestpages.org/en/abp-testcase-subscription.txt");
   return kTestPagesUrl;
 }
 

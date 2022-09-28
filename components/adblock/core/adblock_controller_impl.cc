@@ -117,15 +117,6 @@ AdblockControllerImpl::AdblockControllerImpl(
   // default EasyList.
   if (language_.size() != 2u)
     language_ = "en";
-
-  if (prefs_->GetBoolean(prefs::kInstallFirstStartSubscriptions) &&
-      subscriptions_.IsDefaultValue() &&
-      custom_subscriptions_.IsDefaultValue()) {
-    // There are no subscriptions migrated from previous versions, we shall
-    // install a language-based recommendation.
-    AddToPref(FindLanguageBasedRecommendedSubscription().spec(),
-              &subscriptions_);
-  }
 }
 
 AdblockControllerImpl::~AdblockControllerImpl() = default;
@@ -362,6 +353,8 @@ void AdblockControllerImpl::SynchronizeSubscriptions() {
         AddToPref(cur.url.spec(), &subscriptions_);
       }
     }
+    AddToPref(FindLanguageBasedRecommendedSubscription().spec(),
+              &subscriptions_);
     prefs_->SetBoolean(prefs::kInstallFirstStartSubscriptions, false);
   }
 

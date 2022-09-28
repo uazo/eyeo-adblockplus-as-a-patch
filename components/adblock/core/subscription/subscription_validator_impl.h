@@ -48,7 +48,7 @@ class SubscriptionValidatorImpl final : public SubscriptionValidator {
 
   PrefService* pref_service_;
   scoped_refptr<base::SequencedTaskRunner> main_thread_task_runner_;
-  base::Value initial_subscription_signatures_;
+  base::Value::Dict initial_subscription_signatures_;
 };
 
 }  // namespace adblock

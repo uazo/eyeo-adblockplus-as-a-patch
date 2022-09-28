@@ -46,7 +46,7 @@ public class TestPagesSnippetsTest {
     private TestPagesTestsHelper mHelper = new TestPagesTestsHelper();
 
     public static final String SNIPPETS_COMMON_UNIT_TESTCASES_ROOT =
-            "https://testpages.adblockplus.org/en/snippets/";
+            "https://abptestpages.org/en/snippets/";
 
     @Before
     public void setUp() {
@@ -63,7 +63,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testAbortCurrentInlineScriptBasic() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#abort-current-inline-script console.group");
+                "abptestpages.org#$#abort-current-inline-script console.group");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-current-inline-script");
         // All "Abort" snippets cancel creation of the target div, so it won't be hidden - it will
         // not exist in DOM. Therefore we verify it's not displayed instead of verifying it's
@@ -76,7 +76,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testAbortCurrentInlineScriptSearch() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#abort-current-inline-script console.info acis-search");
+                "abptestpages.org#$#abort-current-inline-script console.info acis-search");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-current-inline-script");
         mHelper.verifyDisplayedCount(0, "div#search-target > div[data-expectedresult='fail']");
     }
@@ -86,7 +86,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testAbortCurrentInlineScriptRegex() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#abort-current-inline-script console.warn '/acis-regex[1-2]/'");
+                "abptestpages.org#$#abort-current-inline-script console.warn '/acis-regex[1-2]/'");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-current-inline-script");
         mHelper.verifyDisplayedCount(0, "div#regex-target > div[data-expectedresult='fail']");
     }
@@ -95,7 +95,7 @@ public class TestPagesSnippetsTest {
     @LargeTest
     @Feature({"adblock"})
     public void testAbortOnPropertyReadBasic() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#$#abort-on-property-read aoprb");
+        mHelper.addCustomFilter("abptestpages.org#$#abort-on-property-read aoprb");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-property-read");
         mHelper.verifyDisplayedCount(0, "div#basic-target > div[data-expectedresult='fail']");
     }
@@ -104,7 +104,7 @@ public class TestPagesSnippetsTest {
     @LargeTest
     @Feature({"adblock"})
     public void testAbortOnPropertyReadSubProperty() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#$#abort-on-property-read aopr.sp");
+        mHelper.addCustomFilter("abptestpages.org#$#abort-on-property-read aopr.sp");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-property-read");
         mHelper.verifyDisplayedCount(0, "div#subproperty-target > div[data-expectedresult='fail']");
     }
@@ -114,7 +114,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testAbortOnPropertyReadFunctionProperty()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#$#abort-on-property-read aoprf.fp");
+        mHelper.addCustomFilter("abptestpages.org#$#abort-on-property-read aoprf.fp");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-property-read");
         mHelper.verifyDisplayedCount(
                 0, "div#functionproperty-target > div[data-expectedresult='fail']");
@@ -124,7 +124,7 @@ public class TestPagesSnippetsTest {
     @LargeTest
     @Feature({"adblock"})
     public void testAbortOnPropertyWriteBasic() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#$#abort-on-property-write window.aopwb");
+        mHelper.addCustomFilter("abptestpages.org#$#abort-on-property-write window.aopwb");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-property-write");
         mHelper.verifyDisplayedCount(0, "div#basic-target > div[data-expectedresult='fail']");
     }
@@ -135,7 +135,7 @@ public class TestPagesSnippetsTest {
     public void testAbortOnPropertyWriteSubProperty()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#abort-on-property-write window.aopwsp");
+                "abptestpages.org#$#abort-on-property-write window.aopwsp");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-property-write");
         mHelper.verifyDisplayedCount(0, "div#subproperty-target > div[data-expectedresult='fail']");
     }
@@ -145,7 +145,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testAbortOnPropertyWriteFunctionProperty()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#$#abort-on-property-write aopwf.fp");
+        mHelper.addCustomFilter("abptestpages.org#$#abort-on-property-write aopwf.fp");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-property-write");
         mHelper.verifyDisplayedCount(
                 0, "div#functionproperty-target > div[data-expectedresult='fail']");
@@ -155,7 +155,7 @@ public class TestPagesSnippetsTest {
     @LargeTest
     @Feature({"adblock"})
     public void testAbortOnIframePropertyReadBasic() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#$#abort-on-iframe-property-read aoiprb");
+        mHelper.addCustomFilter("abptestpages.org#$#abort-on-iframe-property-read aoiprb");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-iframe-property-read");
         mHelper.verifyDisplayedCount(0, "div#basic-target > div[data-expectedresult='fail']");
     }
@@ -166,7 +166,7 @@ public class TestPagesSnippetsTest {
     public void testAbortOnIframePropertyReadSubProperty()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#abort-on-iframe-property-read aoipr.sp");
+                "abptestpages.org#$#abort-on-iframe-property-read aoipr.sp");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-iframe-property-read");
         mHelper.verifyDisplayedCount(0, "div#subproperty-target > div[data-expectedresult='fail']");
     }
@@ -177,7 +177,7 @@ public class TestPagesSnippetsTest {
     public void testAbortOnIframePropertyReadMultipleProperties()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#abort-on-iframe-property-read aoipr1 aoipr2");
+                "abptestpages.org#$#abort-on-iframe-property-read aoipr1 aoipr2");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-iframe-property-read");
         mHelper.verifyDisplayedCount(
                 0, "div#multipleproperties-target > div[data-expectedresult='fail']");
@@ -189,7 +189,7 @@ public class TestPagesSnippetsTest {
     public void testAbortOnIframePropertyWriteBasic()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#abort-on-iframe-property-write aoipwb");
+                "abptestpages.org#$#abort-on-iframe-property-write aoipwb");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-iframe-property-write");
         mHelper.verifyDisplayedCount(0, "div#basic-target > div[data-expectedresult='fail']");
     }
@@ -200,7 +200,7 @@ public class TestPagesSnippetsTest {
     public void testAbortOnIframePropertyWriteSubProperty()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#abort-on-iframe-property-write aoipw.sp");
+                "abptestpages.org#$#abort-on-iframe-property-write aoipw.sp");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-iframe-property-write");
         mHelper.verifyDisplayedCount(0, "div#subproperty-target > div[data-expectedresult='fail']");
     }
@@ -211,7 +211,7 @@ public class TestPagesSnippetsTest {
     public void testAbortOnIframePropertyWriteMultipleProperties()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#abort-on-iframe-property-write aoipw1 aoipw2");
+                "abptestpages.org#$#abort-on-iframe-property-write aoipw1 aoipw2");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "abort-on-iframe-property-write");
         mHelper.verifyDisplayedCount(
                 0, "div#multipleproperties-target > div[data-expectedresult='fail']");
@@ -222,7 +222,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfContainsStatic() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains 'hic-basic-static' p[id]");
+                "abptestpages.org#$#hide-if-contains 'hic-basic-static' p[id]");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains");
         mHelper.verifyHiddenCount(1, "p#hic-static-id");
     }
@@ -232,7 +232,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfContainsDynamic() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains 'hic-basic-dynamic' p[id]");
+                "abptestpages.org#$#hide-if-contains 'hic-basic-dynamic' p[id]");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains");
         mHelper.verifyHiddenCount(1, "p#hic-dynamic-id");
     }
@@ -242,7 +242,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfContainsSearch() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains 'hic-search' p[id] .target");
+                "abptestpages.org#$#hide-if-contains 'hic-search' p[id] .target");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains");
         mHelper.verifyHiddenCount(1, "div#search2-target > p.target");
         mHelper.verifyDisplayedCount(1, "div#search1-target > p[data-expectedresult='pass']");
@@ -253,7 +253,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfContainsRegex() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains /hic-regex-[2-3]/ p[id]");
+                "abptestpages.org#$#hide-if-contains /hic-regex-[2-3]/ p[id]");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains");
         // "hic-regex-1" does not match regex, should remain displayed.
         mHelper.verifyDisplayedCount(1, "p#hic-regex-1");
@@ -268,7 +268,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfContainsFrame() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains hidden span#frame-target");
+                "abptestpages.org#$#hide-if-contains hidden span#frame-target");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains");
         mHelper.verifyHiddenCount(1, "span#frame-target");
     }
@@ -279,7 +279,7 @@ public class TestPagesSnippetsTest {
     public void testHideIfContainsAndMatchesStyleStatic()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains-and-matches-style hicamss div[id] span.label /./ 'display: inline;'");
+                "abptestpages.org#$#hide-if-contains-and-matches-style hicamss div[id] span.label /./ 'display: inline;'");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains-and-matches-style");
         mHelper.verifyHiddenCount(1, "div#static-usage-area > div[data-expectedresult='fail']");
         mHelper.verifyDisplayedCount(1, "div#static-usage-area > div[data-expectedresult='pass']");
@@ -291,7 +291,7 @@ public class TestPagesSnippetsTest {
     public void testHideIfContainsAndMatchesStyleDynamic()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains-and-matches-style hicamsd div[id] span.label /./ 'display: inline;'");
+                "abptestpages.org#$#hide-if-contains-and-matches-style hicamsd div[id] span.label /./ 'display: inline;'");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains-and-matches-style");
         mHelper.verifyHiddenCount(1, "div#dynamic-target > div[data-expectedresult='fail']");
         mHelper.verifyDisplayedCount(1, "div#dynamic-target > div[data-expectedresult='pass']");
@@ -302,7 +302,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfContainsImage() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains-image /^89504e470d0a1a0a0000000d4948445200000064000000640802/ div[shouldhide] div");
+                "abptestpages.org#$#hide-if-contains-image /^89504e470d0a1a0a0000000d4948445200000064000000640802/ div[shouldhide] div");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains-image");
         mHelper.verifyHiddenCount(2, "div[data-expectedresult='fail']");
     }
@@ -313,7 +313,7 @@ public class TestPagesSnippetsTest {
     public void testHideIfContainsVisibleTextBasicUsage()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains-visible-text Sponsored-hicvt-basic '#parent-basic > .article' '#parent-basic > .article .label'");
+                "abptestpages.org#$#hide-if-contains-visible-text Sponsored-hicvt-basic '#parent-basic > .article' '#parent-basic > .article .label'");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains-visible-text");
         mHelper.verifyHiddenCount(1, "div#parent-basic > div[data-expectedresult='fail']");
     }
@@ -324,7 +324,7 @@ public class TestPagesSnippetsTest {
     public void testHideIfContainsVisibleTextContentUsage()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-contains-visible-text Sponsored-hicvt-content '#parent-content > .article' '#parent-content > .article .label'");
+                "abptestpages.org#$#hide-if-contains-visible-text Sponsored-hicvt-content '#parent-content > .article' '#parent-content > .article .label'");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-contains-visible-text");
         mHelper.verifyHiddenCount(1, "div#parent-content > div[data-expectedresult='fail']");
     }
@@ -335,7 +335,7 @@ public class TestPagesSnippetsTest {
     public void testHideIfHasAndMatchesStyleBasicUsage()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-has-and-matches-style a[href=\"#basic-target-ad\"] div[id] span.label /./ 'display: inline;'");
+                "abptestpages.org#$#hide-if-has-and-matches-style a[href=\"#basic-target-ad\"] div[id] span.label /./ 'display: inline;'");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-has-and-matches-style");
         mHelper.verifyHiddenCount(1, "div#basic-target > div[data-expectedresult='fail']");
     }
@@ -346,7 +346,7 @@ public class TestPagesSnippetsTest {
     public void testHideIfHasAndMatchesStyleLegitElements()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-has-and-matches-style a[href=\"#comments-target-ad\"] div[id] span.label ';' /\\\\bdisplay:\\ inline\\;/");
+                "abptestpages.org#$#hide-if-has-and-matches-style a[href=\"#comments-target-ad\"] div[id] span.label ';' /\\\\bdisplay:\\ inline\\;/");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-has-and-matches-style");
         mHelper.verifyDisplayedCount(1, "div#comments-target > div[data-expectedresult='pass']");
     }
@@ -356,7 +356,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfLabeledBy() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-labelled-by 'Label' '#hilb-target [aria-labelledby]' '#hilb-target'");
+                "abptestpages.org#$#hide-if-labelled-by 'Label' '#hilb-target [aria-labelledby]' '#hilb-target'");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-labelled-by");
         mHelper.verifyHiddenCount(1, "div[data-expectedresult='fail']");
         mHelper.verifyDisplayedCount(1, "div[data-expectedresult='pass']");
@@ -368,7 +368,7 @@ public class TestPagesSnippetsTest {
     public void testHideIfMatchesXPathBasicStaticUsage()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-matches-xpath //*[@id=\"isnfnv\"]");
+                "abptestpages.org#$#hide-if-matches-xpath //*[@id=\"isnfnv\"]");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-matches-xpath");
         mHelper.verifyHiddenCount(
                 1, "div#basic-static-usage-area > div[data-expectedresult='fail']");
@@ -381,7 +381,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfMatchesXPathClassUsage() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-matches-xpath //*[@class=\"to-be-hidden\"]");
+                "abptestpages.org#$#hide-if-matches-xpath //*[@class=\"to-be-hidden\"]");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-matches-xpath");
         mHelper.verifyHiddenCount(1, "div#class-usage-area > div[data-expectedresult='fail']");
         mHelper.verifyDisplayedCount(1, "div#class-usage-area > div[data-expectedresult='pass']");
@@ -392,7 +392,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfMatchesXPathIdStartsWith() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-matches-xpath //div[starts-with(@id,\"fail\")]");
+                "abptestpages.org#$#hide-if-matches-xpath //div[starts-with(@id,\"fail\")]");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-matches-xpath");
         mHelper.verifyHiddenCount(
                 1, "div#hide-if-id-starts-with-area > div[data-expectedresult='fail']");
@@ -405,7 +405,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfShadowContainsBasicUsage() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-shadow-contains 'hisc-basic' p");
+                "abptestpages.org#$#hide-if-shadow-contains 'hisc-basic' p");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-shadow-contains");
         mHelper.verifyHiddenCount(1, "div#basic-target > p[data-expectedresult='fail']");
     }
@@ -415,7 +415,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testHideIfShadowContainsRegexUsage() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#hide-if-shadow-contains '/hisc-regex[1-2]/' div");
+                "abptestpages.org#$#hide-if-shadow-contains '/hisc-regex[1-2]/' div");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "hide-if-shadow-contains");
         mHelper.verifyHiddenCount(2, "div#regex-target > div[data-expectedresult='fail']");
         mHelper.verifyDisplayedCount(1, "div#regex-target > div[data-expectedresult='pass']");
@@ -426,7 +426,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testJsonPrune() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#json-prune 'data-expectedresult jsonprune aria-label' ");
+                "abptestpages.org#$#json-prune 'data-expectedresult jsonprune aria-label' ");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "json-prune?delay=100");
         // The object does not get hidden, it no longer exists in the DOM.
         mHelper.verifyDisplayedCount(0, "div#testcase-area > div[data-expectedresult='fail']");
@@ -437,7 +437,7 @@ public class TestPagesSnippetsTest {
     @Feature({"adblock"})
     public void testOverridePropertyRead() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#override-property-read overridePropertyRead.fp false ");
+                "abptestpages.org#$#override-property-read overridePropertyRead.fp false ");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "override-property-read");
         mHelper.verifyHiddenCount(1, "div#basic-target > div[data-expectedresult='fail']");
     }
@@ -448,7 +448,7 @@ public class TestPagesSnippetsTest {
     public void testStripFetchQueryParameterBasicUsage()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#strip-fetch-query-parameter basicBlocked testpages.adblockplus.org");
+                "abptestpages.org#$#strip-fetch-query-parameter basicBlocked abptestpages.org");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "strip-fetch-query-parameter");
         mHelper.verifyDisplayedCount(0, "div#basic-target > div[data-expectedresult='fail']");
         mHelper.verifyDisplayedCount(1, "div#basic-target > div[data-expectedresult='pass']");
@@ -460,7 +460,7 @@ public class TestPagesSnippetsTest {
     public void testStripFetchQueryParameterOtherUsage()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#$#strip-fetch-query-parameter otherAllowed2 other-domain");
+                "abptestpages.org#$#strip-fetch-query-parameter otherAllowed2 other-domain");
         mHelper.loadUrl(SNIPPETS_COMMON_UNIT_TESTCASES_ROOT + "strip-fetch-query-parameter");
         mHelper.verifyDisplayedCount(2, "div#other-target > div[data-expectedresult='pass']");
     }

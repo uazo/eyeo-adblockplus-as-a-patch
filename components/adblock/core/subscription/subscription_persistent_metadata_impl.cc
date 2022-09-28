@@ -142,10 +142,9 @@ void SubscriptionPersistentMetadataImpl::UpdatePrefs() {
 }
 
 void SubscriptionPersistentMetadataImpl::LoadFromPrefs() {
-  const base::Value* dict = prefs_->Get(prefs::kSubscriptionMetadata);
-  DCHECK(dict);
-  DCHECK(dict->is_dict());
-  for (const auto dict_item : dict->DictItems()) {
+  const base::Value& dict = prefs_->GetValue(prefs::kSubscriptionMetadata);
+  DCHECK(dict.is_dict());
+  for (const auto dict_item : dict.DictItems()) {
     Metadata subscription;
     subscription.expiration_time =
         ValueToTime(dict_item.second.FindKey(kExpirationTimeKey))

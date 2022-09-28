@@ -65,7 +65,7 @@ SubscriptionValidatorImpl::SubscriptionValidatorImpl(
       main_thread_task_runner_(std::move(main_thread_task_runner)) {
   ClearSignaturesIfSchemaVersionChanged(pref_service_, current_schema_version);
   initial_subscription_signatures_ =
-      pref_service_->Get(prefs::kSubscriptionSignatures)->Clone();
+      pref_service_->GetDict(prefs::kSubscriptionSignatures).Clone();
 }
 
 SubscriptionValidatorImpl::~SubscriptionValidatorImpl() = default;
@@ -73,7 +73,7 @@ SubscriptionValidatorImpl::~SubscriptionValidatorImpl() = default;
 bool SubscriptionValidatorImpl::IsSignatureValid(
     const FlatbufferData& data,
     const base::FilePath& path) const {
-  const auto* expected_hash = initial_subscription_signatures_.FindStringKey(
+  const auto* expected_hash = initial_subscription_signatures_.FindString(
       path.BaseName().AsUTF8Unsafe());
   if (!expected_hash) {
     DLOG(WARNING) << "[eyeo] " << path << " has no matching signature in prefs";

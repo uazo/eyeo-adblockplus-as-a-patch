@@ -92,19 +92,19 @@ void SubscriptionUpdaterImpl::RunUpdateCheck() {
   for (const auto& subscription : available_subscriptions) {
     if (subscription->GetInstallationState() !=
         Subscription::InstallationState::Installed) {
-      DLOG(INFO) << "[eyeo] Skipping update of " << subscription->GetSourceUrl()
-                 << ", it's currently being installed or updated";
+      DVLOG(1) << "[eyeo] Skipping update of " << subscription->GetSourceUrl()
+               << ", it's currently being installed or updated";
       continue;
     }
 
     if (persistent_metadata_->IsExpired(subscription->GetSourceUrl())) {
-      DLOG(INFO) << "[eyeo] Downloading update for subscription "
-                 << subscription->GetSourceUrl();
+      DVLOG(1) << "[eyeo] Downloading update for subscription "
+               << subscription->GetSourceUrl();
       subscription_service_->DownloadAndInstallSubscription(
           subscription->GetSourceUrl(), base::DoNothing());
     } else {
-      DLOG(INFO) << "[eyeo] Subscription " << subscription->GetSourceUrl()
-                 << " not expired yet, not updating";
+      DVLOG(1) << "[eyeo] Subscription " << subscription->GetSourceUrl()
+               << " not expired yet, not updating";
     }
   }
   SendPingIfNecessary(available_subscriptions);
