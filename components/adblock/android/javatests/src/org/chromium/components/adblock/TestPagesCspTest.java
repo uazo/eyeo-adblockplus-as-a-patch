@@ -61,7 +61,7 @@ public class TestPagesCspTest {
     @Feature({"adblock"})
     public void testCspAllSites() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter("*$csp=script-src 'none'");
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/filters/csp_all");
+        mHelper.loadUrl("https://abptestpages.org/en/filters/csp_all");
         mHelper.verifyDisplayedCount(0, "img[id='all-sites-fail-1']");
     }
 
@@ -70,8 +70,8 @@ public class TestPagesCspTest {
     @Feature({"adblock"})
     public void testCspSpecificSite() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "||testpages.adblockplus.org^$csp=script-src https://testpages.adblockplus.org/lib/utils.js");
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/filters/csp_specific");
+                "||abptestpages.org^$csp=script-src https://abptestpages.org/lib/utils.js");
+        mHelper.loadUrl("https://abptestpages.org/en/filters/csp_specific");
         mHelper.verifyDisplayedCount(0, "img[id='specific-site-fail-1']", IncludeSubframes.NO);
     }
 
@@ -79,8 +79,8 @@ public class TestPagesCspTest {
     @LargeTest
     @Feature({"adblock"})
     public void testCspSpecificSiteFrameSrc() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("||testpages.adblockplus.org^$csp=frame-src 'self'");
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/filters/csp_specific");
+        mHelper.addCustomFilter("||abptestpages.org^$csp=frame-src 'self'");
+        mHelper.loadUrl("https://abptestpages.org/en/filters/csp_specific");
         mHelper.verifyDisplayedCount(0, "div[id='sub-frame-error']", IncludeSubframes.NO);
         mHelper.verifyDisplayedCount(0, "div[id='sub-frame-error-details']", IncludeSubframes.NO);
     }
@@ -91,15 +91,15 @@ public class TestPagesCspTest {
     public void testCspException() throws TimeoutException, InterruptedException {
         // Blocking filter:
         mHelper.addCustomFilter(
-                "||testpages.adblockplus.org^$csp=script-src https://testpages.adblockplus.org/lib/utils.js");
+                "||abptestpages.org^$csp=script-src https://abptestpages.org/lib/utils.js");
         // Resource loaded by JS was blocked
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/exceptions/csp");
+        mHelper.loadUrl("https://abptestpages.org/en/exceptions/csp");
         mHelper.verifyDisplayedCount(0, "div[id='unblock-javascript'] > img");
 
         // Allowing filter:
-        mHelper.addCustomFilter("@@||testpages.adblockplus.org^$csp");
+        mHelper.addCustomFilter("@@||abptestpages.org^$csp");
         // Resource loaded by JS was allowed
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/exceptions/csp");
+        mHelper.loadUrl("https://abptestpages.org/en/exceptions/csp");
         mHelper.verifyDisplayedCount(1, "div[id='unblock-javascript'] > img");
     }
 
@@ -109,15 +109,15 @@ public class TestPagesCspTest {
     public void testCspGenericBlockException() throws TimeoutException, InterruptedException {
         // Blocking filter:
         mHelper.addCustomFilter(
-                "||testpages.adblockplus.org^$csp=script-src https://testpages.adblockplus.org/lib/utils.js");
+                "||abptestpages.org^$csp=script-src https://abptestpages.org/lib/utils.js");
         // Resource loaded by JS was blocked
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/exceptions/csp_genericblock");
+        mHelper.loadUrl("https://abptestpages.org/en/exceptions/csp_genericblock");
         mHelper.verifyDisplayedCount(0, "div[id='genericblock-javascript'] > img");
 
         // Allowing filter:
-        mHelper.addCustomFilter("@@||testpages.adblockplus.org^$genericblock");
+        mHelper.addCustomFilter("@@||abptestpages.org^$genericblock");
         // Resource loaded by JS was allowed
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/exceptions/csp_genericblock");
+        mHelper.loadUrl("https://abptestpages.org/en/exceptions/csp_genericblock");
         mHelper.verifyDisplayedCount(1, "div[id='genericblock-javascript'] > img");
     }
 }

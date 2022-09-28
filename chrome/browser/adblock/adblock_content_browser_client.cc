@@ -18,6 +18,7 @@
 #include "chrome/browser/adblock/adblock_content_browser_client.h"
 
 #include "base/containers/unique_ptr_adapters.h"
+#include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/adblock/adblock_mojo_interface_impl.h"
 #include "chrome/browser/adblock/resource_classification_runner_factory.h"
 #include "chrome/browser/adblock/subscription_service_factory.h"
@@ -25,6 +26,9 @@
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "components/adblock/content/browser/resource_classification_runner.h"
 #include "components/adblock/content/common/adblock_url_loader_factory.h"
+#ifndef NDEBUG
+#include "components/adblock/content/common/adblock_url_loader_factory_for_test.h"
+#endif
 #include "components/adblock/content/common/mojom/adblock.mojom.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/subscription/subscription_service.h"
@@ -42,14 +46,6 @@
 #include "third_party/blink/public/common/loader/url_loader_throttle.h"
 
 namespace {
-
-void CreateAdblockInterfaceForRenderer(
-    int32_t render_process_id,
-    mojo::PendingReceiver<adblock::mojom::AdblockInterface> receiver) {
-  mojo::MakeSelfOwnedReceiver(
-      std::make_unique<adblock::AdblockMojoInterfaceImpl>(render_process_id),
-      std::move(receiver));
-}
 
 bool IsAdblockEnabled(content::RenderFrameHost* frame) {
   if (frame) {
@@ -74,7 +70,8 @@ class AdblockContextData : public base::SupportsUserData::Data {
       content::RenderFrameHost* frame,
       int render_process_id,
       mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
-      mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory) {
+      mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
+      content::ContentBrowserClient::URLLoaderFactoryType type) {
     const void* const kAdblockContextUserDataKey = &kAdblockContextUserDataKey;
     auto* self = static_cast<AdblockContextData*>(
         profile->GetUserData(kAdblockContextUserDataKey));
@@ -82,6 +79,29 @@ class AdblockContextData : public base::SupportsUserData::Data {
       self = new AdblockContextData();
       profile->SetUserData(kAdblockContextUserDataKey, base::WrapUnique(self));
     }
+#ifndef NDEBUG
+    content::WebContents* wc = content::WebContents::FromRenderFrameHost(frame);
+    bool is_adblock_test_url =
+        (type ==
+         content::ContentBrowserClient::URLLoaderFactoryType::kNavigation) &&
+        wc->GetVisibleURL().is_valid() &&
+        wc->GetVisibleURL().host() ==
+            adblock::AdblockURLLoaderFactoryForTest::kAdblockDebugDataHostName;
+    if (is_adblock_test_url) {
+      auto proxy = std::make_unique<adblock::AdblockURLLoaderFactoryForTest>(
+          std::make_unique<adblock::AdblockMojoInterfaceImpl>(
+              render_process_id),
+          frame->GetRoutingID(), std::move(receiver), std::move(target_factory),
+          embedder_support::GetUserAgent(),
+          base::BindOnce(&AdblockContextData::RemoveProxy,
+                         self->weak_factory_.GetWeakPtr()),
+          adblock::AdblockControllerFactory::GetForBrowserContext(
+              Profile::FromBrowserContext(
+                  frame->GetProcess()->GetBrowserContext())));
+      self->proxies_.emplace(std::move(proxy));
+      return;
+    }
+#endif
     auto proxy = std::make_unique<adblock::AdblockURLLoaderFactory>(
         std::make_unique<adblock::AdblockMojoInterfaceImpl>(render_process_id),
         frame->GetRoutingID(), std::move(receiver), std::move(target_factory),
@@ -248,21 +268,6 @@ void AdblockContentBrowserClient::OnWebSocketFilterCheckCompleted(
   LOG(INFO) << "[eyeo] Web socket blocked for " << url;
 }
 
-void AdblockContentBrowserClient::ExposeInterfacesToRenderer(
-    service_manager::BinderRegistry* registry,
-    blink::AssociatedInterfaceRegistry* associated_registry,
-    content::RenderProcessHost* render_process_host) {
-  ChromeContentBrowserClient::ExposeInterfacesToRenderer(
-      registry, associated_registry, render_process_host);
-
-  scoped_refptr<base::SingleThreadTaskRunner> ui_task_runner =
-      content::GetUIThreadTaskRunner({});
-
-  registry->AddInterface(base::BindRepeating(&CreateAdblockInterfaceForRenderer,
-                                             render_process_host->GetID()),
-                         ui_task_runner);
-}
-
 bool AdblockContentBrowserClient::WillCreateURLLoaderFactory(
     content::BrowserContext* browser_context,
     content::RenderFrameHost* frame,
@@ -298,7 +303,7 @@ bool AdblockContentBrowserClient::WillCreateURLLoaderFactory(
     *factory_receiver = target_factory_remote.InitWithNewPipeAndPassReceiver();
     AdblockContextData::StartProxying(profile, frame, render_process_id,
                                       std::move(proxied_receiver),
-                                      std::move(target_factory_remote));
+                                      std::move(target_factory_remote), type);
   }
   return use_adblock_proxy || use_chrome_proxy;
 }

@@ -42,9 +42,9 @@ public class TestPagesElemhideEmuTest {
     private TestPagesTestsHelper mHelper = new TestPagesTestsHelper();
 
     public static final String ELEMENT_HIDING_EMULATION_TESTPAGES_URL =
-            "https://testpages.adblockplus.org/en/filters/element-hiding-emulation";
+            "https://abptestpages.org/en/filters/element-hiding-emulation";
     public static final String ELEMENT_HIDING_EMULATION_EXCEPTIONS_TESTPAGES_URL =
-            "https://testpages.adblockplus.org/en/exceptions/element-hiding";
+            "https://abptestpages.org/en/exceptions/element-hiding";
 
     @Before
     public void setUp() {
@@ -61,7 +61,7 @@ public class TestPagesElemhideEmuTest {
     @Feature({"adblock"})
     public void testElemHideEmuFiltersBasicAbpProperties()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#?#div:-abp-properties(width: 213px)");
+        mHelper.addCustomFilter("abptestpages.org#?#div:-abp-properties(width: 213px)");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='basic-abp-properties-usage-fail-1']");
     }
@@ -70,7 +70,7 @@ public class TestPagesElemhideEmuTest {
     @LargeTest
     @Feature({"adblock"})
     public void testElemHideEmuFiltersBasicAbpHas() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#?#div:-abp-has(>div>span.ehe-abp-has)");
+        mHelper.addCustomFilter("abptestpages.org#?#div:-abp-has(>div>span.ehe-abp-has)");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='basic-abp-has-usage-fail-1']");
     }
@@ -79,7 +79,7 @@ public class TestPagesElemhideEmuTest {
     @LargeTest
     @Feature({"adblock"})
     public void testElemHideEmuFiltersBasicHas() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#?#div:has(>div>span.ehe-has)");
+        mHelper.addCustomFilter("abptestpages.org#?#div:has(>div>span.ehe-has)");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         // "Basic :has() usage" are duplicated on testpage.
         mHelper.verifyHiddenCount(2, "div[id='basic-has-usage-fail-1']");
@@ -91,7 +91,7 @@ public class TestPagesElemhideEmuTest {
     public void testElemHideEmuFiltersBasicAbpContains()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#?#span:-abp-contains(ehe-contains-target)");
+                "abptestpages.org#?#span:-abp-contains(ehe-contains-target)");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "span[id='basic-abp-contains-usage-fail-1']");
     }
@@ -101,7 +101,7 @@ public class TestPagesElemhideEmuTest {
     @Feature({"adblock"})
     public void testElemHideEmuFiltersBasicXpath() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#?#span:xpath(//*[@id=\"basic-xpath-usage-fail\"])");
+                "abptestpages.org#?#span:xpath(//*[@id=\"basic-xpath-usage-fail\"])");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "span[id='basic-xpath-usage-fail']");
     }
@@ -110,7 +110,7 @@ public class TestPagesElemhideEmuTest {
     @LargeTest
     @Feature({"adblock"})
     public void testElemHideEmuFiltersBasicHasText() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#?#span:has-text(ehe-has-text)");
+        mHelper.addCustomFilter("abptestpages.org#?#span:has-text(ehe-has-text)");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "span[id='basic-has-text-usage-fail-1']");
     }
@@ -121,7 +121,7 @@ public class TestPagesElemhideEmuTest {
     public void testElemHideEmuFiltersChainedExtendedSelectors()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#?#div:-abp-has(> div:-abp-properties(width: 214px))");
+                "abptestpages.org#?#div:-abp-has(> div:-abp-properties(width: 214px))");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='chained-extended-selectors-fail-1']");
     }
@@ -131,7 +131,7 @@ public class TestPagesElemhideEmuTest {
     @Feature({"adblock"})
     public void testElemHideEmuFiltersCaseInsensitiveExtendedSelectors()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#?#div:-abp-properties(WiDtH: 215px)");
+        mHelper.addCustomFilter("abptestpages.org#?#div:-abp-properties(WiDtH: 215px)");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='case-insensitive-extended-selectors-fail-1']");
     }
@@ -141,7 +141,7 @@ public class TestPagesElemhideEmuTest {
     @Feature({"adblock"})
     public void testElemHideEmuFiltersWildcardInExtendedSelector()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org#?#div:-abp-properties(cursor:*)");
+        mHelper.addCustomFilter("abptestpages.org#?#div:-abp-properties(cursor:*)");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='wildcard-in-extended-selector-fail-1']");
     }
@@ -152,7 +152,7 @@ public class TestPagesElemhideEmuTest {
     public void testElemHideEmuFiltersRegularExpressionInAbpProperties()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#?#div:-abp-properties(/width: 12[1-5]px;/)");
+                "abptestpages.org#?#div:-abp-properties(/width: 12[1-5]px;/)");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='regular-expression-in-abp-properties-fail-1']");
         mHelper.verifyHiddenCount(1, "div[id='regular-expression-in-abp-properties-fail-2']");
@@ -166,7 +166,7 @@ public class TestPagesElemhideEmuTest {
     public void testElemHideEmuFiltersRegularExpressionInAbpContains()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org#?#div > div:-abp-contains(/ehe-containsregex\\d/)");
+                "abptestpages.org#?#div > div:-abp-contains(/ehe-containsregex\\d/)");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='regular-expression-in-abp-contains-fail-1']");
         mHelper.verifyHiddenCount(1, "div[id='regular-expression-in-abp-contains-fail-2']");
@@ -178,12 +178,12 @@ public class TestPagesElemhideEmuTest {
     @Feature({"adblock"})
     public void testElemHideEmuFiltersException() throws TimeoutException, InterruptedException {
         // Add a blocking filter, verify element hidden.
-        mHelper.addCustomFilter("testpages.adblockplus.org##.testcase-ehe");
+        mHelper.addCustomFilter("abptestpages.org##.testcase-ehe");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_EXCEPTIONS_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='exception-usage-pass-1']");
 
         // Add exception filter, verify element no longer hidden.
-        mHelper.addCustomFilter("testpages.adblockplus.org#@#.testcase-ehe");
+        mHelper.addCustomFilter("abptestpages.org#@#.testcase-ehe");
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_EXCEPTIONS_TESTPAGES_URL);
         mHelper.verifyDisplayedCount(1, "div[id='exception-usage-pass-1']");
     }

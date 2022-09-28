@@ -83,7 +83,7 @@ class SubscriptionServiceImpl final : public SubscriptionService {
       scoped_refptr<InstalledSubscription> subscription);
   void OnHeadRequestDone(InstallationCallback on_finished,
                          const std::string version);
-  void UninstallSubscriptionInternal(const GURL& subscription_url);
+  bool UninstallSubscriptionInternal(const GURL& subscription_url);
   void UpdatePreloadedSubscriptionProvider();
   void UpdatePreloadedSubscriptionProviderAndRun(
       InstallationCallback on_finished,

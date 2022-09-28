@@ -61,12 +61,12 @@ public class TestPagesHeaderFilterTest {
     @Feature({"adblock"})
     public void testHeaderFilterScript() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "||testpages.adblockplus.org/testfiles/header/$header=content-type=application/javascript");
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/filters/header");
+                "||abptestpages.org/testfiles/header/$header=content-type=application/javascript");
+        mHelper.loadUrl("https://abptestpages.org/en/filters/header");
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_SCRIPT));
         Assert.assertTrue(
-                mHelper.isBlocked("https://testpages.adblockplus.org/testfiles/header/script.js"));
+                mHelper.isBlocked("https://abptestpages.org/testfiles/header/script.js"));
         mHelper.verifyDisplayedCount(
                 0, "div#functionproperty-target > div[data-expectedresult='fail']");
     }
@@ -76,12 +76,12 @@ public class TestPagesHeaderFilterTest {
     @Feature({"adblock"})
     public void testHeaderFilterImage() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "||testpages.adblockplus.org/testfiles/header/$header=content-type=image/png");
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/filters/header");
+                "||abptestpages.org/testfiles/header/$header=content-type=image/png");
+        mHelper.loadUrl("https://abptestpages.org/en/filters/header");
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_IMAGE));
         Assert.assertTrue(
-                mHelper.isBlocked("https://testpages.adblockplus.org/testfiles/header/image.png"));
+                mHelper.isBlocked("https://abptestpages.org/testfiles/header/image.png"));
         mHelper.verifyDisplayedCount(0, "img[id='image-fail-1']");
     }
 
@@ -90,13 +90,13 @@ public class TestPagesHeaderFilterTest {
     @Feature({"adblock"})
     public void testHeaderFilterStylesheet() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "||testpages.adblockplus.org/testfiles/header/$header=content-type=text/css");
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/filters/header");
+                "||abptestpages.org/testfiles/header/$header=content-type=text/css");
+        mHelper.loadUrl("https://abptestpages.org/en/filters/header");
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertEquals(
                 1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_STYLESHEET));
         Assert.assertTrue(mHelper.isBlocked(
-                "https://testpages.adblockplus.org/testfiles/header/stylesheet.css"));
+                "https://abptestpages.org/testfiles/header/stylesheet.css"));
     }
 
     @Test
@@ -106,21 +106,21 @@ public class TestPagesHeaderFilterTest {
         // TODO: uncomment this part of test after DPD-1257.
         // Add blocking filter, expect blocked image
         // mHelper.addCustomFilter(
-        //         "||testpages.adblockplus.org/testfiles/header_exception/$header=content-type=image/png");
-        // mHelper.loadUrl("https://testpages.adblockplus.org/en/exceptions/header");
+        //         "||abptestpages.org/testfiles/header_exception/$header=content-type=image/png");
+        // mHelper.loadUrl("https://abptestpages.org/en/exceptions/header");
         // Assert.assertEquals(1, mHelper.numBlocked());
         // Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_IMAGE));
         // mHelper.verifyDisplayedCount(0, "img[id='image-header-exception-pass-1']");
 
         // Add exception filter, expect image allowed
         mHelper.addCustomFilter(
-                "||testpages.adblockplus.org/testfiles/header_exception/$header=content-type=image/png");
-        mHelper.addCustomFilter("@@testpages.adblockplus.org/testfiles/header_exception/$header");
-        mHelper.loadUrl("https://testpages.adblockplus.org/en/exceptions/header");
+                "||abptestpages.org/testfiles/header_exception/$header=content-type=image/png");
+        mHelper.addCustomFilter("@@abptestpages.org/testfiles/header_exception/$header");
+        mHelper.loadUrl("https://abptestpages.org/en/exceptions/header");
         Assert.assertEquals(1, mHelper.numAllowed());
         Assert.assertEquals(1, mHelper.numAllowedByType(AdblockContentType.CONTENT_TYPE_IMAGE));
         Assert.assertTrue(mHelper.isAllowed(
-                "https://testpages.adblockplus.org/testfiles/header_exception/image.png"));
+                "https://abptestpages.org/testfiles/header_exception/image.png"));
         mHelper.verifyDisplayedCount(1, "img[id='image-header-exception-pass-1']");
     }
 }

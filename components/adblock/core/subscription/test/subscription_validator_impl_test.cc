@@ -132,9 +132,10 @@ TEST_F(AdblockSubscriptionValidatorImplTest, SignatureStoredViaKey) {
   // indicates a deeper level of dict
   // "Key" interprets dict["x.fb"]="hash" as {"x.fb":"hash"} - the dot is part
   // of the key name
-  const base::Value* pref = pref_service_.Get(prefs::kSubscriptionSignatures);
-  ASSERT_TRUE(pref->FindStringKey("x.fb"));
-  EXPECT_EQ(*pref->FindStringKey("x.fb"),
+  const base::Value::Dict& pref =
+      pref_service_.GetDict(prefs::kSubscriptionSignatures);
+  ASSERT_TRUE(pref.FindString("x.fb"));
+  EXPECT_EQ(*pref.FindString("x.fb"),
             base::Base64Encode(crypto::SHA256Hash(
                 base::make_span(buffer->data(), buffer->size()))));
 }

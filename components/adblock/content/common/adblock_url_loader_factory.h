@@ -26,7 +26,7 @@
 
 namespace adblock {
 
-class AdblockURLLoaderFactory final : public network::mojom::URLLoaderFactory {
+class AdblockURLLoaderFactory : public network::mojom::URLLoaderFactory {
  public:
   using DisconnectCallback = base::OnceCallback<void(AdblockURLLoaderFactory*)>;
 
@@ -37,7 +37,7 @@ class AdblockURLLoaderFactory final : public network::mojom::URLLoaderFactory {
       mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
       std::string user_agent_string,
       DisconnectCallback on_disconnect);
-  ~AdblockURLLoaderFactory() final;
+  ~AdblockURLLoaderFactory() override;
 
   void CreateLoaderAndStart(
       ::mojo::PendingReceiver<::network::mojom::URLLoader> loader,
@@ -46,8 +46,8 @@ class AdblockURLLoaderFactory final : public network::mojom::URLLoaderFactory {
       const ::network::ResourceRequest& request,
       ::mojo::PendingRemote<::network::mojom::URLLoaderClient> client,
       const ::net::MutableNetworkTrafficAnnotationTag& traffic_annotation)
-      final;
-  void Clone(::mojo::PendingReceiver<URLLoaderFactory> factory) final;
+      override;
+  void Clone(::mojo::PendingReceiver<URLLoaderFactory> factory) override;
 
  private:
   class InProgressRequest;

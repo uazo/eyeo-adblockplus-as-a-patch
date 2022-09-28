@@ -43,7 +43,7 @@ import java.util.concurrent.TimeoutException;
 public class TestPagesTestsHelper {
     public static final String MAIN_DISTRIBUTION_UNIT_TEST_PAGE =
             "https://dp-testpages.adblockplus.org/";
-    public static final String MAIN_COMMON_TEST_PAGE = "https://testpages.adblockplus.org/";
+    public static final String MAIN_COMMON_TEST_PAGE = "https://abptestpages.org/";
     public static final String DISTRIBUTION_UNIT_TESTCASES_ROOT =
             MAIN_DISTRIBUTION_UNIT_TEST_PAGE + "en/";
     public static final String COMMON_UNIT_TESTCASES_ROOT = MAIN_COMMON_TEST_PAGE + "en/";
@@ -62,7 +62,7 @@ public class TestPagesTestsHelper {
     public static final String DISTRIBUTION_UNIT_WEBSOCKET_TESTPAGE_SUBSCRIPTION =
             DISTRIBUTION_UNIT_TESTCASES_ROOT + "websocket-webrtc-subscription.txt";
     public static final String TESTPAGE_SUBSCRIPTION =
-            "https://testpages.adblockplus.org/en/abp-testcase-subscription.txt";
+            "https://abptestpages.org/en/abp-testcase-subscription.txt";
 
     public enum IncludeSubframes {
         YES,

@@ -42,9 +42,9 @@ public class TestPagesElemhideTest {
     private TestPagesTestsHelper mHelper = new TestPagesTestsHelper();
 
     public static final String ELEMENT_HIDING_TESTPAGES_URL =
-            "https://testpages.adblockplus.org/en/filters/element-hiding";
+            "https://abptestpages.org/en/filters/element-hiding";
     public static final String ELEMENT_HIDING_EXCEPTIONS_TESTPAGES_URL =
-            "https://testpages.adblockplus.org/en/exceptions/elemhide";
+            "https://abptestpages.org/en/exceptions/elemhide";
 
     @Before
     public void setUp() {
@@ -60,7 +60,7 @@ public class TestPagesElemhideTest {
     @LargeTest
     @Feature({"adblock"})
     public void testElemHideFiltersIdSelector() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org###eh-id");
+        mHelper.addCustomFilter("abptestpages.org###eh-id");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='eh-id']");
     }
@@ -70,7 +70,7 @@ public class TestPagesElemhideTest {
     @Feature({"adblock"})
     public void testElemHideFiltersIdSelectorDoubleCurlyBraces()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##div[id='{{eh-id}}']");
+        mHelper.addCustomFilter("abptestpages.org##div[id='{{eh-id}}']");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='{{eh-id}}']");
     }
@@ -79,7 +79,7 @@ public class TestPagesElemhideTest {
     @LargeTest
     @Feature({"adblock"})
     public void testElemHideFiltersClassSelector() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##.eh-class");
+        mHelper.addCustomFilter("abptestpages.org##.eh-class");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[class='eh-class']");
     }
@@ -89,7 +89,7 @@ public class TestPagesElemhideTest {
     @Feature({"adblock"})
     public void testElemHideFiltersDescendantSelector()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##.testcase-area > .eh-descendant");
+        mHelper.addCustomFilter("abptestpages.org##.testcase-area > .eh-descendant");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[class='eh-descendant']");
     }
@@ -99,7 +99,7 @@ public class TestPagesElemhideTest {
     @Feature({"adblock"})
     public void testElemHideFiltersSiblingSelector() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org##.testcase-examplecontent + .eh-sibling");
+                "abptestpages.org##.testcase-examplecontent + .eh-sibling");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[class='eh-sibling']");
     }
@@ -109,7 +109,7 @@ public class TestPagesElemhideTest {
     @Feature({"adblock"})
     public void testElemHideFiltersAttributeSelector1()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##div[height=\"100\"][width=\"100\"]");
+        mHelper.addCustomFilter("abptestpages.org##div[height=\"100\"][width=\"100\"]");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='attribute-selector-1-fail-1']");
     }
@@ -120,7 +120,7 @@ public class TestPagesElemhideTest {
     public void testElemHideFiltersAttributeSelector2()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org##div[href=\"http://testcase-attribute.com/\"]");
+                "abptestpages.org##div[href=\"http://testcase-attribute.com/\"]");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='attribute-selector-2-fail-1']");
     }
@@ -130,7 +130,7 @@ public class TestPagesElemhideTest {
     @Feature({"adblock"})
     public void testElemHideFiltersAttributeSelector3()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##div[style=\"width: 200px;\"]");
+        mHelper.addCustomFilter("abptestpages.org##div[style=\"width: 200px;\"]");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='attribute-selector-3-fail-1']");
     }
@@ -141,7 +141,7 @@ public class TestPagesElemhideTest {
     public void testElemHideFiltersStartsWithSelector1()
             throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "testpages.adblockplus.org##div[href^=\"http://testcase-startswith.com/\"]");
+                "abptestpages.org##div[href^=\"http://testcase-startswith.com/\"]");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='starts-with-selector-1-fail-1']");
     }
@@ -151,7 +151,7 @@ public class TestPagesElemhideTest {
     @Feature({"adblock"})
     public void testElemHideFiltersStartsWithSelector2()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##div[style^=\"width: 201px;\"]");
+        mHelper.addCustomFilter("abptestpages.org##div[style^=\"width: 201px;\"]");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='starts-with-selector-2-fail-1']");
     }
@@ -161,7 +161,7 @@ public class TestPagesElemhideTest {
     @Feature({"adblock"})
     public void testElemHideFiltersEndsWithSelector1()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##div[style$=\"width: 202px;\"]");
+        mHelper.addCustomFilter("abptestpages.org##div[style$=\"width: 202px;\"]");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='ends-with-selector-1-fail-1']");
     }
@@ -170,7 +170,7 @@ public class TestPagesElemhideTest {
     @LargeTest
     @Feature({"adblock"})
     public void testElemHideFiltersContains() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##div[style*=\"width: 203px;\"]");
+        mHelper.addCustomFilter("abptestpages.org##div[style*=\"width: 203px;\"]");
         mHelper.loadUrl(ELEMENT_HIDING_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "div[id='contains-fail-1']");
     }
@@ -180,14 +180,14 @@ public class TestPagesElemhideTest {
     @LargeTest
     @Feature({"adblock"})
     public void testElemHideFiltersBasicException() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##.ex-elemhide");
-        mHelper.addCustomFilter("||testpages.adblockplus.org/testfiles/elemhide/basic/*");
+        mHelper.addCustomFilter("abptestpages.org##.ex-elemhide");
+        mHelper.addCustomFilter("||abptestpages.org/testfiles/elemhide/basic/*");
         mHelper.loadUrl(ELEMENT_HIDING_EXCEPTIONS_TESTPAGES_URL);
         // No exceptions added yet, both objects should be blocked.
         mHelper.verifyHiddenCount(1, "img[id='basic-usage-fail-1']");
         mHelper.verifyHiddenCount(1, "div[id='basic-usage-pass-1']");
         // Add exception filter and reload.
-        mHelper.addCustomFilter("@@testpages.adblockplus.org/en/exceptions/elemhide$elemhide");
+        mHelper.addCustomFilter("@@abptestpages.org/en/exceptions/elemhide$elemhide");
         mHelper.loadUrl(ELEMENT_HIDING_EXCEPTIONS_TESTPAGES_URL);
         // Image should remain blocked, div should be unblocked.
         mHelper.verifyHiddenCount(1, "img[id='basic-usage-fail-1']");
@@ -199,14 +199,14 @@ public class TestPagesElemhideTest {
     @LargeTest
     @Feature({"adblock"})
     public void testElemHideFiltersIframeException() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##.targ-elemhide");
-        mHelper.addCustomFilter("||testpages.adblockplus.org/testfiles/elemhide/iframe/*.png");
+        mHelper.addCustomFilter("abptestpages.org##.targ-elemhide");
+        mHelper.addCustomFilter("||abptestpages.org/testfiles/elemhide/iframe/*.png");
         mHelper.loadUrl(ELEMENT_HIDING_EXCEPTIONS_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "img[id='iframe-fail-1']");
         mHelper.verifyHiddenCount(1, "div[id='iframe-pass-1']");
 
         // Add exception filter and reload.
-        mHelper.addCustomFilter("@@testpages.adblockplus.org/en/exceptions/elemhide$elemhide");
+        mHelper.addCustomFilter("@@abptestpages.org/en/exceptions/elemhide$elemhide");
         mHelper.loadUrl(ELEMENT_HIDING_EXCEPTIONS_TESTPAGES_URL);
         mHelper.verifyHiddenCount(1, "img[id='iframe-fail-1']");
         mHelper.verifyDisplayedCount(1, "div[id='iframe-pass-1']");

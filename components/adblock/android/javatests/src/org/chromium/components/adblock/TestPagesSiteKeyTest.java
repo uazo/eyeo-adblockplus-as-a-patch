@@ -59,20 +59,20 @@ public class TestPagesSiteKeyTest {
     @LargeTest
     @Feature({"adblock"})
     public void testVerifySitekeyException() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("testpages.adblockplus.org##.testcase-sitekey-eh");
-        mHelper.addCustomFilter("||testpages.adblockplus.org/testfiles/sitekey/outofframe.png");
-        mHelper.addCustomFilter("||testpages.adblockplus.org/testfiles/sitekey/inframe.png");
+        mHelper.addCustomFilter("abptestpages.org##.testcase-sitekey-eh");
+        mHelper.addCustomFilter("||abptestpages.org/testfiles/sitekey/outofframe.png");
+        mHelper.addCustomFilter("||abptestpages.org/testfiles/sitekey/inframe.png");
         mHelper.addCustomFilter(
                 "@@$document,sitekey=MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBANGtTstne7e8MbmDHDiMFkGbcuBgXmiVesGOG3gtYeM1EkrzVhBjGUvKXYE4GLFwqty3v5MuWWbvItUWBTYoVVsCAwEAAQ");
         // DP testpages does not work.
-        final String TEST_URL = "https://testpages.adblockplus.org/exceptions/sitekey";
+        final String TEST_URL = "https://abptestpages.org/exceptions/sitekey";
         mHelper.loadUrl(TEST_URL);
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertTrue(mHelper.isBlocked(
-                "https://testpages.adblockplus.org/testfiles/sitekey/outofframe.png"));
+                "https://abptestpages.org/testfiles/sitekey/outofframe.png"));
         Assert.assertEquals(1, mHelper.numAllowed());
         Assert.assertTrue(mHelper.isAllowed(
-                "https://testpages.adblockplus.org/testfiles/sitekey/inframe.png"));
+                "https://abptestpages.org/testfiles/sitekey/inframe.png"));
         mHelper.verifyHiddenCount(1, "img");
         mHelper.verifyHiddenCount(1, "div");
     }

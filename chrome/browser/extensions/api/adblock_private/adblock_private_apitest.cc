@@ -23,6 +23,7 @@
 #include "chrome/common/extensions/api/tabs.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/adblock/core/adblock_controller.h"
+#include "components/adblock/core/common/adblock_constants.h"
 #include "content/public/test/browser_test.h"
 #include "extensions/browser/background_script_executor.h"
 #include "net/dns/mock_host_resolver.h"
@@ -73,11 +74,16 @@ class AdblockPrivateApiTest : public ExtensionApiTest {
   AdblockPrivateApiTest& operator=(const AdblockPrivateApiTest&) = delete;
 
  protected:
-  void SetUp() override {
-    ExtensionApiTest::SetUp();
+  void SetUpOnMainThread() override {
+    ExtensionApiTest::SetUpOnMainThread();
+
     // When any of that fails we need to update comment in adblock_private.idl
     ASSERT_EQ(api::tabs::TAB_ID_NONE, -1);
     ASSERT_EQ(SessionID::InvalidValue().id(), -1);
+
+    adblock::AdblockControllerFactory::GetForBrowserContext(
+        browser()->profile())
+        ->RemoveCustomFilter(adblock::kAllowlistEverythingFilter);
   }
 
   bool RunTest(const std::string& subtest) {
@@ -254,13 +260,15 @@ class AdblockPrivateApiBackgroundPageTest : public ExtensionApiTest {
     // Map example.com to localhost.
     host_resolver()->AddRule("example.com", "127.0.0.1");
     ASSERT_TRUE(StartEmbeddedTestServer());
+    adblock::AdblockControllerFactory::GetForBrowserContext(
+        browser()->profile())
+        ->RemoveCustomFilter(adblock::kAllowlistEverythingFilter);
   }
 
-  void ExecuteJavascript(const std::string& js_code) const {
+  void ExecuteScript(const std::string& js_code) const {
     content::WebContents* web_contents =
         browser()->tab_strip_model()->GetActiveWebContents();
-    ASSERT_TRUE(
-        content::ExecuteScript(web_contents->GetPrimaryMainFrame(), js_code));
+    ASSERT_TRUE(content::ExecJs(web_contents->GetPrimaryMainFrame(), js_code));
   }
 };
 
@@ -387,12 +395,12 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTest, PopupEvents) {
                                                  kReadCountersScript));
 
   ExecuteScriptInBackgroundPage(extension->id(), kBlockPopupScript);
-  ExecuteJavascript("window.open('some-popup.html');");
+  ExecuteScript("window.open('some-popup.html');");
   ASSERT_EQ("1-0", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
 
   ExecuteScriptInBackgroundPage(extension->id(), kAllowPopupScript);
-  ExecuteJavascript("window.open('some-popup.html');");
+  ExecuteScript("window.open('some-popup.html');");
   ASSERT_EQ("1-1", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
 }
@@ -446,13 +454,13 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTest, PopupStats) {
       ExecuteScriptInBackgroundPage(extension->id(), kReadBlockedStatsScript));
 
   ExecuteScriptInBackgroundPage(extension->id(), kBlockPopupScript);
-  ExecuteJavascript("window.open('some-popup.html');");
+  ExecuteScript("window.open('some-popup.html');");
   ASSERT_EQ(initial_blocked_value + 1,
             std::stoi(ExecuteScriptInBackgroundPage(extension->id(),
                                                     kReadBlockedStatsScript)));
 
   ExecuteScriptInBackgroundPage(extension->id(), kAllowPopupScript);
-  ExecuteJavascript("window.open('some-popup.html');");
+  ExecuteScript("window.open('some-popup.html');");
   ASSERT_EQ(initial_allowed_value + 1,
             std::stoi(ExecuteScriptInBackgroundPage(extension->id(),
                                                     kReadAllowedStatsScript)));

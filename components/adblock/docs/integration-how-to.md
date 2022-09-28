@@ -208,7 +208,7 @@ The bundled filter list will be replaced by a version of the filter list downloa
 
 ## How to test filters?
 
-Eyeo provides testing pages for eyeo Chromium SDK's ad-blocking features on https://testpages.adblockplus.org. You need to subscribe to the accompanying [test filter list](https://testpages.adblockplus.org/en/abp-testcase-subscription.txt) before loading them. To learn how to subscribe to a specific filter list, consult "How to add and remove subscription(s) to my filter lists" in this page.
+Eyeo provides testing pages for eyeo Chromium SDK's ad-blocking features on https://abptestpages.org. You need to subscribe to the accompanying [test filter list](https://abptestpages.org/en/abp-testcase-subscription.txt) before loading them. To learn how to subscribe to a specific filter list, consult "How to add and remove subscription(s) to my filter lists" in this page.
 
 
 ## How to find out what has changed between eyeo Chromium SDK releases?

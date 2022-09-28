@@ -14,8 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
-import 'chrome://resources/cr_elements/cr_button/cr_button.m.js';
-import 'chrome://resources/cr_elements/shared_style_css.m.js';
+import 'chrome://resources/cr_elements/cr_button/cr_button.js';
+import 'chrome://resources/cr_elements/cr_shared_style.css.js';
 import 'chrome://resources/polymer/v3_0/iron-collapse/iron-collapse.js';
 import 'chrome://resources/polymer/v3_0/iron-flex-layout/iron-flex-layout-classes.js';
 import 'chrome://resources/polymer/v3_0/iron-icon/iron-icon.js';
@@ -29,7 +29,7 @@ import { BaseMixin } from '../base_mixin.js';
 import { html, PolymerElement } from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 import { PrefsMixin } from '../prefs/prefs_mixin.js';
 import { CrSettingsPrefs } from '../prefs/prefs_types.js';
-import { CrCheckboxElement } from 'chrome://resources/cr_elements/cr_checkbox/cr_checkbox.m.js';
+import { CrCheckboxElement } from 'chrome://resources/cr_elements/cr_checkbox/cr_checkbox.js';
 import { getTemplate } from './adblock_page.html.js';
 
 const SettingsAdblockPageElementBase =

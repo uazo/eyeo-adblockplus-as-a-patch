@@ -180,7 +180,7 @@ void OngoingSubscriptionRequestImpl::StartInternal() {
     // indefinitely.
     return;
   }
-  DLOG(INFO) << "[eyeo] Downloading " << url_;
+  DVLOG(1) << "[eyeo] Downloading " << url_;
   auto request = std::make_unique<network::ResourceRequest>();
   request->url = url_;
   request->method = MethodToString();

@@ -30,7 +30,7 @@ struct HeaderFilterData {
   // required by std::set
   bool operator<(const HeaderFilterData& other) const {
     return (header_filter < other.header_filter);
-  };
+  }
 };
 
 }  // namespace adblock

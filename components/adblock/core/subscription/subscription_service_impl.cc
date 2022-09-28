@@ -196,7 +196,12 @@ void SubscriptionServiceImpl::PingAcceptableAds(PingCallback on_finished) {
 
 void SubscriptionServiceImpl::UninstallSubscription(
     const GURL& subscription_url) {
-  UninstallSubscriptionInternal(subscription_url);
+  DVLOG(1) << "[eyeo] Removing subscription " << subscription_url;
+  if (!UninstallSubscriptionInternal(subscription_url)) {
+    VLOG(1) << "[eyeo] Nothing to remove, subscription not installed "
+            << subscription_url;
+    return;
+  };
   if (subscription_url != AcceptableAdsUrl()) {
     // Remove metadata associated with the subscription. Retain (forever)
     // metadata of the Acceptable Ads subscription even when it's no longer
@@ -204,6 +209,7 @@ void SubscriptionServiceImpl::UninstallSubscription(
     persistent_metadata_->RemoveMetadata(subscription_url);
   }
   UpdatePreloadedSubscriptionProvider();
+  VLOG(1) << "[eyeo] Removed subscription " << subscription_url;
 }
 
 void SubscriptionServiceImpl::SetCustomFilters(
@@ -342,38 +348,46 @@ void SubscriptionServiceImpl::SubscriptionAddedToStorage(
     return;
   }
   // Remove any subscription that already exists with the same URL
-  UninstallSubscriptionInternal(subscription->GetSourceUrl());
+  bool subscription_existed =
+      UninstallSubscriptionInternal(subscription->GetSourceUrl());
   // Add the new subscription
   current_state_.push_back(subscription);
-  VLOG(1) << "[eyeo] Added subscription " << subscription->GetSourceUrl()
-          << ", current number of subscriptions: " << current_state_.size();
+  if (subscription_existed) {
+    VLOG(1) << "[eyeo] Updated subscription " << subscription->GetSourceUrl()
+            << ", current version " << subscription->GetCurrentVersion();
+  } else {
+    VLOG(1) << "[eyeo] Added subscription " << subscription->GetSourceUrl()
+            << ", current number of subscriptions: " << current_state_.size();
+  }
 
   std::move(on_finished).Run(true);
 }
 
-void SubscriptionServiceImpl::UninstallSubscriptionInternal(
+bool SubscriptionServiceImpl::UninstallSubscriptionInternal(
     const GURL& subscription_url) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(IsInitialized());
+  bool subscription_removed = false;
   auto it = base::ranges::find(current_state_, subscription_url,
                                &Subscription::GetSourceUrl);
   if (it != current_state_.end()) {
-    DLOG(INFO) << "[eyeo] Removing subscription " << subscription_url;
     storage_->RemoveSubscription(*it);
     current_state_.erase(it);
-    VLOG(1) << "[eyeo] Removed subscription " << subscription_url;
+    subscription_removed = true;
   }
 
   auto ongoing_installation_it = base::ranges::find(
       ongoing_installations_, subscription_url, &Subscription::GetSourceUrl);
   if (ongoing_installation_it != ongoing_installations_.end()) {
     ongoing_installations_.erase(ongoing_installation_it);
-    DLOG(INFO) << "[eyeo] Canceling installation of subscription "
-               << subscription_url;
+    DVLOG(1) << "[eyeo] Canceling installation of subscription "
+             << subscription_url;
     downloader_->CancelDownload(subscription_url);
-    VLOG(1) << "[eyeo] Canceled installation of subscription "
-            << subscription_url;
+    DVLOG(2) << "[eyeo] Canceled installation of subscription "
+             << subscription_url;
+    subscription_removed = true;
   }
+  return subscription_removed;
 }
 
 void SubscriptionServiceImpl::UpdatePreloadedSubscriptionProvider() {

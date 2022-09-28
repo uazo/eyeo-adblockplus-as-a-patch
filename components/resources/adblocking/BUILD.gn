@@ -58,3 +58,13 @@ group("make_all_preloaded_subscriptions") {
     ":make_exceptionrules",
   ]
 }
+
+copy("copy_snippets_lib") {
+  if (is_debug) {
+    sources = [ "//components/resources/adblocking/snippets/dist/isolated-first.source.jst" ]
+  } else {
+    sources =
+        [ "//components/resources/adblocking/snippets/dist/isolated-first.jst" ]
+  }
+  outputs = [ "${target_gen_dir}/snippets.js" ]
+}

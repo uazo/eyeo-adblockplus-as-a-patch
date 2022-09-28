@@ -21,8 +21,15 @@ source_set("common_impl") {
   ]
   sources = [
     "adblock_url_loader_factory.cc",
-    "adblock_url_loader_factory.h"
+    "adblock_url_loader_factory.h",
   ]
+
+  if (is_debug) {
+    sources += [
+      "adblock_url_loader_factory_for_test.cc",
+      "adblock_url_loader_factory_for_test.h",
+    ]
+  }
 
   deps = [
     "//components/adblock/core",

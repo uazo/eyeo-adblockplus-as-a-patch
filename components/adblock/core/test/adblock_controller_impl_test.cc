@@ -430,10 +430,6 @@ TEST_F(AdblockControllerImplTest,
   ExpectNoInstallation(installed_custom_subscription);
   ExpectNoInstallation(installed_built_in_subscription);
 
-  // |kRecommendedSubscription| will be installed.
-  ExpectInstallationTriggered(kRecommendedSubscription);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(kRecommendedSubscription));
-
   // |new_built_in_subscription| isn't available, so it will be installed.
   ExpectInstallationTriggered(new_built_in_subscription);
   EXPECT_CALL(observer, OnSubscriptionUpdated(new_built_in_subscription));
@@ -789,6 +785,9 @@ TEST_F(AdblockControllerImplTest, InstallAntiCvOnFirstRunIfMigrating) {
 
   ExpectInstallationTriggered(kMigratedSubscription);
   EXPECT_CALL(observer, OnSubscriptionUpdated(kMigratedSubscription));
+  // Additionally recommended subscription based on new locale will be installed
+  ExpectInstallationTriggered(kRecommendedSubscription);
+  EXPECT_CALL(observer, OnSubscriptionUpdated(kRecommendedSubscription));
   // Anti-CV filter list is installed as well, to enable snippets.
   ExpectInstallationTriggered(AntiCVUrl());
   EXPECT_CALL(observer, OnSubscriptionUpdated(AntiCVUrl()));
@@ -806,6 +805,7 @@ TEST_F(AdblockControllerImplTest, InstallAntiCvOnFirstRunIfMigrating) {
   // Controller has the recommended subscription installed.
   const std::vector<scoped_refptr<Subscription>> installed_subscriptions = {
       MakeMockSubscription(kMigratedSubscription),
+      MakeMockSubscription(kRecommendedSubscription),
       MakeMockSubscription(AntiCVUrl())};
   EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
       .WillRepeatedly(testing::Return(installed_subscriptions));

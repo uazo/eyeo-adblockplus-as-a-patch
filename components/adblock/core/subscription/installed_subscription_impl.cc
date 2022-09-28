@@ -154,9 +154,9 @@ absl::optional<base::StringPiece> InstalledSubscriptionImpl::FindRewriteFilter(
   DCHECK(category == FilterCategory::Allowing || filter->rewrite())
       << "Blocking rewrite filter must contain payload";
   if (filter->rewrite()) {
-    auto url = RewriteUrl(filter->rewrite()->replace_with());
-    DCHECK(!url.empty());
-    return url;
+    auto new_url = RewriteUrl(filter->rewrite()->replace_with());
+    DCHECK(!new_url.empty());
+    return new_url;
   }
   return absl::nullopt;
 }

@@ -327,17 +327,17 @@ SubscriptionCollectionImpl::GetElementHideEmulationSelectors(
 std::string SubscriptionCollectionImpl::GenerateSnippetsJson(
     const GURL& frame_url,
     const std::vector<GURL>& frame_hierarchy) const {
-  std::vector<base::Value> snippets;
+  base::Value::List snippets;
   auto document_domain = DocumentDomain(frame_url, frame_hierarchy);
 
   for (const auto& subscription : subscriptions_) {
     auto matched = subscription->MatchSnippets(document_domain);
     for (const auto& snippet : matched) {
-      std::vector<base::Value> call;
-      call.push_back(base::Value(snippet.command));
+      base::Value::List call;
+      call.Append(base::Value(snippet.command));
       for (const auto& arg : snippet.arguments)
-        call.push_back(base::Value(arg));
-      snippets.push_back(base::Value(std::move(call)));
+        call.Append(base::Value(arg));
+      snippets.Append(std::move(call));
     }
   }
 
@@ -346,7 +346,7 @@ std::string SubscriptionCollectionImpl::GenerateSnippetsJson(
 
   std::string serialized;
   JSONStringValueSerializer serializer(&serialized);
-  serializer.Serialize(base::Value(std::move(snippets)));
+  serializer.Serialize(std::move(snippets));
 
   return serialized;
 }

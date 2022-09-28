@@ -53,6 +53,7 @@ grit("components_resources") {
   deps = [
     ":about_credits",
     "//components/flags_ui/resources:build_ts",
+    "//components/security_interstitials/content/resources:build_ts",
   ]
 
   if (!is_ios) {
@@ -65,7 +66,10 @@ grit("components_resources") {
     ]
   }
 
-  deps += [ "//components/resources/adblocking:make_all_preloaded_subscriptions" ]
+  deps += [
+    "//components/resources/adblocking:copy_snippets_lib",
+    "//components/resources/adblocking:make_all_preloaded_subscriptions",
+  ]
 }
 
 grit("dev_ui_components_resources") {
