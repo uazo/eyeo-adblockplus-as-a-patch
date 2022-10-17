@@ -431,20 +431,13 @@ class Load_nytimes_Story2021(EyeoStorySet):
   NAME = 'load:media:_nytimes_:2021'
   URL = 'https://www.nytimes.com/'
   TAGS = [story_tags.YEAR_2021]
-  load_count = 0
 
   def _DidLoadDocument(self, action_runner):
-    if self.is_desktop or self.load_count %2 == 0:
-      # TODO(kzlomek): Find a proper fix or remove this comment under DPD-1276
-      # In case `cookie_button_selector` won't show we will increase counter
-      # before calling `WaitForElement` so in 2nd run it will not block-wait.
-      self.load_count += 1
+    if self.is_desktop:
       cookie_button_selector = 'button.css-aovwtd'
       action_runner.WaitForElement(selector=cookie_button_selector)
       action_runner.ScrollPageToElement(selector=cookie_button_selector)
       action_runner.ClickElement(selector=cookie_button_selector)
-    else:
-      self.load_count += 1
 
 
 class Load_speedtest_netStory2021(EyeoStorySet):
@@ -691,17 +684,12 @@ class Load_buzzfeed_Story2021(EyeoStorySet):
 
   def _DidLoadDocument(self, action_runner):
     if self.load_count %2 == 0:
-      # TODO(kzlomek): Find a proper fix or remove this comment under DPD-1276
-      # In case `cookie_button_selector` won't show we will increase counter
-      # before calling `WaitForElement` so in 2nd run it will not block-wait.
-      self.load_count += 1
       cookie_button_selector = ('button.css-2wu0d3' if self.is_desktop else
       'button.css-15dhgct')
       action_runner.WaitForElement(selector=cookie_button_selector)
       action_runner.ScrollPageToElement(selector=cookie_button_selector)
       action_runner.ClickElement(selector=cookie_button_selector)
-    else:
-      self.load_count += 1
+    self.load_count += 1
 
 
 class Load_money_cnn_Story2021(EyeoStorySet):
@@ -802,7 +790,6 @@ class EyeoExtendedPageSet(story.StorySet):
 
     self.AddStory(Load_195sports_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_britishcouncil_orgStory2021(self, take_memory_measurement, is_desktop))
-    self.AddStory(Load_buzzfeed_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_dw_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_eldiario_esStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_ellitoral_Story2021(self, take_memory_measurement, is_desktop))
@@ -852,6 +839,8 @@ class EyeoExtendedPageSet(story.StorySet):
       self.AddStory(Load_scotch_ioStory2021(self, take_memory_measurement, is_desktop))
       self.AddStory(Load_walmart_Story2021(self, take_memory_measurement, is_desktop))
       self.AddStory(Load_ria_ruStory2021(self, take_memory_measurement, is_desktop))
+    else:
+      self.AddStory(Load_buzzfeed_Story2021(self, take_memory_measurement, is_desktop))
 
 class EyeoAdHeavyPageSet(story.StorySet):
   def __init__(self, minified, is_desktop, take_memory_measurement = False):
@@ -882,13 +871,14 @@ class EyeoExtendedPageSetPt1(story.StorySet):
 
     self.AddStory(Load_195sports_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_britishcouncil_orgStory2021(self, take_memory_measurement, is_desktop))
-    self.AddStory(Load_buzzfeed_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_dw_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_eldiario_esStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_ellitoral_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_euronews_Story2021(self, take_memory_measurement, is_desktop))
     if not is_desktop:
       self.AddStory(Load_extreme_down_tvStory2021(self, take_memory_measurement, is_desktop))
+    else:
+      self.AddStory(Load_buzzfeed_Story2021(self, take_memory_measurement, is_desktop))
 
 class EyeoExtendedPageSetPt2(story.StorySet):
   def __init__(self, minified, is_desktop, take_memory_measurement = False):

@@ -1,4 +1,4 @@
-// Copyright 2017 The Chromium Authors. All rights reserved.
+// Copyright 2017 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -45,6 +45,7 @@ extern const char kChromeUIAppsWithDeprecationDialogURL[];
 extern const char kChromeUIAppsWithForceInstalledDeprecationDialogURL[];
 extern const char kChromeUIAutofillInternalsHost[];
 extern const char kChromeUIBluetoothInternalsHost[];
+extern const char kChromeUIBluetoothInternalsURL[];
 extern const char kChromeUIBookmarksHost[];
 extern const char kChromeUIBookmarksURL[];
 extern const char kChromeUIBrowsingTopicsInternalsHost[];
@@ -156,6 +157,7 @@ extern const char kChromeUIOsUrlAppURL[];
 #endif
 extern const char kChromeUIPasswordManagerInternalsHost[];
 extern const char kChromeUIPasswordManagerHost[];
+extern const char kChromeUIPerformanceSettingsURL[];
 extern const char kChromeUIPolicyHost[];
 extern const char kChromeUIPolicyURL[];
 extern const char kChromeUIPredictorsHost[];
@@ -515,6 +517,7 @@ extern const char kPasswordCheckSubPage[];
 extern const char kPasswordManagerSubPage[];
 extern const char kPaymentsSubPage[];
 extern const char kPeopleSubPage[];
+extern const char kPerformanceSubPage[];
 extern const char kPrintingSettingsSubPage[];
 extern const char kPrivacyGuideSubPage[];
 extern const char kPrivacySubPage[];

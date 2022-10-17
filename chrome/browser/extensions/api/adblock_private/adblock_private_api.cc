@@ -661,6 +661,21 @@ AdblockPrivateRemoveCustomFilterFunction::
     ~AdblockPrivateRemoveCustomFilterFunction() {}
 
 ExtensionFunction::ResponseAction
+AdblockPrivateGetCustomFiltersFunction::Run() {
+  auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
+      browser_context());
+  return RespondNow(
+      ArgumentList(api::adblock_private::GetCustomFilters::Results::Create(
+          controller->GetCustomFilters())));
+}
+
+AdblockPrivateGetCustomFiltersFunction::
+    AdblockPrivateGetCustomFiltersFunction() {}
+
+AdblockPrivateGetCustomFiltersFunction::
+    ~AdblockPrivateGetCustomFiltersFunction() {}
+
+ExtensionFunction::ResponseAction
 AdblockPrivateRemoveCustomFilterFunction::Run() {
   std::unique_ptr<api::adblock_private::RemoveCustomFilter::Params> params(
       api::adblock_private::RemoveCustomFilter::Params::Create(args()));

@@ -328,7 +328,8 @@ void MojoURLLoaderClient::OnReceiveEarlyHints(
 
 void MojoURLLoaderClient::OnReceiveResponse(
     network::mojom::URLResponseHeadPtr response_head,
-    mojo::ScopedDataPipeConsumerHandle body) {
+    mojo::ScopedDataPipeConsumerHandle body,
+    absl::optional<mojo_base::BigBuffer> cached_metadata) {
   TRACE_EVENT1("loading", "MojoURLLoaderClient::OnReceiveResponse", "url",
                last_loaded_url_.GetString().Utf8());
 
@@ -346,6 +347,23 @@ void MojoURLLoaderClient::OnReceiveResponse(
 
   if (!weak_this)
     return;
+
+  // Send the cached metadata, if any, before starting to load the body, so that
+  // resources using the cached data (e.g. script resources deserialising the
+  // code cache) immediately know whether the cache is available before starting
+  // to process the response body.
+  if (cached_metadata) {
+    if (NeedsStoringMessage()) {
+      StoreAndDispatch(std::make_unique<DeferredOnReceiveCachedMetadata>(
+          std::move(*cached_metadata)));
+    } else {
+      resource_request_sender_->OnReceivedCachedMetadata(
+          std::move(*cached_metadata));
+    }
+
+    if (!weak_this)
+      return;
+  }
 
   if (!body)
     return;
@@ -463,15 +481,6 @@ void MojoURLLoaderClient::OnUploadProgress(
     resource_request_sender_->OnUploadProgress(current_position, total_size);
   }
   std::move(ack_callback).Run();
-}
-
-void MojoURLLoaderClient::OnReceiveCachedMetadata(mojo_base::BigBuffer data) {
-  if (NeedsStoringMessage()) {
-    StoreAndDispatch(
-        std::make_unique<DeferredOnReceiveCachedMetadata>(std::move(data)));
-  } else {
-    resource_request_sender_->OnReceivedCachedMetadata(std::move(data));
-  }
 }
 
 void MojoURLLoaderClient::OnTransferSizeUpdated(int32_t transfer_size_diff) {

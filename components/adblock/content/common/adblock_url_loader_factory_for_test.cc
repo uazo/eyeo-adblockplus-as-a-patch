@@ -19,7 +19,7 @@
 
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
-#include "base/strings/utf_string_conversions.cc"
+#include "base/strings/utf_string_conversions.h"
 #include "net/http/http_status_code.h"
 #include "net/http/http_util.h"
 #include "services/network/public/cpp/resource_request.h"

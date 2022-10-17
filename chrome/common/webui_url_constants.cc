@@ -1,4 +1,4 @@
-// Copyright 2017 The Chromium Authors. All rights reserved.
+// Copyright 2017 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -43,6 +43,7 @@ const char kChromeUIAppsWithForceInstalledDeprecationDialogURL[] =
     "chrome://apps?showForceInstallDialog=";
 const char kChromeUIAutofillInternalsHost[] = "autofill-internals";
 const char kChromeUIBluetoothInternalsHost[] = "bluetooth-internals";
+const char kChromeUIBluetoothInternalsURL[] = "chrome://bluetooth-internals";
 const char kChromeUIBookmarksHost[] = "bookmarks";
 const char kChromeUIBookmarksURL[] = "chrome://bookmarks/";
 const char kChromeUIBrowsingTopicsInternalsHost[] = "topics-internals";
@@ -160,6 +161,7 @@ const char kChromeUIOsUrlAppURL[] = "chrome://internal/";
 const char kChromeUIPasswordManagerInternalsHost[] =
     "password-manager-internals";
 const char kChromeUIPasswordManagerHost[] = "password-manager";
+const char kChromeUIPerformanceSettingsURL[] = "chrome://settings/performance";
 const char kChromeUIPolicyHost[] = "policy";
 const char kChromeUIPolicyURL[] = "chrome://policy/";
 const char kChromeUIPredictorsHost[] = "predictors";
@@ -581,6 +583,7 @@ const char kOnStartupSubPage[] = "onStartup";
 const char kPasswordCheckSubPage[] = "passwords/check?start=true";
 const char kPasswordManagerSubPage[] = "passwords";
 const char kPaymentsSubPage[] = "payments";
+const char kPerformanceSubPage[] = "performance";
 const char kPrintingSettingsSubPage[] = "printing";
 const char kPrivacyGuideSubPage[] = "privacy/guide";
 const char kPrivacySubPage[] = "privacy";

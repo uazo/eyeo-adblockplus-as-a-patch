@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -22,17 +22,18 @@
 #include "content/public/test/browser_test.h"
 #include "third_party/blink/public/common/features.h"
 
-// Ash doesn't support System Profile.
-#if !BUILDFLAG(IS_CHROMEOS_ASH)
 namespace {
 
-// Constructs the Original System Profile for testing.
-Profile* GetSystemOriginalProfile() {
+// Creates a Profile and it's underlying OTR Profile for testing.
+// Waits for all tasks to be done to get as much services created as possible.
+// Returns the Original Profile.
+Profile* CreateProfileAndWaitForAllTaks(const base::FilePath& profile_path) {
   ProfileManager* profile_manager = g_browser_process->profile_manager();
   ProfileWaiter profile_waiter;
-  profile_manager->CreateProfileAsync(ProfileManager::GetSystemProfilePath(),
-                                      {});
+  profile_manager->CreateProfileAsync(profile_path, {});
   Profile* system_profile = profile_waiter.WaitForProfileAdded();
+  // Wait for Profile creation, and potentially other services that will be
+  // created after all tasks are done.
   content::RunAllTasksUntilIdle();
   return system_profile;
 }
@@ -196,13 +197,10 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
   };
   // clang-format on
 
-  Profile* system_profile = GetSystemOriginalProfile();
+  Profile* system_profile =
+      CreateProfileAndWaitForAllTaks(ProfileManager::GetSystemProfilePath());
   ASSERT_TRUE(system_profile->HasAnyOffTheRecordProfile());
-  std::vector<Profile*> otr_profiles =
-      system_profile->GetAllOffTheRecordProfiles();
-  ASSERT_EQ(otr_profiles.size(), 1u);
-
-  Profile* system_profile_otr = otr_profiles[0];
+  Profile* system_profile_otr = system_profile->GetPrimaryOTRProfile(false);
   ASSERT_TRUE(system_profile_otr->IsOffTheRecord());
   ASSERT_TRUE(system_profile_otr->IsSystemProfile());
   TestKeyedProfileServicesActives(system_profile_otr,
@@ -262,9 +260,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "BluetoothPrivateAPI",
     "BluetoothSocketEventDispatcher",
     "BookmarkManagerPrivateAPI",
-    "BookmarkModel",
     "BookmarkSyncServiceFactory",
-    "BookmarkUndoService",
     "BookmarksAPI",
     "BookmarksApiWatcher",
     "BrailleDisplayPrivateAPI",
@@ -327,7 +323,6 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "LiveCaptionController",
     "LoginUIServiceFactory",
     "MDnsAPI",
-    "ManagedBookmarkService",
     "ManagedConfigurationAPI",
     "ManagementAPI",
     "MediaRouter",
@@ -351,6 +346,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "PlatformNotificationService",
     "PluginManager",
     "PluginPrefs",
+    "PowerBookmarkService",
     "PrefMetricsService",
     "PrefWatcher",
     "PreferenceAPI",
@@ -446,14 +442,12 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
   };
   // clang-format on
 
-  Profile* system_profile = GetSystemOriginalProfile();
+  Profile* system_profile =
+      CreateProfileAndWaitForAllTaks(ProfileManager::GetSystemProfilePath());
   ASSERT_FALSE(system_profile->IsOffTheRecord());
   ASSERT_TRUE(system_profile->IsSystemProfile());
   TestKeyedProfileServicesActives(system_profile, system_active_services);
 }
-<<<<<<< HEAD
-#endif  // !BUILDFLAG(IS_CHROMEOS_ASH)
-=======
 
 IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
                        GuestProfileOTR_NeededServices) {
@@ -766,4 +760,3 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
   ASSERT_TRUE(guest_profile->IsGuestSession());
   TestKeyedProfileServicesActives(guest_profile, guest_active_services);
 }
->>>>>>> 54b2a67d3c457... Squashed commits

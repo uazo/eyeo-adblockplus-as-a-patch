@@ -73,7 +73,7 @@ class AdblockTelemetryService : public KeyedService {
   void AddTopicProvider(std::unique_ptr<TopicProvider> topic_provider);
 
   // Starts periodic Telemetry requests, provided ad-blocking is enabled.
-  // If prefs::kAdblockEnabled is false, the schedule will instead start when
+  // If prefs::kEnableAdblock is false, the schedule will instead start when
   // the pref becomes true.
   void Start();
 

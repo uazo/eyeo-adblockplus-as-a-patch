@@ -139,6 +139,8 @@ interface Functions {
   static void addCustomFilter(DOMString filter);
   // Removes a custom filter.
   static void removeCustomFilter(DOMString filter);
+  // Returns a list of custom filters a user set.
+  static void getCustomFilters(ListCallback callback);
   // Returns number of allowlisted requests in a current session (runtime).
   static void getSessionAllowedAdsCount(SessionStatsCallback callback);
   // Returns number of blocked requests in a current session (runtime).
