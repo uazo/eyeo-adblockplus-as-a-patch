@@ -80,7 +80,7 @@ class AdblockURLLoaderFactory::InProgressRequest
              mojo::PendingReceiver<network::mojom::URLLoader> target_loader,
              mojo::PendingRemote<network::mojom::URLLoaderClient> proxy_client,
              const absl::optional<GURL>& rewrite);
-  void OnFilterMatchResult(
+  void OnRequestFilterMatchResult(
       ::mojo::PendingReceiver<network::mojom::URLLoader> loader,
       int32_t request_id,
       uint32_t options,
@@ -88,6 +88,9 @@ class AdblockURLLoaderFactory::InProgressRequest
       ::mojo::PendingRemote<network::mojom::URLLoaderClient> client,
       const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
       adblock::mojom::FilterMatchResult result);
+  void OnRedirectFilterMatchResult(const net::RedirectInfo& redirect_info,
+                                   network::mojom::URLResponseHeadPtr head,
+                                   adblock::mojom::FilterMatchResult result);
   void OnProcessHeadersResult(
       ::network::mojom::URLResponseHeadPtr head,
       ::mojo::ScopedDataPipeConsumerHandle body,
@@ -97,6 +100,7 @@ class AdblockURLLoaderFactory::InProgressRequest
   void OnRequestError(int error_code);
 
   GURL request_url_;
+  int resource_type_;
   const std::string& user_agent_string_;
   const raw_ptr<AdblockURLLoaderFactory> factory_;
   // There are the mojo pipe endpoints between this proxy and the renderer.
@@ -123,6 +127,7 @@ AdblockURLLoaderFactory::InProgressRequest::InProgressRequest(
     mojo::PendingRemote<network::mojom::URLLoaderClient> client,
     const net::MutableNetworkTrafficAnnotationTag& traffic_annotation)
     : request_url_(request.url),
+      resource_type_(request.resource_type),
       user_agent_string_(user_agent_string),
       factory_(factory),
       target_client_(std::move(client)),
@@ -237,6 +242,27 @@ void AdblockURLLoaderFactory::InProgressRequest::OnReceiveRedirect(
     const net::RedirectInfo& redirect_info,
     network::mojom::URLResponseHeadPtr head) {
   request_url_ = redirect_info.new_url;
+  factory_->adblock_interface_->CheckFilterMatch(
+      request_url_, resource_type_, factory_->frame_tree_node_id_,
+      base::BindOnce(&InProgressRequest::OnRedirectFilterMatchResult,
+                     weak_factory_.GetWeakPtr(), redirect_info,
+                     std::move(head)));
+}
+
+void AdblockURLLoaderFactory::InProgressRequest::OnRedirectFilterMatchResult(
+    const net::RedirectInfo& redirect_info,
+    network::mojom::URLResponseHeadPtr head,
+    adblock::mojom::FilterMatchResult result) {
+  if (!factory_->target_factory_.is_bound()) {
+    DLOG(WARNING) << "[eyeo] "
+                     "AdblockURLLoaderFactory::InProgressRequest::"
+                     "OnRedirectFilterMatchResult: target_factory_ not bound";
+    return;
+  }
+  if (result == adblock::mojom::FilterMatchResult::kBlockRule) {
+    OnRequestError(net::ERR_BLOCKED_BY_ADMINISTRATOR);
+    return;
+  }
   target_client_->OnReceiveRedirect(redirect_info, std::move(head));
 }
 
@@ -329,13 +355,13 @@ void AdblockURLLoaderFactory::InProgressRequest::Start(
 
   factory_->adblock_interface_->CheckFilterMatch(
       request.url, request.resource_type, factory_->frame_tree_node_id_,
-      base::BindOnce(&InProgressRequest::OnFilterMatchResult,
+      base::BindOnce(&InProgressRequest::OnRequestFilterMatchResult,
                      weak_factory_.GetWeakPtr(), std::move(target_loader),
                      request_id, options, request, std::move(proxy_client),
                      traffic_annotation));
 }
 
-void AdblockURLLoaderFactory::InProgressRequest::OnFilterMatchResult(
+void AdblockURLLoaderFactory::InProgressRequest::OnRequestFilterMatchResult(
     ::mojo::PendingReceiver<network::mojom::URLLoader> target_loader,
     int32_t request_id,
     uint32_t options,
@@ -346,7 +372,7 @@ void AdblockURLLoaderFactory::InProgressRequest::OnFilterMatchResult(
   if (!factory_->target_factory_.is_bound()) {
     DLOG(WARNING) << "[eyeo] "
                      "AdblockURLLoaderFactory::InProgressRequest::"
-                     "OnFilterMatchResult: target_factory_ not bound";
+                     "OnRequestFilterMatchResult: target_factory_ not bound";
     return;
   }
   if (result == adblock::mojom::FilterMatchResult::kBlockRule) {

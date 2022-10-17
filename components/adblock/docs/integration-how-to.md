@@ -18,8 +18,6 @@ If this is not convenient (changes of the above affect the whole application) th
 gn gen --args='eyeo_application_name="My great browser" eyeo_application_version="99.99.0.1"...' ...
 ```
 
-Warning: gn `abp_application_name` and `abp_application_version` variables are deprecated since eyeo Chromium SDK version 105.
-
 ## How to set build arguments for user counting?
 
 These `gn` arguments are required for the SDK to correctly count active users and attribute usage to the product.
@@ -38,8 +36,6 @@ If these arguments are not set, eyeo may not be able to correctly attribute user
 Always keep the auth token secret, do not embed it in open-source repositories or documents. If the auth token leaks out, contact eyeo and you will receive a new token.
 
 User counting does not transfer any user-identifiable data to eyeo, nor does it allow tracking or profiling users by eyeo.
-
-Warning: gn `adb_telemetry_client_id` and `adb_telemetry_activeping_auth_token` variables are deprecated since eyeo Chromium SDK version 105.
 
 ## How to disable ad-blocking on a specific domain?
 

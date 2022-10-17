@@ -18,6 +18,7 @@
 #ifndef CHROME_BROWSER_ADBLOCK_ADBLOCK_CONTENT_BROWSER_CLIENT_H_
 #define CHROME_BROWSER_ADBLOCK_ADBLOCK_CONTENT_BROWSER_CLIENT_H_
 
+#include "build/buildflag.h"
 #include "chrome/browser/chrome_content_browser_client.h"
 
 namespace adblock::mojom {
@@ -35,6 +36,13 @@ class AdblockContentBrowserClient : public ChromeContentBrowserClient {
  public:
   AdblockContentBrowserClient();
   ~AdblockContentBrowserClient() override;
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  // Enable ad filtering also for requests initiated by extensions.
+  // This allows implementing extension-driven browser tests.
+  // In production code, requests from extensions are not blocked.
+  static void ForceAdblockProxyForTesting();
+#endif
 
   bool CanCreateWindow(content::RenderFrameHost* opener,
                        const GURL& opener_url,
@@ -85,6 +93,10 @@ class AdblockContentBrowserClient : public ChromeContentBrowserClient {
       adblock::mojom::FilterMatchResult result);
 
   base::WeakPtrFactory<AdblockContentBrowserClient> weak_factory_{this};
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  static bool force_adblock_proxy_for_testing_;
+#endif
 };
 
 #endif  // CHROME_BROWSER_ADBLOCK_ADBLOCK_CONTENT_BROWSER_CLIENT_H_

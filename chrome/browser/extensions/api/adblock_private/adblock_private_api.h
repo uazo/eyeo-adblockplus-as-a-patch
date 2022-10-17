@@ -369,6 +369,23 @@ class AdblockPrivateRemoveCustomFilterFunction : public ExtensionFunction {
       const AdblockPrivateRemoveCustomFilterFunction&) = delete;
 };
 
+class AdblockPrivateGetCustomFiltersFunction : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.getCustomFilters",
+                             ADBLOCKPRIVATE_GETCUSTOMFILTERS)
+  AdblockPrivateGetCustomFiltersFunction();
+
+ private:
+  ~AdblockPrivateGetCustomFiltersFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateGetCustomFiltersFunction(
+      const AdblockPrivateGetCustomFiltersFunction&) = delete;
+  AdblockPrivateGetCustomFiltersFunction& operator=(
+      const AdblockPrivateGetCustomFiltersFunction&) = delete;
+};
+
 class AdblockPrivateGetSessionAllowedAdsCountFunction
     : public ExtensionFunction {
  public:

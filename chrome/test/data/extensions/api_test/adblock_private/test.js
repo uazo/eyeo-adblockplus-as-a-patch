@@ -373,6 +373,46 @@ var availableTests = [
       });
     });
   },
+  function customFiltersManagement() {
+    chrome.adblockPrivate.getCustomFilters(function(filters) {
+      if (filters.length) {
+        for (const filter of filters)
+          chrome.adblockPrivate.removeCustomFilter(filter);
+      }
+
+      chrome.adblockPrivate.getCustomFilters(function(filters) {
+        if (filters.length) {
+          chrome.test.fail('Failed: There shouldn\'t be any custom filters');
+          return;
+        }
+
+        chrome.adblockPrivate.addCustomFilter('foo.bar');
+        chrome.adblockPrivate.addCustomFilter('bar.baz');
+        chrome.adblockPrivate.getCustomFilters(function(filters) {
+          if (filters.length != 2) {
+            chrome.test.fail('Failed: There should be 2 custom filters');
+            return;
+          }
+
+          if (filters.indexOf('foo.bar') == -1 ||
+              filters.indexOf('bar.baz') == -1) {
+            chrome.test.fail('Failed: Didn\'t find expected custom filters');
+            return;
+          }
+
+          chrome.adblockPrivate.removeCustomFilter('foo.bar');
+          chrome.adblockPrivate.removeCustomFilter('bar.baz');
+
+          chrome.adblockPrivate.getCustomFilters(function(filters) {
+            if (filters.length)
+              chrome.test.fail('Failed: Still have custom filters');
+            else
+              chrome.test.succeed();
+          });
+        });
+      });
+    });
+  },
   function adBlockedEvents() {
     const urlParams = new URLSearchParams(window.location.search);
     let expectedSubscription = urlParams.get('subscription_url');
@@ -460,7 +500,7 @@ var availableTests = [
 var testToRun;
 if (window.location.search.indexOf('&') > 1)
   testToRun =
-      window.location.search.substring(1, window.location.search.indexOf('&'))
+      window.location.search.substring(1, window.location.search.indexOf('&'));
 else
   testToRun = window.location.search.substring(1);
 chrome.test.runTests(availableTests.filter(function(op) {

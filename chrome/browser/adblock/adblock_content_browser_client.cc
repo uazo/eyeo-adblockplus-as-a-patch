@@ -26,9 +26,6 @@
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "components/adblock/content/browser/resource_classification_runner.h"
 #include "components/adblock/content/common/adblock_url_loader_factory.h"
-#ifndef NDEBUG
-#include "components/adblock/content/common/adblock_url_loader_factory_for_test.h"
-#endif
 #include "components/adblock/content/common/mojom/adblock.mojom.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/subscription/subscription_service.h"
@@ -44,6 +41,14 @@
 #include "services/network/public/mojom/websocket.mojom.h"
 #include "services/service_manager/public/cpp/binder_registry.h"
 #include "third_party/blink/public/common/loader/url_loader_throttle.h"
+
+#ifdef EYEO_INTERCEPT_DEBUG_URL
+#include "components/adblock/content/common/adblock_url_loader_factory_for_test.h"
+#endif
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+#include "chrome/browser/extensions/extension_util.h"
+#endif
 
 namespace {
 
@@ -79,7 +84,7 @@ class AdblockContextData : public base::SupportsUserData::Data {
       self = new AdblockContextData();
       profile->SetUserData(kAdblockContextUserDataKey, base::WrapUnique(self));
     }
-#ifndef NDEBUG
+#ifdef EYEO_INTERCEPT_DEBUG_URL
     content::WebContents* wc = content::WebContents::FromRenderFrameHost(frame);
     bool is_adblock_test_url =
         (type ==
@@ -132,6 +137,16 @@ class AdblockContextData : public base::SupportsUserData::Data {
 AdblockContentBrowserClient::AdblockContentBrowserClient() = default;
 
 AdblockContentBrowserClient::~AdblockContentBrowserClient() = default;
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+// static
+bool AdblockContentBrowserClient::force_adblock_proxy_for_testing_ = false;
+
+// static
+void AdblockContentBrowserClient::ForceAdblockProxyForTesting() {
+  force_adblock_proxy_for_testing_ = true;
+}
+#endif
 
 bool AdblockContentBrowserClient::CanCreateWindow(
     content::RenderFrameHost* opener,
@@ -292,6 +307,17 @@ bool AdblockContentBrowserClient::WillCreateURLLoaderFactory(
   auto* profile = frame ? Profile::FromBrowserContext(
                               frame->GetProcess()->GetBrowserContext())
                         : nullptr;
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  if (!force_adblock_proxy_for_testing_ &&
+      request_initiator.scheme() == extensions::kExtensionScheme) {
+    VLOG(1) << "[eyeo] Do not use adblock proxy for extensions requests "
+               "[extension id:"
+            << request_initiator.host() << "].";
+    return use_chrome_proxy;
+  }
+#endif
+
   bool use_adblock_proxy =
       (type == URLLoaderFactoryType::kDocumentSubResource ||
        type == URLLoaderFactoryType::kNavigation) &&

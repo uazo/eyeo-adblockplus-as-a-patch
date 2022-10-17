@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
 
-import("//components/adblock/core/features.gni")
+import("//components/adblock/features.gni")
 import("//third_party/flatbuffers/flatbuffer.gni")
 
 flatbuffer("schema") {
@@ -68,20 +68,10 @@ config("adblock_core_config") {
     # Expicitly setting Telemetry server URL, used for testing with a test
     # server.
     defines += [ "EYEO_TELEMETRY_SERVER_URL=\"$eyeo_telemetry_server_url\"" ]
-  } else if (abp_telemetry_server_url != "") {
-    print("WARNING! abp_telemetry_server_url is deprecated, " +
-          "use eyeo_telemetry_server_url instead.")
-    eyeo_telemetry_server_url = abp_telemetry_server_url
-    defines += [ "EYEO_TELEMETRY_SERVER_URL=\"$eyeo_telemetry_server_url\"" ]
   } else {
     # Implicitly setting production Telemetry server URL based on
     # eyeo_telemetry_client_id (or a default client id as a fallback).
     if (eyeo_telemetry_client_id != "") {
-      defines += [ "EYEO_TELEMETRY_CLIENT_ID=\"$eyeo_telemetry_client_id\"" ]
-    } else if (abp_telemetry_client_id != "") {
-      print("WARNING! abp_telemetry_client_id is deprecated, " +
-            "use eyeo_telemetry_client_id instead.")
-      eyeo_telemetry_client_id = abp_telemetry_client_id
       defines += [ "EYEO_TELEMETRY_CLIENT_ID=\"$eyeo_telemetry_client_id\"" ]
     } else {
       print("WARNING! gn arg eyeo_telemetry_client_id is not set. " +
@@ -95,11 +85,6 @@ config("adblock_core_config") {
 
   if (eyeo_telemetry_activeping_auth_token != "") {
     defines += [ "EYEO_TELEMETRY_ACTIVEPING_AUTH_TOKEN=\"$eyeo_telemetry_activeping_auth_token\"" ]
-  } else if (abp_telemetry_activeping_auth_token != "") {
-    print("WARNING! abp_telemetry_activeping_auth_token is deprecated, " +
-          "use eyeo_telemetry_activeping_auth_token instead.")
-    eyeo_telemetry_activeping_auth_token = abp_telemetry_activeping_auth_token
-    defines += [ "EYEO_TELEMETRY_ACTIVEPING_AUTH_TOKEN=\"$eyeo_telemetry_activeping_auth_token\"" ]
   } else {
     print("WARNING! gn arg eyeo_telemetry_activeping_auth_token is not set. " +
           "Users will not be counted correctly by eyeo.")
@@ -107,19 +92,9 @@ config("adblock_core_config") {
 
   if (eyeo_application_name != "") {
     defines += [ "EYEO_APPLICATION_NAME=\"$eyeo_application_name\"" ]
-  } else if (abp_application_name != "") {
-    print("WARNING! abp_application_name is deprecated, " +
-          "use eyeo_application_name instead.")
-    eyeo_application_name = abp_application_name
-    defines += [ "EYEO_APPLICATION_NAME=\"$eyeo_application_name\"" ]
   }
 
   if (eyeo_application_version != "") {
-    defines += [ "EYEO_APPLICATION_VERSION=\"$eyeo_application_version\"" ]
-  } else if (abp_application_version != "") {
-    print("WARNING! abp_application_version is deprecated, " +
-          "use eyeo_application_version instead.")
-    eyeo_application_version = abp_application_version
     defines += [ "EYEO_APPLICATION_VERSION=\"$eyeo_application_version\"" ]
   }
 }

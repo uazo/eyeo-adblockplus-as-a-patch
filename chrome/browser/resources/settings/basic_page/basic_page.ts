@@ -1,4 +1,4 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2015 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -10,9 +10,9 @@
  * @fileoverview
  * 'settings-basic-page' is the settings page containing the actual settings.
  */
-import 'chrome://resources/cr_elements/hidden_style_css.m.js';
-import 'chrome://resources/cr_elements/shared_style_css.m.js';
-import 'chrome://resources/cr_elements/shared_vars_css.m.js';
+import 'chrome://resources/cr_elements/cr_hidden_style.css.js';
+import 'chrome://resources/cr_elements/cr_shared_style.css.js';
+import 'chrome://resources/cr_elements/cr_shared_vars.css.js';
 import 'chrome://resources/polymer/v3_0/iron-flex-layout/iron-flex-layout-classes.js';
 import '../adblock_page/adblock_page.js';
 import '../appearance_page/appearance_page.js';
@@ -24,16 +24,17 @@ import '../controls/settings_idle_load.js';
 import '../on_startup_page/on_startup_page.js';
 import '../people_page/people_page.js';
 import '../reset_page/reset_profile_banner.js';
+import '../performance_page/performance_page.js';
 import '../search_page/search_page.js';
 import '../settings_page/settings_section.js';
 import '../settings_page_styles.css.js';
-
 // <if expr="not is_chromeos">
 import '../default_browser_page/default_browser_page.js';
 // </if>
 
 // <if expr="not chromeos_ash">
 import '../languages_page/languages.js';
+
 // </if>
 
 import {assert} from 'chrome://resources/js/assert_ts.js';
@@ -406,6 +407,11 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
 
   private showAdvancedSettings_(visibility?: boolean): boolean {
     return visibility !== false;
+  }
+
+  private showPerformancePage_(visibility?: boolean): boolean {
+    return visibility !== false &&
+        loadTimeData.getBoolean('highEfficiencyModeAvailable');
   }
 }
 

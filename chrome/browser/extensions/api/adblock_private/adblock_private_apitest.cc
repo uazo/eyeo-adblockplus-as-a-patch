@@ -17,6 +17,7 @@
 #include <memory>
 #include <string>
 
+#include "chrome/browser/adblock/adblock_content_browser_client.h"
 #include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/extensions/extension_apitest.h"
 #include "chrome/common/extensions/api/adblock_private.h"
@@ -39,33 +40,6 @@ using testing::Return;
 
 namespace extensions {
 
-namespace {
-
-std::unique_ptr<net::test_server::HttpResponse> HandleSubscriptionUpdateRequest(
-    const std::string subcription_path,
-    const std::string subcription_filters,
-    const net::test_server::HttpRequest& request) {
-  static const char kSubscriptionHeader[] =
-      "[Adblock Plus 2.0]\n"
-      "! Checksum: X5A8vtJDBW2a9EgS9glqbg\n"
-      "! Version: 202202061935\n"
-      "! Last modified: 06 Feb 2022 19:35 UTC\n"
-      "! Expires: 1 days (update frequency)\n\n";
-
-  if (base::StartsWith(request.relative_url, subcription_path,
-                       base::CompareCase::SENSITIVE)) {
-    auto http_response =
-        std::make_unique<net::test_server::BasicHttpResponse>();
-    http_response->set_code(net::HTTP_OK);
-    http_response->set_content(kSubscriptionHeader + subcription_filters);
-    http_response->set_content_type("text/plain");
-    return std::move(http_response);
-  }
-
-  // Unhandled requests result in the Embedded test server sending a 404.
-  return nullptr;
-}
-
 class AdblockPrivateApiTest : public ExtensionApiTest {
  public:
   AdblockPrivateApiTest() {}
@@ -84,6 +58,8 @@ class AdblockPrivateApiTest : public ExtensionApiTest {
     adblock::AdblockControllerFactory::GetForBrowserContext(
         browser()->profile())
         ->RemoveCustomFilter(adblock::kAllowlistEverythingFilter);
+
+    AdblockContentBrowserClient::ForceAdblockProxyForTesting();
   }
 
   bool RunTest(const std::string& subtest) {
@@ -105,25 +81,49 @@ class AdblockPrivateApiTest : public ExtensionApiTest {
   }
 
   bool RunTestWithServer(const std::string& subtest,
-                         const std::string& subcription_path,
-                         const std::string& subcription_filters) {
+                         const std::string& subscription_path,
+                         const std::string& subscription_filters) {
     net::EmbeddedTestServer https_server{
         net::EmbeddedTestServer(net::EmbeddedTestServer::TYPE_HTTPS)};
     https_server.SetSSLConfig(net::EmbeddedTestServer::CERT_OK);
-    https_server.RegisterRequestHandler(
-        base::BindRepeating(&HandleSubscriptionUpdateRequest, subcription_path,
-                            subcription_filters));
+    https_server.RegisterRequestHandler(base::BindRepeating(
+        &AdblockPrivateApiTest::HandleSubscriptionUpdateRequest,
+        base::Unretained(this), subscription_path, subscription_filters));
     if (!https_server.Start()) {
       return false;
     }
     const std::string subtest_with_params =
         subtest +
-        "&subscription_url=" + https_server.GetURL(subcription_path).spec();
+        "&subscription_url=" + https_server.GetURL(subscription_path).spec();
     return RunTest(subtest_with_params);
   }
-};
 
-}  // namespace
+  std::unique_ptr<net::test_server::HttpResponse>
+  HandleSubscriptionUpdateRequest(
+      const std::string subscription_path,
+      const std::string subscription_filters,
+      const net::test_server::HttpRequest& request) {
+    static const char kSubscriptionHeader[] =
+        "[Adblock Plus 2.0]\n"
+        "! Checksum: X5A8vtJDBW2a9EgS9glqbg\n"
+        "! Version: 202202061935\n"
+        "! Last modified: 06 Feb 2022 19:35 UTC\n"
+        "! Expires: 1 days (update frequency)\n\n";
+
+    if (base::StartsWith(request.relative_url, subscription_path,
+                         base::CompareCase::SENSITIVE)) {
+      auto http_response =
+          std::make_unique<net::test_server::BasicHttpResponse>();
+      http_response->set_code(net::HTTP_OK);
+      http_response->set_content(kSubscriptionHeader + subscription_filters);
+      http_response->set_content_type("text/plain");
+      return std::move(http_response);
+    }
+
+    // Unhandled requests result in the Embedded test server sending a 404.
+    return nullptr;
+  }
+};
 
 IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, UpdateConsent) {
   EXPECT_TRUE(RunTest("updateConsent")) << message_;
@@ -218,29 +218,29 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, AllowedDomainsManagement) {
 }
 
 IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, AdBlockedEvents) {
-  std::string subcription_path = "/testeventssub.txt";
-  std::string subcription_filters = "test1.png";
+  std::string subscription_path = "/testeventssub.txt";
+  std::string subscription_filters = "test1.png";
 
-  EXPECT_TRUE(RunTestWithServer("adBlockedEvents", subcription_path,
-                                subcription_filters))
+  EXPECT_TRUE(RunTestWithServer("adBlockedEvents", subscription_path,
+                                subscription_filters))
       << message_;
 }
 
 IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, AdAllowedEvents) {
-  std::string subcription_path = "/testeventssub.txt";
-  std::string subcription_filters = "test2.png\n@@test2.png";
+  std::string subscription_path = "/testeventssub.txt";
+  std::string subscription_filters = "test2.png\n@@test2.png";
 
-  EXPECT_TRUE(RunTestWithServer("adAllowedEvents", subcription_path,
-                                subcription_filters))
+  EXPECT_TRUE(RunTestWithServer("adAllowedEvents", subscription_path,
+                                subscription_filters))
       << message_;
 }
 
 IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, SessionStats) {
-  std::string subcription_path = "/teststatssub.txt";
-  std::string subcription_filters = "test3.png\ntest4.png\n@@test4.png";
+  std::string subscription_path = "/teststatssub.txt";
+  std::string subscription_filters = "test3.png\ntest4.png\n@@test4.png";
 
   EXPECT_TRUE(
-      RunTestWithServer("sessionStats", subcription_path, subcription_filters))
+      RunTestWithServer("sessionStats", subscription_path, subscription_filters))
       << message_;
 }
 
@@ -298,7 +298,7 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTest, PageAllowedEvents) {
     window.domAutomationController.send('');
   )";
 
-  GURL test_url = embedded_test_server()->GetURL(
+  const GURL test_url = embedded_test_server()->GetURL(
       "example.com", "/extensions/api_test/adblock_private/test.html");
 
   ExecuteScriptInBackgroundPage(extension->id(), kSetListenersScript);
@@ -335,7 +335,7 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTest, PageAllowedStats) {
     window.domAutomationController.send('');
   )";
 
-  GURL test_url = embedded_test_server()->GetURL(
+  const GURL test_url = embedded_test_server()->GetURL(
       "example.com", "/extensions/api_test/adblock_private/test.html");
   int initial_value = std::stoi(
       ExecuteScriptInBackgroundPage(extension->id(), kReadAllowedStatsScript));
@@ -386,7 +386,7 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTest, PopupEvents) {
     window.domAutomationController.send('');
   )";
 
-  GURL test_url = embedded_test_server()->GetURL(
+  const GURL test_url = embedded_test_server()->GetURL(
       "example.com", "/extensions/api_test/adblock_private/test.html");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
 
@@ -444,7 +444,7 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTest, PopupStats) {
     window.domAutomationController.send('');
   )";
 
-  GURL test_url = embedded_test_server()->GetURL(
+  const GURL test_url = embedded_test_server()->GetURL(
       "example.com", "/extensions/api_test/adblock_private/test.html");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
 
@@ -464,6 +464,129 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTest, PopupStats) {
   ASSERT_EQ(initial_allowed_value + 1,
             std::stoi(ExecuteScriptInBackgroundPage(extension->id(),
                                                     kReadAllowedStatsScript)));
+}
+
+class AdblockPrivateApiBackgroundPageTestWithRedirect
+    : public AdblockPrivateApiBackgroundPageTest {
+ public:
+  AdblockPrivateApiBackgroundPageTestWithRedirect() {}
+  ~AdblockPrivateApiBackgroundPageTestWithRedirect() override = default;
+  AdblockPrivateApiBackgroundPageTestWithRedirect(
+      const AdblockPrivateApiBackgroundPageTestWithRedirect&) = delete;
+  AdblockPrivateApiBackgroundPageTestWithRedirect& operator=(
+      const AdblockPrivateApiBackgroundPageTestWithRedirect&) = delete;
+
+ protected:
+  void SetUpOnMainThread() override {
+    ExtensionApiTest::SetUpOnMainThread();
+
+    // Map domains to localhost. Add redirect handler.
+    host_resolver()->AddRule(before_redirect_domain, "127.0.0.1");
+    host_resolver()->AddRule(after_redirect_domain, "127.0.0.1");
+    embedded_test_server()->RegisterRequestHandler(base::BindRepeating(
+        &AdblockPrivateApiBackgroundPageTestWithRedirect::RedirectRequest,
+        base::Unretained(this)));
+    ASSERT_TRUE(StartEmbeddedTestServer());
+    adblock::AdblockControllerFactory::GetForBrowserContext(
+        browser()->profile())
+        ->RemoveCustomFilter(adblock::kAllowlistEverythingFilter);
+  }
+
+  std::unique_ptr<net::test_server::HttpResponse> RedirectRequest(
+      const net::test_server::HttpRequest& request) {
+    if (base::EndsWith(request.relative_url, before_redirect_domain,
+                       base::CompareCase::SENSITIVE)) {
+      std::unique_ptr<net::test_server::BasicHttpResponse> http_response(
+          new net::test_server::BasicHttpResponse());
+      http_response->set_code(net::HTTP_FOUND);
+      http_response->set_content("Redirecting...");
+      http_response->set_content_type("text/plain");
+      http_response->AddCustomHeader("Location",
+                                     "http://" + after_redirect_domain);
+      return std::move(http_response);
+    }
+
+    // Unhandled requests result in the Embedded test server sending a 404.
+    return nullptr;
+  }
+
+  const std::string before_redirect_domain = "before-redirect.com";
+  const std::string after_redirect_domain = "after-redirect.com";
+};
+
+// Test for DPD-1519
+IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTestWithRedirect,
+                       PageAllowedEvents) {
+  const Extension* extension =
+      LoadExtension(test_data_dir_.AppendASCII("adblock_private"));
+  ASSERT_TRUE(extension);
+
+  constexpr char kSetListenersScript[] = R"(
+    var testData = {};
+    testData.pageAllowedBeforeRedirectCount = 0;
+    testData.pageAllowedAfterRedirectCount = 0;
+    chrome.adblockPrivate.onPageAllowed.addListener(function(e) {
+      if (e.url.includes('before-redirect.com')) {
+        testData.pageAllowedBeforeRedirectCount =
+            testData.pageAllowedBeforeRedirectCount + 1;
+      } else if (e.url.includes('after-redirect.com')) {
+        testData.pageAllowedAfterRedirectCount =
+            testData.pageAllowedAfterRedirectCount + 1;
+      }
+    });
+    window.domAutomationController.send('');
+  )";
+
+  constexpr char kReadCountersScript[] = R"(
+    window.domAutomationController.send(
+      testData.pageAllowedBeforeRedirectCount + '-' +
+          testData.pageAllowedAfterRedirectCount);
+  )";
+
+  constexpr char kAddAllowDomainScript[] = R"(
+    chrome.adblockPrivate.addAllowedDomain('after-redirect.com');
+    window.domAutomationController.send('');
+  )";
+
+  constexpr char kRemoveAllowDomainScript[] = R"(
+    chrome.adblockPrivate.removeAllowedDomain('after-redirect.com');
+    window.domAutomationController.send('');
+  )";
+
+  constexpr char kAddBlockDomainFilterScript[] = R"(
+    chrome.adblockPrivate.addCustomFilter('after-redirect.com');
+    window.domAutomationController.send('');
+  )";
+
+  // Because RedirectRequest handler sees just a 127.0.0.1 instead of
+  // a domain we are passing here source domain as a path in url.
+  const GURL test_url = embedded_test_server()->GetURL(
+      before_redirect_domain, "/" + before_redirect_domain);
+
+  ExecuteScriptInBackgroundPage(extension->id(), kSetListenersScript);
+
+  // No filter
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
+  ASSERT_EQ("0-0", ExecuteScriptInBackgroundPage(extension->id(),
+                                                 kReadCountersScript));
+
+  // Just allow filter
+  ExecuteScriptInBackgroundPage(extension->id(), kAddAllowDomainScript);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
+  ASSERT_EQ("0-1", ExecuteScriptInBackgroundPage(extension->id(),
+                                                 kReadCountersScript));
+  // Just block filter
+  ExecuteScriptInBackgroundPage(extension->id(), kAddBlockDomainFilterScript);
+  ExecuteScriptInBackgroundPage(extension->id(), kRemoveAllowDomainScript);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
+  ASSERT_EQ("0-1", ExecuteScriptInBackgroundPage(extension->id(),
+                                                 kReadCountersScript));
+
+  // Allow and block filter
+  ExecuteScriptInBackgroundPage(extension->id(), kAddAllowDomainScript);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
+  ASSERT_EQ("0-2", ExecuteScriptInBackgroundPage(extension->id(),
+                                                 kReadCountersScript));
 }
 
 }  // namespace extensions
