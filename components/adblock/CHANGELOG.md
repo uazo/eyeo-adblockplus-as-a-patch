@@ -1,12 +1,40 @@
 # Release Notes
 
+## eyeo Chromium SDK 108.0
+* Updated to Chromium 108.0.5359.28
+* Allow Telemetry TopicProviders to collect payload asynchronously (DPD-1507)
+* Download filter list on any connection type (DPD-1418)
+  - Filter lists are now being compressed server-side and are very small (~400 kB)
+  - It's no longer advantageous to download them only on Wi-Fi
+  - APIs related to Allowed Connection Type are deprecated and non-functional
+  - Those APIs will be removed in version 111
+* Ensure Telemetry pings trigger correctly after the computer wakes up from sleep (DPD-1559)
+* Ensure filter list download requests attach Accept-Language header (DPD-1405)
+* Fixed a use-after-free when element hiding was applied on a closed tab (DPD-1600)
+* Fixed element hiding to apply within iframes served from Web Bundles (DPD-1510)
+* Improved page load times significantly by optimizing filter matching regular expressions (DPD-586)
+
+## eyeo Chromium SDK 107.0
+* Updated to Chromium 107.0.5304.54
+* Packaging a non-obfuscated version of snippets library for debug builds (DPD-1448)
+* Add GetCustomFilters call to web extensions API (DPD-849)
+* Add eyeo_intercept_debug_url build flag to hide internal testing feature (DPD-1407, DPD-1532)
+* Allow all requests from web extensions (DPD-1505)
+* Fixed a rare crash when tab is closed before websocket classification completes (DPD-1548)
+* Fixed a rare crash when network service disconnects during resource classification (DPD-1496)
+* Fixed Telemetry pings being sent too rarely when PC is suspended (DPD-1559)
+* Removed deprecated abp telemetry gn gen arguments
+
+Known issues:
+* Disabled AdblockMojoInterfaceImpl related unit tests. Will be removed in future releases
+
 ## eyeo Chromium SDK 106.0
 * Updated to Chromium 106.0.5249.38
 * Updated snippets library from v0.5.1 to v0.5.5
-* Fixed faulty handling URL redirection by creating AdblockURLLoaderFactory as the last proxy (DPD-1492). Backported into 105.1.
-* Fixed SiteKey validation for redirected urls (DPD-1452).
+* Fixed faulty handling URL redirection by creating AdblockURLLoaderFactory as the last proxy (DPD-1492). Backported into 105.1
+* Fixed SiteKey validation for redirected urls (DPD-1452)
 * Improved logging related to subscription update (DPD-1359)
-* Simplified subscription first run update (DPD-1389).
+* Simplified subscription first run update (DPD-1389)
 
 Known issues:
 * The following browser tests are failing and will be fixed in future releases:

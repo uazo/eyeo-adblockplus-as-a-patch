@@ -22,10 +22,12 @@
 
 #include "testing/gmock/include/gmock/gmock.h"
 
+using testing::NiceMock;
+
 namespace adblock {
 
 class MockSubscriptionPersistentMetadata
-    : public SubscriptionPersistentMetadata {
+    : public NiceMock<SubscriptionPersistentMetadata> {
  public:
   MockSubscriptionPersistentMetadata();
   ~MockSubscriptionPersistentMetadata() override;

@@ -54,7 +54,7 @@ class FakeResourceClassificationRunner : public ResourceClassificationRunner {
               CheckRequestFilterMatchForWebSocket,
               (std::unique_ptr<SubscriptionCollection>,
                const GURL& request_url,
-               content::RenderFrameHost* render_frame_host,
+               content::GlobalRenderFrameHostId render_frame_host,
                mojom::AdblockInterface::CheckFilterMatchCallback callback),
               (override));
 

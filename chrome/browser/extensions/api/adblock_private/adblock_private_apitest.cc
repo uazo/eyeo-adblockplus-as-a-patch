@@ -25,6 +25,7 @@
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/adblock/core/adblock_controller.h"
 #include "components/adblock/core/common/adblock_constants.h"
+#include "components/adblock/core/subscription/subscription_config.h"
 #include "content/public/test/browser_test.h"
 #include "extensions/browser/background_script_executor.h"
 #include "net/dns/mock_host_resolver.h"
@@ -64,7 +65,8 @@ class AdblockPrivateApiTest : public ExtensionApiTest {
 
   bool RunTest(const std::string& subtest) {
     const std::string page_url = "main.html?" + subtest;
-    return RunExtensionTest("adblock_private", {.page_url = page_url.c_str()},
+    return RunExtensionTest("adblock_private",
+                            {.extension_url = page_url.c_str()},
                             {.load_as_component = true});
   }
 
@@ -124,10 +126,6 @@ class AdblockPrivateApiTest : public ExtensionApiTest {
     return nullptr;
   }
 };
-
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, UpdateConsent) {
-  EXPECT_TRUE(RunTest("updateConsent")) << message_;
-}
 
 IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, SetAndCheckEnabled) {
   EXPECT_TRUE(RunTest("setEnabled_isEnabled")) << message_;
@@ -239,8 +237,8 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, SessionStats) {
   std::string subscription_path = "/teststatssub.txt";
   std::string subscription_filters = "test3.png\ntest4.png\n@@test4.png";
 
-  EXPECT_TRUE(
-      RunTestWithServer("sessionStats", subscription_path, subscription_filters))
+  EXPECT_TRUE(RunTestWithServer("sessionStats", subscription_path,
+                                subscription_filters))
       << message_;
 }
 
@@ -484,7 +482,7 @@ class AdblockPrivateApiBackgroundPageTestWithRedirect
     host_resolver()->AddRule(before_redirect_domain, "127.0.0.1");
     host_resolver()->AddRule(after_redirect_domain, "127.0.0.1");
     embedded_test_server()->RegisterRequestHandler(base::BindRepeating(
-        &AdblockPrivateApiBackgroundPageTestWithRedirect::RedirectRequest,
+        &AdblockPrivateApiBackgroundPageTestWithRedirect::RequestHandler,
         base::Unretained(this)));
     ASSERT_TRUE(StartEmbeddedTestServer());
     adblock::AdblockControllerFactory::GetForBrowserContext(
@@ -492,7 +490,7 @@ class AdblockPrivateApiBackgroundPageTestWithRedirect
         ->RemoveCustomFilter(adblock::kAllowlistEverythingFilter);
   }
 
-  std::unique_ptr<net::test_server::HttpResponse> RedirectRequest(
+  std::unique_ptr<net::test_server::HttpResponse> RequestHandler(
       const net::test_server::HttpRequest& request) {
     if (base::EndsWith(request.relative_url, before_redirect_domain,
                        base::CompareCase::SENSITIVE)) {
@@ -501,8 +499,25 @@ class AdblockPrivateApiBackgroundPageTestWithRedirect
       http_response->set_code(net::HTTP_FOUND);
       http_response->set_content("Redirecting...");
       http_response->set_content_type("text/plain");
-      http_response->AddCustomHeader("Location",
-                                     "http://" + after_redirect_domain);
+      http_response->AddCustomHeader(
+          "Location", "http://" + after_redirect_domain + ":" +
+                          base::NumberToString(embedded_test_server()->port()) +
+                          request.relative_url.substr(
+                              0, request.relative_url.size() -
+                                     before_redirect_domain.size() - 1));
+      return std::move(http_response);
+    }
+    if (base::EndsWith(request.relative_url, subresource_with_redirect,
+                       base::CompareCase::SENSITIVE)) {
+      auto http_response =
+          std::make_unique<net::test_server::BasicHttpResponse>();
+      http_response->set_code(net::HTTP_OK);
+      // Create a sub resource url which causes redirection
+      const GURL url = embedded_test_server()->GetURL(
+          before_redirect_domain, "/image.png?" + before_redirect_domain);
+      std::string body = "<img src=\"" + url.spec() + "\">";
+      http_response->set_content(body);
+      http_response->set_content_type("text/html");
       return std::move(http_response);
     }
 
@@ -512,9 +527,11 @@ class AdblockPrivateApiBackgroundPageTestWithRedirect
 
   const std::string before_redirect_domain = "before-redirect.com";
   const std::string after_redirect_domain = "after-redirect.com";
+  const std::string subresource_with_redirect = "subresource_with_redirect";
 };
 
 // Test for DPD-1519
+// This test verifies redirection of a main page
 IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTestWithRedirect,
                        PageAllowedEvents) {
   const Extension* extension =
@@ -527,11 +544,9 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTestWithRedirect,
     testData.pageAllowedAfterRedirectCount = 0;
     chrome.adblockPrivate.onPageAllowed.addListener(function(e) {
       if (e.url.includes('before-redirect.com')) {
-        testData.pageAllowedBeforeRedirectCount =
-            testData.pageAllowedBeforeRedirectCount + 1;
+        ++testData.pageAllowedBeforeRedirectCount;
       } else if (e.url.includes('after-redirect.com')) {
-        testData.pageAllowedAfterRedirectCount =
-            testData.pageAllowedAfterRedirectCount + 1;
+        ++testData.pageAllowedAfterRedirectCount;
       }
     });
     window.domAutomationController.send('');
@@ -558,7 +573,7 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTestWithRedirect,
     window.domAutomationController.send('');
   )";
 
-  // Because RedirectRequest handler sees just a 127.0.0.1 instead of
+  // Because RequestHandler handler sees just a 127.0.0.1 instead of
   // a domain we are passing here source domain as a path in url.
   const GURL test_url = embedded_test_server()->GetURL(
       before_redirect_domain, "/" + before_redirect_domain);
@@ -586,6 +601,68 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTestWithRedirect,
   ExecuteScriptInBackgroundPage(extension->id(), kAddAllowDomainScript);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
   ASSERT_EQ("0-2", ExecuteScriptInBackgroundPage(extension->id(),
+                                                 kReadCountersScript));
+}
+
+// This test verifies redirection of a sub resource
+IN_PROC_BROWSER_TEST_F(AdblockPrivateApiBackgroundPageTestWithRedirect,
+                       AdMatchedEvents) {
+  const Extension* extension =
+      LoadExtension(test_data_dir_.AppendASCII("adblock_private"));
+  ASSERT_TRUE(extension);
+
+  constexpr char kSetListenersScript[] = R"(
+    var testData = {};
+    testData.adBlockedCount = 0;
+    testData.adAllowedCount = 0;
+    chrome.adblockPrivate.onAdBlocked.addListener(function(e) {
+      if (e.url.includes('http://after-redirect.com')) {
+        ++testData.adBlockedCount;
+      }
+    });
+    chrome.adblockPrivate.onAdAllowed.addListener(function(e) {
+      if (e.url.includes('http://after-redirect.com')) {
+        ++testData.adAllowedCount;
+      }
+    });
+    window.domAutomationController.send('');
+  )";
+
+  constexpr char kReadCountersScript[] = R"(
+    window.domAutomationController.send(
+      testData.adBlockedCount + '-' + testData.adAllowedCount);
+  )";
+
+  constexpr char kAddBlockingFilterScript[] = R"(
+    chrome.adblockPrivate.addCustomFilter('||after-redirect.com*/image.png');
+    window.domAutomationController.send('');
+  )";
+
+  constexpr char kAddAllowingFilterScript[] = R"(
+    chrome.adblockPrivate.addCustomFilter('@@||after-redirect.com*/image.png');
+    window.domAutomationController.send('');
+  )";
+
+  ExecuteScriptInBackgroundPage(extension->id(), kSetListenersScript);
+
+  const GURL test_url = embedded_test_server()->GetURL(
+      after_redirect_domain, "/" + subresource_with_redirect);
+
+  // No filter
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
+  ASSERT_EQ("0-0", ExecuteScriptInBackgroundPage(extension->id(),
+                                                 kReadCountersScript));
+
+  // Just block filter
+  ExecuteScriptInBackgroundPage(extension->id(), kAddBlockingFilterScript);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
+  ASSERT_EQ("1-0", ExecuteScriptInBackgroundPage(extension->id(),
+                                                 kReadCountersScript));
+
+  // Allow and block filter
+  ExecuteScriptInBackgroundPage(extension->id(), kAddAllowingFilterScript);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
+  ASSERT_EQ("1-1", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
 }
 

@@ -82,10 +82,10 @@ dictionary AdInfo {
   long window_id;
 };
 
+// Deprecated, to be removed in version 109.
+[deprecated="Updates can no longer be disabled on slow connections"]
 enum UpdateConsent {
-  // Allow downloading subscription updates on any network:
   ALWAYS,
-  // Allow downloading subscription updates only when on WiFi:
   WIFI_ONLY
 };
 
@@ -98,10 +98,10 @@ callback UpdateConsentCallback = void(UpdateConsent consent);
 callback SessionStatsCallback = void(SessionStatsEntry[] result);
 
 interface Functions {
-  // Sets on which connection type subscription update is allowed.
-  static void setUpdateConsent(UpdateConsent consent);
-  // Gets connection type on which subscription update is allowed.
-  static void getUpdateConsent(UpdateConsentCallback callback);
+// Deprecated, to be removed in version 109.
+  [deprecated="Updates can no longer be disabled on slow connections"] static void setUpdateConsent(UpdateConsent consent);
+// Deprecated, to be removed in version 109.
+  [deprecated="Updates can no longer be disabled on slow connections"] static void getUpdateConsent(UpdateConsentCallback callback);
   // Allows to turn Adblock on or off.
   static void setEnabled(boolean enabled);
   // Returns whether Adblock is on.

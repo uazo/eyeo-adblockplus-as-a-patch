@@ -30,6 +30,7 @@
 #include "url/gurl.h"
 
 namespace content {
+struct GlobalRenderFrameHostId;
 class RenderFrameHost;
 }
 namespace adblock {
@@ -80,7 +81,7 @@ class ResourceClassificationRunner : public KeyedService {
   virtual void CheckRequestFilterMatchForWebSocket(
       std::unique_ptr<SubscriptionCollection> subscription_collection,
       const GURL& request_url,
-      content::RenderFrameHost* render_frame_host,
+      content::GlobalRenderFrameHostId render_frame_host_id,
       mojom::AdblockInterface::CheckFilterMatchCallback callback) = 0;
   virtual void CheckResponseFilterMatch(
       std::unique_ptr<SubscriptionCollection> subscription_collection,

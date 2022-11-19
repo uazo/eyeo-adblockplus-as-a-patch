@@ -29,7 +29,6 @@ extern const char kAdblockCustomFilters[];
 extern const char kAdblockSubscriptions[];
 extern const char kAdblockCustomSubscriptions[];
 extern const char kAdblockMoreOptionsEnabled[];
-extern const char kAdblockAllowedConnectionType[];
 extern const char kInstallFirstStartSubscriptions[];
 extern const char kSubscriptionSignatures[];
 extern const char kLastUsedSchemaVersion[];

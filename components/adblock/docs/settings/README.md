@@ -14,18 +14,6 @@ At the moment, the following settings are supported:
 | Allowed connection type | String  | Connection type under which filter lists can be downloaded. |
 
 
-## "Allowed connection type" setting ("Update on WiFi only" in the UI)
-
-The "allowed connection type" setting specifies under which circumstances eyeo Chromium SDK may issue network requests, like filter list downloads. The possible values are:
-
-* *any*: On any network.
-* *wifi*: Only on WiFi.
-
-By default, downloads are allowed on any connection type to ensure that the most up-to-date filter lists are always available.
-
-When only WiFi is allowed, eyeo Chromium SDK won't issue network requests when the user is on a different connection type, reducing the usage of their data allowance. But as a consequence, filter lists won't be updated or even downloaded, which means this setting has a huge impact on ad-blocking functionality. You can bundle filter lists to ensure that they are available in this scenario. See the [ad-filtering documentation](../ad-filtering/filter-lists.md) for more information about bundled filter lists.
-
-
 ## Implementation details
 
 Settings can be configured via the C++ class `AdblockController` or its Java counterpart, `org.chromium.components.adblock.AdblockController`.

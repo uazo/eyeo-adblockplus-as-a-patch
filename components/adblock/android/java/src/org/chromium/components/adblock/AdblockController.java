@@ -200,6 +200,7 @@ public final class AdblockController {
         }
     }
 
+    // Deprecated, ConnectionType will be removed in 109
     public enum ConnectionType {
         // All WiFi networks
         WIFI("wifi"),
@@ -213,9 +214,6 @@ public final class AdblockController {
         }
 
         static public ConnectionType fromString(String val) {
-            if (val.equals(ConnectionType.WIFI.getValue())) return ConnectionType.WIFI;
-
-            assert val.equals(ConnectionType.ANY.getValue());
             return ConnectionType.ANY;
         }
 
@@ -257,17 +255,24 @@ public final class AdblockController {
     }
 
     @UiThread
+    @Deprecated
     public ConnectionType getAllowedConnectionType() {
-        // TODO(mpawlowski) call AdblockControllerJni, not read prefs directly
-        return ConnectionType.fromString(UserPrefs.get(Profile.getLastUsedRegularProfile())
-                                                 .getString(Pref.ADBLOCK_ALLOWED_CONNECTION_TYPE));
+        Log.w(TAG,
+                "[eyeo] AllowedConnectionType is not supported "
+                        + "anymore, downloads are allowed anytime. "
+                        + "getAllowedConnectionType will be removed "
+                        + "in version 109.");
+        return ConnectionType.ANY;
     }
 
     @UiThread
+    @Deprecated
     public void setAllowedConnectionType(ConnectionType type) {
-        // TODO(mpawlowski) call AdblockControllerJni, not write prefs directly
-        UserPrefs.get(Profile.getLastUsedRegularProfile())
-                .setString(Pref.ADBLOCK_ALLOWED_CONNECTION_TYPE, type.getValue());
+        Log.w(TAG,
+                "[eyeo] AllowedConnectionType is not supported "
+                        + "anymore, downloads are allowed anytime. "
+                        + "setAllowedConnectionType will be removed "
+                        + "in version 109.");
     }
 
     @UiThread

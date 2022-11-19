@@ -65,6 +65,7 @@ class AdblockController : public KeyedService {
   virtual void RemoveAllowedDomain(const std::string& domain) = 0;
   virtual std::vector<std::string> GetAllowedDomains() const = 0;
 
+  // Deprecated, AllowedConnectionType will be removed in 109
   virtual void SetUpdateConsent(AllowedConnectionType consent) = 0;
   virtual AllowedConnectionType GetUpdateConsent() const = 0;
 

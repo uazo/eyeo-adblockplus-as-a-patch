@@ -31,8 +31,7 @@
 
 namespace adblock {
 
-class AdblockElementHiderFlatbufferTest
-    : public content::RenderViewHostTestHarness {
+class AdblockElementHiderImplTest : public content::RenderViewHostTestHarness {
  protected:
   MockSubscriptionService sub_service_;
 
@@ -41,7 +40,7 @@ class AdblockElementHiderFlatbufferTest
   const SiteKey kSitekey{""};
 };
 
-TEST_F(AdblockElementHiderFlatbufferTest, BatchesSelectors) {
+TEST_F(AdblockElementHiderImplTest, BatchesSelectors) {
   std::vector<base::StringPiece> selectors(1u << 11u, "selector");
   std::vector<base::StringPiece> emu_selectors;
 
@@ -87,7 +86,51 @@ TEST_F(AdblockElementHiderFlatbufferTest, BatchesSelectors) {
           }));
 }
 
-TEST_F(AdblockElementHiderFlatbufferTest, UninitializedSubscriptionService) {
+TEST_F(AdblockElementHiderImplTest, AppliesElementHidingOnSiteWithWeirdUrl) {
+  std::vector<base::StringPiece> selectors{"a", "b"};
+  std::vector<base::StringPiece> emu_selectors;
+
+  // When loading web bundles, URLs of iframes may not look like ordinary
+  // addresses:
+  const GURL kNonStandardFrameUrl{
+      "uuid-in-package:429fcc4e-0696-4bad-b099-ee9175f023ad"};
+
+  // SubscriptionService starts initialized.
+  EXPECT_CALL(sub_service_, IsInitialized()).WillOnce(testing::Return(true));
+
+  ElementHiderImpl element_hide(&sub_service_);
+  EXPECT_CALL(sub_service_, GetCurrentSnapshot())
+      .WillOnce([this, selectors, emu_selectors, &kNonStandardFrameUrl]() {
+        auto collection = std::make_unique<MockSubscriptionCollection>();
+        EXPECT_CALL(*collection,
+                    FindBySpecialFilter(SpecialFilterType::Document,
+                                        kNonStandardFrameUrl, kFrameHierarchy,
+                                        kSitekey))
+            .WillOnce(testing::Return(absl::nullopt));
+        EXPECT_CALL(*collection,
+                    FindBySpecialFilter(SpecialFilterType::Elemhide,
+                                        kNonStandardFrameUrl, kFrameHierarchy,
+                                        kSitekey))
+            .WillOnce(testing::Return(absl::nullopt));
+        EXPECT_CALL(*collection,
+                    GetElementHideSelectors(kNonStandardFrameUrl,
+                                            kFrameHierarchy, kSitekey))
+            .WillOnce(testing::Return(selectors));
+        EXPECT_CALL(*collection,
+                    GetElementHideEmulationSelectors(kNonStandardFrameUrl))
+            .WillOnce(testing::Return(emu_selectors));
+        return collection;
+      });
+
+  element_hide.ApplyElementHidingEmulationOnPage(
+      kNonStandardFrameUrl, kFrameHierarchy, main_rfh(), kSitekey,
+      base::BindLambdaForTesting(
+          [&](const ElementHider::ElemhideInjectionData& data) {
+            EXPECT_EQ(data.stylesheet, "a, b {display: none !important;}\n");
+          }));
+}
+
+TEST_F(AdblockElementHiderImplTest, UninitializedSubscriptionService) {
   std::vector<base::StringPiece> selectors{"selector"};
   std::vector<base::StringPiece> emu_selectors;
 
@@ -148,8 +191,7 @@ TEST_F(AdblockElementHiderFlatbufferTest, UninitializedSubscriptionService) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockElementHiderFlatbufferTest,
-       GeneratesSnippetsWhenAllowListedPage) {
+TEST_F(AdblockElementHiderImplTest, GeneratesSnippetsWhenAllowListedPage) {
   EXPECT_CALL(sub_service_, IsInitialized()).WillOnce(testing::Return(true));
 
   EXPECT_CALL(sub_service_, GetCurrentSnapshot()).WillOnce([this]() {
@@ -179,7 +221,7 @@ TEST_F(AdblockElementHiderFlatbufferTest,
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockElementHiderFlatbufferTest, GeneratesNothingDocumentAllowListed) {
+TEST_F(AdblockElementHiderImplTest, GeneratesNothingDocumentAllowListed) {
   EXPECT_CALL(sub_service_, IsInitialized()).WillOnce(testing::Return(true));
 
   EXPECT_CALL(sub_service_, GetCurrentSnapshot()).WillOnce([this]() {

@@ -16,6 +16,7 @@
 #include "chrome/browser/extensions/api/adblock_private/adblock_private_api.h"
 
 #include "base/containers/flat_map.h"
+#include "base/logging.h"
 #include "base/no_destructor.h"
 #include "base/time/time_to_iso8601.h"
 #include "base/values.h"
@@ -27,7 +28,6 @@
 #include "components/adblock/content/browser/resource_classification_runner.h"
 #include "components/adblock/core/adblock_controller.h"
 #include "components/adblock/core/common/adblock_utils.h"
-#include "components/adblock/core/common/allowed_connection_type.h"
 #include "components/adblock/core/common/content_type.h"
 #include "components/adblock/core/session_stats.h"
 #include "components/sessions/core/session_id.h"
@@ -337,23 +337,10 @@ AdblockPrivateSetUpdateConsentFunction::
 
 ExtensionFunction::ResponseAction
 AdblockPrivateSetUpdateConsentFunction::Run() {
-  std::unique_ptr<api::adblock_private::SetUpdateConsent::Params> params(
-      api::adblock_private::SetUpdateConsent::Params::Create(args()));
-  EXTENSION_FUNCTION_VALIDATE(params);
-
-  auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
-      browser_context());
-  switch (params->consent) {
-    case api::adblock_private::UpdateConsent::UPDATE_CONSENT_WIFI_ONLY:
-      controller->SetUpdateConsent(adblock::AllowedConnectionType::kWiFi);
-      break;
-    case api::adblock_private::UpdateConsent::UPDATE_CONSENT_ALWAYS:
-      controller->SetUpdateConsent(adblock::AllowedConnectionType::kAny);
-      break;
-    default:
-      NOTREACHED();
-  }
-
+  LOG(WARNING)
+      << "[eyeo] adblock_private::UpdateConsent is not supported anymore, "
+         "downloads are allowed anytime. AdblockPrivate::SetUpdateConsent will "
+         "be removed in version 109.";
   return RespondNow(NoArguments());
 }
 
@@ -365,26 +352,13 @@ AdblockPrivateGetUpdateConsentFunction::
 
 ExtensionFunction::ResponseAction
 AdblockPrivateGetUpdateConsentFunction::Run() {
-  auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
-      browser_context());
-
-  auto consent = controller->GetUpdateConsent();
-  api::adblock_private::UpdateConsent result =
-      api::adblock_private::UpdateConsent::UPDATE_CONSENT_NONE;
-  switch (consent) {
-    case adblock::AllowedConnectionType::kWiFi:
-      result = api::adblock_private::UpdateConsent::UPDATE_CONSENT_WIFI_ONLY;
-      break;
-    case adblock::AllowedConnectionType::kAny:
-      result = api::adblock_private::UpdateConsent::UPDATE_CONSENT_ALWAYS;
-      break;
-    // TODO what about NONE? This will trigger a dcheck...
-    default:
-      NOTREACHED();
-  }
-
-  return RespondNow(ArgumentList(
-      api::adblock_private::GetUpdateConsent::Results::Create(result)));
+  LOG(WARNING)
+      << "[eyeo] adblock_private::UpdateConsent is not supported anymore, "
+         "downloads are allowed anytime. AdblockPrivate::GetUpdateConsent will "
+         "be removed in version 109.";
+  return RespondNow(
+      ArgumentList(api::adblock_private::GetUpdateConsent::Results::Create(
+          api::adblock_private::UpdateConsent::UPDATE_CONSENT_ALWAYS)));
 }
 
 AdblockPrivateSetEnabledFunction::AdblockPrivateSetEnabledFunction() {}

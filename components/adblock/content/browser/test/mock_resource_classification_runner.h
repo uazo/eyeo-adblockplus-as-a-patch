@@ -19,6 +19,7 @@
 #define COMPONENTS_ADBLOCK_CONTENT_BROWSER_TEST_MOCK_RESOURCE_CLASSIFICATION_RUNNER_
 
 #include "components/adblock/content/browser/resource_classification_runner.h"
+#include "content/public/browser/render_frame_host.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "url/gurl.h"
 
@@ -29,14 +30,8 @@ class MockResourceClassificationRunner : public ResourceClassificationRunner {
   MockResourceClassificationRunner();
   ~MockResourceClassificationRunner() override;
 
-  MOCK_METHOD(void,
-              AddObserver,
-              (ResourceClassificationRunner::Observer*),
-              (override));
-  MOCK_METHOD(void,
-              RemoveObserver,
-              (ResourceClassificationRunner::Observer*),
-              (override));
+  void AddObserver(ResourceClassificationRunner::Observer*) override;
+  void RemoveObserver(ResourceClassificationRunner::Observer*) override;
 
   MOCK_METHOD((mojom::FilterMatchResult),
               ShouldBlockPopup,
@@ -60,7 +55,7 @@ class MockResourceClassificationRunner : public ResourceClassificationRunner {
               CheckRequestFilterMatchForWebSocket,
               (std::unique_ptr<SubscriptionCollection>,
                const GURL&,
-               content::RenderFrameHost*,
+               content::GlobalRenderFrameHostId,
                mojom::AdblockInterface::CheckFilterMatchCallback),
               (override));
 

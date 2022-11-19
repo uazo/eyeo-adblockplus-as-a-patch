@@ -27,9 +27,7 @@
 
 namespace adblock {
 
-// Specifies the connection type for which subscription updates are allowed.
-// Subscription files can be quite big so it makes sense to limit them on
-// metered data connection.
+// Deprecated, AllowedConnectionType will be removed in 109
 enum class AllowedConnectionType {
   // Allow updates only when on WiFi:
   kWiFi,

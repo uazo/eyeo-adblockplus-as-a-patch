@@ -19,6 +19,7 @@
 #define CHROME_BROWSER_ADBLOCK_ADBLOCK_TELEMETRY_SERVICE_FACTORY_H_
 
 #include "base/no_destructor.h"
+#include "base/time/time.h"
 #include "components/keyed_service/content/browser_context_keyed_service_factory.h"
 
 class Profile;
@@ -30,6 +31,11 @@ class AdblockTelemetryServiceFactory
  public:
   static AdblockTelemetryService* GetForProfile(Profile* profile);
   static AdblockTelemetryServiceFactory* GetInstance();
+
+  // Sets the initial delay and interval checks required for browser tests.
+  // Must be called before BuildServiceInstanceFor().
+  void SetCheckAndDelayIntervalsForTesting(base::TimeDelta check_interval,
+                                           base::TimeDelta initial_delay);
 
  private:
   friend class base::NoDestructor<AdblockTelemetryServiceFactory>;

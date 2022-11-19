@@ -56,7 +56,7 @@ class OngoingSubscriptionRequestImpl final
  private:
   bool IsStarted() const;
   bool IsConnectionAllowed() const;
-  void CheckAllowedConnectionType();
+  void CheckConnectionAllowed();
   void StartInternal();
   void StopInternal();
   void OnDownloadFinished(base::FilePath downloaded_file);
@@ -64,7 +64,6 @@ class OngoingSubscriptionRequestImpl final
   const char* MethodToString() const;
 
   SEQUENCE_CHECKER(sequence_checker_);
-  StringPrefMember allowed_connection_type_;
   BooleanPrefMember adblocking_enabled_;
   std::unique_ptr<net::BackoffEntry> backoff_entry_;
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;

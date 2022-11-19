@@ -57,7 +57,7 @@ class ResourceClassificationRunnerImpl final
   void CheckRequestFilterMatchForWebSocket(
       std::unique_ptr<SubscriptionCollection> subscription_collection,
       const GURL& request_url,
-      content::RenderFrameHost* render_frame_host,
+      content::GlobalRenderFrameHostId render_frame_host_id,
       mojom::AdblockInterface::CheckFilterMatchCallback callback) final;
   void CheckResponseFilterMatch(
       std::unique_ptr<SubscriptionCollection> subscription_collection,

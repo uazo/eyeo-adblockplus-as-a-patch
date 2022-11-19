@@ -31,9 +31,6 @@ extern const char kSiteKeyHeaderKey[];
 extern const char kAllowlistEverythingFilter[];
 
 const std::string& CurrentSchemaVersion();
-const GURL& AcceptableAdsUrl();
-const GURL& AntiCVUrl();
-const GURL& DefaultSubscriptionUrl();
 const GURL& TestPagesSubscriptionUrl();
 const GURL& CustomFiltersUrl();
 base::StringPiece RewriteUrl(flat::AbpResource type);

@@ -25,8 +25,8 @@
 #include "base/logging.h"
 #include "base/ranges/algorithm.h"
 #include "base/time/time.h"
-#include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_prefs.h"
+#include "components/adblock/core/subscription/subscription_config.h"
 
 namespace adblock {
 

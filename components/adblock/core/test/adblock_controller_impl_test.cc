@@ -127,19 +127,6 @@ TEST_F(AdblockControllerImplTest, EnableAndDisableAdBlocking) {
   EXPECT_FALSE(testee_->IsAdblockEnabled());
 }
 
-TEST_F(AdblockControllerImplTest, SetUpdateConstent) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  // Initially, default value is returned.
-  EXPECT_EQ(testee_->GetUpdateConsent(), AllowedConnectionType::kDefault);
-  // Setting it to a different value is registered.
-  testee_->SetUpdateConsent(AllowedConnectionType::kWiFi);
-  EXPECT_EQ(testee_->GetUpdateConsent(), AllowedConnectionType::kWiFi);
-  // The setting persists after restart.
-  RecreateController();
-  EXPECT_EQ(testee_->GetUpdateConsent(), AllowedConnectionType::kWiFi);
-}
-
 TEST_F(AdblockControllerImplTest, SelectedBuiltInSubscriptionsReadFromPrefs) {
   EXPECT_CALL(subscription_service_, IsInitialized())
       .WillRepeatedly(testing::Return(true));

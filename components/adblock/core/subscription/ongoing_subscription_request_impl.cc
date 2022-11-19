@@ -23,7 +23,6 @@
 #include "base/task/thread_pool.h"
 #include "base/trace_event/trace_event.h"
 #include "components/adblock/core/common/adblock_prefs.h"
-#include "components/adblock/core/common/allowed_connection_type.h"
 #include "net/http/http_request_headers.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
@@ -66,17 +65,12 @@ OngoingSubscriptionRequestImpl::OngoingSubscriptionRequestImpl(
       retry_timer_(std::make_unique<base::OneShotTimer>()),
       number_of_redirects_(0) {
   net::NetworkChangeNotifier::AddNetworkChangeObserver(this);
-  allowed_connection_type_.Init(
-      prefs::kAdblockAllowedConnectionType, prefs,
-      base::BindRepeating(
-          &OngoingSubscriptionRequestImpl::CheckAllowedConnectionType,
-          // Unretained is safe because destruction of |this| will
-          // remove |allowed_connection_type_| and abort the callback.
-          base::Unretained(this)));
   adblocking_enabled_.Init(
       prefs::kEnableAdblock, prefs,
       base::BindRepeating(
-          &OngoingSubscriptionRequestImpl::CheckAllowedConnectionType,
+          &OngoingSubscriptionRequestImpl::CheckConnectionAllowed,
+          // Unretained is safe because destruction of |this| will
+          // remove |allowed_connection_type_| and abort the callback.
           base::Unretained(this)));
 }
 
@@ -135,7 +129,7 @@ size_t OngoingSubscriptionRequestImpl::GetNumberOfRedirects() const {
 void OngoingSubscriptionRequestImpl::OnNetworkChanged(
     net::NetworkChangeNotifier::ConnectionType) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  CheckAllowedConnectionType();
+  CheckConnectionAllowed();
 }
 
 bool OngoingSubscriptionRequestImpl::IsStarted() const {
@@ -143,23 +137,13 @@ bool OngoingSubscriptionRequestImpl::IsStarted() const {
 }
 
 bool OngoingSubscriptionRequestImpl::IsConnectionAllowed() const {
-  if (!adblocking_enabled_.GetValue())
-    return false;
-  if (method_ == Method::HEAD)
-    return true;
-  const auto allowed_connection_type =
-      AllowedConnectionTypeFromString(allowed_connection_type_.GetValue());
-  if (!allowed_connection_type)
-    return true;
-  if (*allowed_connection_type == AllowedConnectionType::kWiFi) {
-    return net::NetworkChangeNotifier::GetConnectionType() ==
-           net::NetworkChangeNotifier::ConnectionType::CONNECTION_WIFI;
-  }
-  DCHECK_EQ(*allowed_connection_type, AllowedConnectionType::kAny);
-  return true;
+  // Connection is allowed if (and only if) adblocking is enabled. When the
+  // user switches off adblocking, we want to stop all adblocking-related
+  // download.
+  return adblocking_enabled_.GetValue();
 }
 
-void OngoingSubscriptionRequestImpl::CheckAllowedConnectionType() {
+void OngoingSubscriptionRequestImpl::CheckConnectionAllowed() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (IsConnectionAllowed() && !IsStarted()) {
     StartInternal();

@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include "base/ranges/algorithm.h"
+#include "base/strings/string_split.h"
 #include "base/test/bind.h"
 #include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/adblock/subscription_service_factory.h"
@@ -23,8 +25,10 @@
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/adblock/core/adblock_controller.h"
 #include "components/adblock/core/subscription/subscription_service.h"
+#include "components/version_info/version_info.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "net/http/http_request_headers.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 
 namespace adblock {
@@ -40,6 +44,27 @@ class AdblockSubscriptionServiceBrowserTest
     https_server_->SetSSLConfig(net::EmbeddedTestServer::CERT_OK);
   }
 
+  bool RequestHeadersContainAcceptLanguage(
+      const net::test_server::HttpRequest& request) {
+    const auto accept_language_it =
+        request.headers.find(net::HttpRequestHeaders::kAcceptLanguage);
+    return accept_language_it != request.headers.end() &&
+           !accept_language_it->second.empty();
+  }
+
+  bool RequestHeadersContainAcceptEncodingBrotli(
+      const net::test_server::HttpRequest& request) {
+    const auto accept_encoding_it =
+        request.headers.find(net::HttpRequestHeaders::kAcceptEncoding);
+    if (accept_encoding_it == request.headers.end())
+      return false;
+    const auto split_encodings =
+        base::SplitString(accept_encoding_it->second, ",",
+                          base::WhitespaceHandling::TRIM_WHITESPACE,
+                          base::SplitResult::SPLIT_WANT_NONEMPTY);
+    return base::ranges::find(split_encodings, "br") != split_encodings.end();
+  }
+
   std::unique_ptr<net::test_server::HttpResponse>
   HandleSubscriptionUpdateRequestWithUrlCheck(
       std::string expected_url_part,
@@ -52,7 +77,20 @@ class AdblockSubscriptionServiceBrowserTest
         "! Expires: 1 days (update frequency)\n\n";
     if (base::StartsWith(request.relative_url, kSubscription,
                          base::CompareCase::SENSITIVE)) {
+      EXPECT_TRUE(RequestHeadersContainAcceptLanguage(request));
+      EXPECT_TRUE(RequestHeadersContainAcceptEncodingBrotli(request));
+      std::string os;
+      base::ReplaceChars(version_info::GetOSType(), base::kWhitespaceASCII, "",
+                         &os);
       EXPECT_TRUE(request.relative_url.find(expected_url_part) !=
+                  std::string::npos);
+      EXPECT_TRUE(request.relative_url.find("addonName=eyeo-chromium-sdk") !=
+                  std::string::npos);
+      EXPECT_TRUE(request.relative_url.find("addonVersion=1.0") !=
+                  std::string::npos);
+      EXPECT_TRUE(request.relative_url.find("platformVersion=1.0") !=
+                  std::string::npos);
+      EXPECT_TRUE(request.relative_url.find("platform=" + os) !=
                   std::string::npos);
       auto http_response =
           std::make_unique<net::test_server::BasicHttpResponse>();

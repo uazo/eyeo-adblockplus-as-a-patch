@@ -119,13 +119,13 @@ mojom::FilterMatchResult ResourceClassificationRunnerImpl::ShouldBlockPopup(
 void ResourceClassificationRunnerImpl::CheckRequestFilterMatchForWebSocket(
     std::unique_ptr<SubscriptionCollection> subscription_collection,
     const GURL& request_url,
-    content::RenderFrameHost* render_frame_host,
+    content::GlobalRenderFrameHostId render_frame_host_id,
     mojom::AdblockInterface::CheckFilterMatchCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(request_url.SchemeIsWSOrWSS());
   CheckRequestFilterMatchImpl(
       std::move(subscription_collection), request_url, ContentType::Websocket,
-      render_frame_host->GetGlobalId(), std::move(callback));
+      render_frame_host_id, std::move(callback));
 }
 
 absl::optional<GURL> ResourceClassificationRunnerImpl::CheckDocumentAllowlisted(

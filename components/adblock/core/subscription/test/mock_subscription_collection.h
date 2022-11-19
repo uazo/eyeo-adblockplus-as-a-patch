@@ -23,9 +23,11 @@
 
 #include "testing/gmock/include/gmock/gmock.h"
 
+using testing::NiceMock;
+
 namespace adblock {
 
-class MockSubscriptionCollection : public SubscriptionCollection {
+class MockSubscriptionCollection : public NiceMock<SubscriptionCollection> {
  public:
   MockSubscriptionCollection();
   ~MockSubscriptionCollection() override;

@@ -111,24 +111,6 @@ const std::string& CurrentSchemaVersion() {
   return kCurrentSchemaVersion;
 }
 
-const GURL& AcceptableAdsUrl() {
-  static GURL kAcceptableAds(
-      "https://easylist-downloads.adblockplus.org/exceptionrules.txt");
-  return kAcceptableAds;
-}
-
-const GURL& AntiCVUrl() {
-  static GURL kAntiCV(
-      "https://easylist-downloads.adblockplus.org/abp-filters-anti-cv.txt");
-  return kAntiCV;
-}
-
-const GURL& DefaultSubscriptionUrl() {
-  static GURL kEasylistUrl(
-      "https://easylist-downloads.adblockplus.org/easylist.txt");
-  return kEasylistUrl;
-}
-
 const GURL& TestPagesSubscriptionUrl() {
   static GURL kTestPagesUrl(
       "https://abptestpages.org/en/abp-testcase-subscription.txt");

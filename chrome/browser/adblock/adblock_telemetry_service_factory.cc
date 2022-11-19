@@ -30,6 +30,24 @@
 #include "content/public/browser/storage_partition.h"
 
 namespace adblock {
+namespace {
+std::optional<base::TimeDelta> g_check_interval_for_testing;
+std::optional<base::TimeDelta> g_initial_delay_for_testing;
+
+base::TimeDelta GetInitialDelay() {
+  static base::TimeDelta kInitialDelay =
+      g_initial_delay_for_testing ? g_initial_delay_for_testing.value()
+                                  : base::Seconds(30);
+  return kInitialDelay;
+}
+
+base::TimeDelta GetCheckInterval() {
+  static base::TimeDelta kCheckInterval =
+      g_check_interval_for_testing ? g_check_interval_for_testing.value()
+                                   : base::Minutes(5);
+  return kCheckInterval;
+}
+}  // namespace
 
 // static
 AdblockTelemetryService* AdblockTelemetryServiceFactory::GetForProfile(
@@ -60,9 +78,8 @@ KeyedService* AdblockTelemetryServiceFactory::BuildServiceInstanceFor(
       context->GetDefaultStoragePartition()
           ->GetURLLoaderFactoryForBrowserProcess();
   auto* prefs = Profile::FromBrowserContext(context)->GetPrefs();
-  auto service =
-      std::make_unique<AdblockTelemetryService>(prefs, url_loader_factory);
-
+  auto service = std::make_unique<AdblockTelemetryService>(
+      prefs, url_loader_factory, GetInitialDelay(), GetCheckInterval());
   service->AddTopicProvider(std::make_unique<ActivepingTelemetryTopicProvider>(
       utils::GetAppInfo(), prefs,
       ActivepingTelemetryTopicProvider::DefaultBaseUrl(),
@@ -86,6 +103,13 @@ bool AdblockTelemetryServiceFactory::ServiceIsNULLWhileTesting() const {
 bool AdblockTelemetryServiceFactory::ServiceIsCreatedWithBrowserContext()
     const {
   return true;
+}
+
+void AdblockTelemetryServiceFactory::SetCheckAndDelayIntervalsForTesting(
+    base::TimeDelta check_interval,
+    base::TimeDelta initial_delay) {
+  g_check_interval_for_testing = check_interval;
+  g_initial_delay_for_testing = initial_delay;
 }
 
 }  // namespace adblock

@@ -221,28 +221,10 @@ void AdblockContentBrowserClient::CreateWebSocket(
     const absl::optional<std::string>& user_agent,
     mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
         handshake_client) {
-  auto* profile =
-      Profile::FromBrowserContext(frame->GetProcess()->GetBrowserContext());
-  if (profile &&
-      profile->GetPrefs()->GetBoolean(adblock::prefs::kEnableAdblock)) {
-    auto* subscription_service =
-        adblock::SubscriptionServiceFactory::GetForBrowserContext(profile);
-    if (!subscription_service->IsInitialized()) {
-      subscription_service->RunWhenInitialized(base::BindOnce(
-          &AdblockContentBrowserClient::CreateWebSocket,
-          weak_factory_.GetWeakPtr(), frame, std::move(factory), url,
-          site_for_cookies, user_agent, std::move(handshake_client)));
-      return;
-    }
-    auto* classification_runner =
-        adblock::ResourceClassificationRunnerFactory::GetForBrowserContext(
-            profile);
-    classification_runner->CheckRequestFilterMatchForWebSocket(
-        subscription_service->GetCurrentSnapshot(), url, frame,
-        base::BindOnce(
-            &AdblockContentBrowserClient::OnWebSocketFilterCheckCompleted,
-            weak_factory_.GetWeakPtr(), frame, std::move(factory), url,
-            site_for_cookies, user_agent, std::move(handshake_client)));
+  if (IsAdblockEnabled(frame)) {
+    CreateWebSocketInternal(frame->GetGlobalId(), std::move(factory), url,
+                            site_for_cookies, user_agent,
+                            std::move(handshake_client));
   } else {
     DCHECK(ChromeContentBrowserClient::WillInterceptWebSocket(frame));
     ChromeContentBrowserClient::CreateWebSocket(frame, std::move(factory), url,
@@ -251,8 +233,41 @@ void AdblockContentBrowserClient::CreateWebSocket(
   }
 }
 
+void AdblockContentBrowserClient::CreateWebSocketInternal(
+    content::GlobalRenderFrameHostId render_frame_host_id,
+    WebSocketFactory factory,
+    const GURL& url,
+    const net::SiteForCookies& site_for_cookies,
+    const absl::optional<std::string>& user_agent,
+    mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
+        handshake_client) {
+  auto* frame = content::RenderFrameHost::FromID(render_frame_host_id);
+  if (!frame)
+    return;
+  auto* browser_context = frame->GetProcess()->GetBrowserContext();
+  auto* subscription_service =
+      adblock::SubscriptionServiceFactory::GetForBrowserContext(
+          browser_context);
+  if (!subscription_service->IsInitialized()) {
+    subscription_service->RunWhenInitialized(base::BindOnce(
+        &AdblockContentBrowserClient::CreateWebSocketInternal,
+        weak_factory_.GetWeakPtr(), render_frame_host_id, std::move(factory),
+        url, site_for_cookies, user_agent, std::move(handshake_client)));
+    return;
+  }
+  auto* classification_runner =
+      adblock::ResourceClassificationRunnerFactory::GetForBrowserContext(
+          browser_context);
+  classification_runner->CheckRequestFilterMatchForWebSocket(
+      subscription_service->GetCurrentSnapshot(), url, render_frame_host_id,
+      base::BindOnce(
+          &AdblockContentBrowserClient::OnWebSocketFilterCheckCompleted,
+          weak_factory_.GetWeakPtr(), render_frame_host_id, std::move(factory),
+          url, site_for_cookies, user_agent, std::move(handshake_client)));
+}
+
 void AdblockContentBrowserClient::OnWebSocketFilterCheckCompleted(
-    content::RenderFrameHost* frame,
+    content::GlobalRenderFrameHostId render_frame_host_id,
     ChromeContentBrowserClient::WebSocketFactory factory,
     const GURL& url,
     const net::SiteForCookies& site_for_cookies,
@@ -260,10 +275,13 @@ void AdblockContentBrowserClient::OnWebSocketFilterCheckCompleted(
     mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
         handshake_client,
     adblock::mojom::FilterMatchResult result) {
+  auto* frame = content::RenderFrameHost::FromID(render_frame_host_id);
+  if (!frame)
+    return;
   const bool has_blocking_filter =
       result == adblock::mojom::FilterMatchResult::kBlockRule;
   if (!has_blocking_filter) {
-    LOG(INFO) << "[eyeo] Web socket allowed for " << url;
+    VLOG(1) << "[eyeo] Web socket allowed for " << url;
     if (ChromeContentBrowserClient::WillInterceptWebSocket(frame)) {
       ChromeContentBrowserClient::CreateWebSocket(
           frame, std::move(factory), url, site_for_cookies, user_agent,
@@ -280,7 +298,7 @@ void AdblockContentBrowserClient::OnWebSocketFilterCheckCompleted(
                            mojo::NullRemote(), mojo::NullRemote());
   }
 
-  LOG(INFO) << "[eyeo] Web socket blocked for " << url;
+  VLOG(1) << "[eyeo] Web socket blocked for " << url;
 }
 
 bool AdblockContentBrowserClient::WillCreateURLLoaderFactory(
