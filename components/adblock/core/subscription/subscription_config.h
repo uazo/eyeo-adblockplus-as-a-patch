@@ -25,6 +25,14 @@
 
 namespace adblock {
 
+const GURL& AcceptableAdsUrl();
+const GURL& AntiCVUrl();
+const GURL& DefaultSubscriptionUrl();
+
+// Sets the port used by the embedded http server required for browser tests.
+// Must be called before the first call to GetKnownSubscriptions().
+void SetFilterListServerPortForTesting(int port_for_testing);
+
 enum class SubscriptionUiVisibility { Visible, Invisible };
 
 enum class SubscriptionFirstRunBehavior {

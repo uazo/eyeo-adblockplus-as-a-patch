@@ -26,9 +26,35 @@
 
 namespace adblock {
 namespace {
-constexpr base::TimeDelta kInitialDelay = base::Seconds(10);
-constexpr base::TimeDelta kNormalPingInterval = base::Hours(8);
-constexpr base::TimeDelta kRetryPingInterval = base::Hours(1);
+int g_http_port_for_testing = 0;
+std::optional<base::TimeDelta> g_time_delta_for_testing;
+
+GURL GetUrl() {
+  GURL url(EYEO_TELEMETRY_SERVER_URL);
+  if (!g_http_port_for_testing) {
+    return url;
+  }
+  DCHECK_EQ(url::kHttpsScheme, url.scheme());
+  GURL::Replacements replacements;
+  replacements.SetSchemeStr(url::kHttpScheme);
+  const std::string port_str = base::NumberToString(g_http_port_for_testing);
+  replacements.SetPortStr(port_str);
+  return url.ReplaceComponents(replacements);
+}
+
+base::TimeDelta GetNormalPingInterval() {
+  static base::TimeDelta kNormalPingInterval =
+      g_time_delta_for_testing ? g_time_delta_for_testing.value()
+                               : base::Hours(8);
+  return kNormalPingInterval;
+}
+
+base::TimeDelta GetRetryPingInterval() {
+  static base::TimeDelta kRetryPingInterval =
+      g_time_delta_for_testing ? g_time_delta_for_testing.value()
+                               : base::Hours(1);
+  return kRetryPingInterval;
+}
 
 void AppendStringIfPresent(PrefService* pref_service,
                            const std::string& pref_name,
@@ -62,7 +88,7 @@ GURL ActivepingTelemetryTopicProvider::DefaultBaseUrl() {
          "not provided. Users will not be counted correctly by eyeo. Please "
          "set an ID via \"eyeo_telemetry_client_id\" gn argument.";
 #endif
-  return GURL(EYEO_TELEMETRY_SERVER_URL);
+  return GetUrl();
 }
 
 // static
@@ -88,7 +114,7 @@ std::string ActivepingTelemetryTopicProvider::GetAuthToken() const {
   return auth_token_;
 }
 
-std::string ActivepingTelemetryTopicProvider::GetPayload() const {
+void ActivepingTelemetryTopicProvider::GetPayload(PayloadCallback callback) {
   base::Value payload(base::Value::Type::DICTIONARY);
   payload.SetStringKey("addon_name", "eyeo-chromium-sdk");
   payload.SetStringKey("addon_version", "2.0.0");
@@ -118,30 +144,25 @@ std::string ActivepingTelemetryTopicProvider::GetPayload() const {
   // payload and root objects here, they should be really shallow.
   CHECK(base::JSONWriter::Write(root, &serialized));
   VLOG(1) << "[eyeo] Telemetry ping payload: " << serialized;
-  return serialized;
+  std::move(callback).Run(std::move(serialized));
 }
 
-base::TimeDelta ActivepingTelemetryTopicProvider::GetTimeToNextRequest() const {
+base::Time ActivepingTelemetryTopicProvider::GetTimeOfNextRequest() const {
   const auto next_ping_time =
       pref_service_->GetTime(prefs::kTelemetryNextPingTime);
   // Next ping time may be unset if this is a first run. Next request should
-  // happen soon, but not immediately to avoid interfering with first run load.
+  // happen ASAP.
   if (next_ping_time.is_null())
-    return kInitialDelay;
+    return base::Time::Now();
 
-  auto delay_to_next_ping = next_ping_time - base::Time::Now();
-  // Next ping can effectively be in the past. This happens ex. if the browser
-  // was shut down for longer than the normal ping interval and is normal.
-  // In that case, make the next ping soon, but not immediately, as to not
-  // interfere with startup network traffic.
-  return std::max(kInitialDelay, delay_to_next_ping);
+  return next_ping_time;
 }
 
 void ActivepingTelemetryTopicProvider::ParseResponse(
     std::unique_ptr<std::string> response_content) {
   if (!response_content) {
     VLOG(1) << "[eyeo] Telemetry ping failed, no response from server";
-    ScheduleNextPing(kRetryPingInterval);
+    ScheduleNextPing(GetRetryPingInterval());
     return;
   }
 
@@ -150,7 +171,7 @@ void ActivepingTelemetryTopicProvider::ParseResponse(
   if (!parsed || !parsed->is_dict()) {
     VLOG(1)
         << "[eyeo] Telemetry ping failed, response could not be parsed as JSON";
-    ScheduleNextPing(kRetryPingInterval);
+    ScheduleNextPing(GetRetryPingInterval());
     return;
   }
 
@@ -158,7 +179,7 @@ void ActivepingTelemetryTopicProvider::ParseResponse(
   if (error_message) {
     VLOG(1) << "[eyeo] Telemetry ping failed, error message: "
             << *error_message;
-    ScheduleNextPing(kRetryPingInterval);
+    ScheduleNextPing(GetRetryPingInterval());
     return;
   }
 
@@ -170,12 +191,12 @@ void ActivepingTelemetryTopicProvider::ParseResponse(
   if (!ping_response_time) {
     VLOG(1) << "[eyeo] Telemetry ping failed, response did not contain a last "
                "ping / token value";
-    ScheduleNextPing(kRetryPingInterval);
+    ScheduleNextPing(GetRetryPingInterval());
     return;
   }
 
   VLOG(1) << "[eyeo] Telemetry ping succeeded";
-  ScheduleNextPing(kNormalPingInterval);
+  ScheduleNextPing(GetNormalPingInterval());
   UpdatePrefs(*ping_response_time);
 }
 
@@ -201,6 +222,18 @@ void ActivepingTelemetryTopicProvider::UpdatePrefs(
   const auto tag = base::GUID::GenerateRandomV4();
   pref_service_->SetString(prefs::kTelemetryLastPingTag,
                            tag.AsLowercaseString());
+}
+
+// static
+void ActivepingTelemetryTopicProvider::SetHttpPortForTesting(
+    int http_port_for_testing) {
+  g_http_port_for_testing = http_port_for_testing;
+}
+
+// static
+void ActivepingTelemetryTopicProvider::SetIntervalsForTesting(
+    base::TimeDelta time_delta) {
+  g_time_delta_for_testing = time_delta;
 }
 
 }  // namespace adblock

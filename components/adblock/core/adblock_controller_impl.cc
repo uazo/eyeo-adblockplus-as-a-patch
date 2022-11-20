@@ -100,8 +100,6 @@ AdblockControllerImpl::AdblockControllerImpl(
                        on_change_cb);
   enable_aa_.Init(adblock::prefs::kEnableAcceptableAds, pref_service,
                   on_change_cb);
-  allowed_connection_type_.Init(adblock::prefs::kAdblockAllowedConnectionType,
-                                pref_service, on_change_cb);
 
   allowed_domains_.Init(adblock::prefs::kAdblockAllowedDomains, pref_service,
                         on_change_cb);
@@ -228,15 +226,12 @@ std::vector<std::string> AdblockControllerImpl::GetAllowedDomains() const {
 }
 
 void AdblockControllerImpl::SetUpdateConsent(AllowedConnectionType value) {
-  allowed_connection_type_.SetValue(AllowedConnectionTypeToString(value));
+  // Deprecated, entire function will be removed in 109
 }
 
 AllowedConnectionType AdblockControllerImpl::GetUpdateConsent() const {
-  auto allowed_connection_type =
-      AllowedConnectionTypeFromString(allowed_connection_type_.GetValue());
-  if (!allowed_connection_type)
-    return AllowedConnectionType::kWiFi;  // it's default
-  return *allowed_connection_type;
+  // Deprecated, entire function will be removed in 109
+  return AllowedConnectionType::kAny;
 }
 
 void AdblockControllerImpl::AddCustomFilter(const std::string& filter) {

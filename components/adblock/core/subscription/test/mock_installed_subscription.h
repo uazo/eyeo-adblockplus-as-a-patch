@@ -23,9 +23,11 @@
 
 #include "testing/gmock/include/gmock/gmock.h"
 
+using testing::NiceMock;
+
 namespace adblock {
 
-class MockInstalledSubscription : public InstalledSubscription {
+class MockInstalledSubscription : public NiceMock<InstalledSubscription> {
  public:
   MockInstalledSubscription();
   MOCK_METHOD(GURL, GetSourceUrl, (), (override, const));

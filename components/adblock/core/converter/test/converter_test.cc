@@ -206,8 +206,7 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_Image) {
 
   EXPECT_TRUE(VerifyRequestBlocked(
       subscription,
-      GURL(
-          "https://abptestpages.org/testfiles/image/static/image.png"),
+      GURL("https://abptestpages.org/testfiles/image/static/image.png"),
       "domain.com", ContentType::Image, ContentTypeIsSpecific));
 }
 
@@ -253,8 +252,7 @@ TEST_F(AdblockConverterTest,
 
   EXPECT_TRUE(VerifyRequestBlocked(
       subscription,
-      GURL(
-          "https://abptestpages.org/testfiles/image/static/image.png"),
+      GURL("https://abptestpages.org/testfiles/image/static/image.png"),
       "domain.com", ContentType::Image, ContentTypeIsSpecific));
 }
 
@@ -279,8 +277,7 @@ TEST_F(AdblockConverterTest,
 
   EXPECT_TRUE(VerifyRequestBlocked(
       subscription,
-      GURL(
-          "https://abptestpages.org/testfiles/image/static/image.png"),
+      GURL("https://abptestpages.org/testfiles/image/static/image.png"),
       "domain.com", ContentType::Image, ContentTypeIsSpecific));
 }
 
@@ -336,8 +333,7 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_Script) {
   )");
 
   EXPECT_TRUE(VerifyRequestBlocked(
-      subscription,
-      GURL("https://abptestpages.org/testfiles/script/script.js"),
+      subscription, GURL("https://abptestpages.org/testfiles/script/script.js"),
       "domain.com", ContentType::Script, ContentTypeIsSpecific));
 }
 
@@ -347,8 +343,7 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_Subdocument) {
   )");
   EXPECT_TRUE(VerifyRequestBlocked(
       subscription,
-      GURL(
-          "https://abptestpages.org/testfiles/subdocument/index.html"),
+      GURL("https://abptestpages.org/testfiles/subdocument/index.html"),
       "domain.com", ContentType::Subdocument, ContentTypeIsSpecific));
 }
 
@@ -357,8 +352,8 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_WebRTC) {
     $webrtc,domain=abptestpages.org
   )");
   EXPECT_TRUE(VerifyRequestBlocked(
-      subscription, GURL("https://abptestpages.org/webrtc"),
-      "abptestpages.org", ContentType::Webrtc, ContentTypeIsSpecific));
+      subscription, GURL("https://abptestpages.org/webrtc"), "abptestpages.org",
+      ContentType::Webrtc, ContentTypeIsSpecific));
 }
 
 TEST_F(AdblockConverterTest, UrlFilterBlocking_Wildcard) {
@@ -378,8 +373,7 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_FullPath) {
   )");
   EXPECT_TRUE(VerifyRequestBlocked(
       subscription,
-      GURL(
-          "https://abptestpages.org/testfiles/blocking/full-path.png"),
+      GURL("https://abptestpages.org/testfiles/blocking/full-path.png"),
       "domain.com", ContentType::Image, ContentTypeIsGeneric));
 }
 
@@ -407,8 +401,8 @@ TEST_F(AdblockConverterTest, UrlFilter_DomainWildcardMiddle1) {
     ||a.*.b.com
   )");
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("http://a.c.b.com"), "https://abptestpages.org",
-      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+      GURL("http://a.c.b.com"), "https://abptestpages.org", ContentType::Image,
+      SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_DomainWildcardMiddle2) {
@@ -416,8 +410,8 @@ TEST_F(AdblockConverterTest, UrlFilter_DomainWildcardMiddle2) {
     ||a*.b.com
   )");
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("http://a.c.b.com"), "https://abptestpages.org",
-      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+      GURL("http://a.c.b.com"), "https://abptestpages.org", ContentType::Image,
+      SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_DomainWildcardMiddle3) {
@@ -425,8 +419,8 @@ TEST_F(AdblockConverterTest, UrlFilter_DomainWildcardMiddle3) {
     ||a.*b.com
   )");
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("http://a.b.com"), "https://abptestpages.org",
-      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+      GURL("http://a.b.com"), "https://abptestpages.org", ContentType::Image,
+      SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_WildcardDomainAndPath1) {
@@ -455,8 +449,8 @@ TEST_F(AdblockConverterTest, UrlFilter_DomainWildcardStart) {
     ||*a.b.com
   )");
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("http://a.b.com"), "https://abptestpages.org",
-      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+      GURL("http://a.b.com"), "https://abptestpages.org", ContentType::Image,
+      SiteKey(), FilterCategory::Blocking));
   EXPECT_TRUE(subscription->HasUrlFilter(
       GURL("http://domena.b.com/path"), "https://abptestpages.org",
       ContentType::Image, SiteKey(), FilterCategory::Blocking));
@@ -467,8 +461,8 @@ TEST_F(AdblockConverterTest, UrlFilter_DomainWildcardStartEndCarret) {
     ||*a.b.com^
   )");
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("http://a.b.com"), "https://abptestpages.org",
-      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+      GURL("http://a.b.com"), "https://abptestpages.org", ContentType::Image,
+      SiteKey(), FilterCategory::Blocking));
   EXPECT_TRUE(subscription->HasUrlFilter(
       GURL("http://domena.b.com/path"), "https://abptestpages.org",
       ContentType::Image, SiteKey(), FilterCategory::Blocking));
@@ -513,10 +507,9 @@ TEST_F(AdblockConverterTest, UrlFilter_SchemeDomainDot) {
   auto subscription = ConvertAndLoadRules(R"(
     ://ads.
   )");
-  EXPECT_TRUE(subscription->HasUrlFilter(GURL("https://ads.example.com/u?dp=1"),
-                                         "https://abptestpages.org",
-                                         ContentType::Script, SiteKey(),
-                                         FilterCategory::Blocking));
+  EXPECT_TRUE(subscription->HasUrlFilter(
+      GURL("https://ads.example.com/u?dp=1"), "https://abptestpages.org",
+      ContentType::Script, SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_PathWildcards) {
@@ -544,19 +537,17 @@ TEST_F(AdblockConverterTest, UrlFilter_PartdomainNoMatch) {
     ||art-domain.com^
   )");
   EXPECT_FALSE(subscription->HasUrlFilter(
-      GURL("https://sub.part-domain.com/path"),
-      "https://abptestpages.org", ContentType::Image, SiteKey(),
-      FilterCategory::Blocking));
+      GURL("https://sub.part-domain.com/path"), "https://abptestpages.org",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_DoubleSlash) {
   auto subscription = ConvertAndLoadRules(R"(
     ||example.com*/script.
   )");
-  EXPECT_TRUE(subscription->HasUrlFilter(GURL("https://example.com//script.js"),
-                                         "https://abptestpages.org",
-                                         ContentType::Image, SiteKey(),
-                                         FilterCategory::Blocking));
+  EXPECT_TRUE(subscription->HasUrlFilter(
+      GURL("https://example.com//script.js"), "https://abptestpages.org",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_Regex) {
@@ -603,9 +594,8 @@ TEST_F(AdblockConverterTest, UrlFilter_StartMatchCompleteUrl) {
     |https://domain.com/path/file.gif
   )");
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("https://domain.com/path/file.gif"),
-      "https://abptestpages.org", ContentType::Image, SiteKey(),
-      FilterCategory::Blocking));
+      GURL("https://domain.com/path/file.gif"), "https://abptestpages.org",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_DomainMatchDotWildcard) {
@@ -613,9 +603,8 @@ TEST_F(AdblockConverterTest, UrlFilter_DomainMatchDotWildcard) {
     ||*.
   )");
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("https://example.com/path/file.gif"),
-      "https://abptestpages.org", ContentType::Image, SiteKey(),
-      FilterCategory::Blocking));
+      GURL("https://example.com/path/file.gif"), "https://abptestpages.org",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_DomainWithPort) {
@@ -623,9 +612,8 @@ TEST_F(AdblockConverterTest, UrlFilter_DomainWithPort) {
     ||example.com:8888/js
   )");
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("https://wwww.example.com:8888/js"),
-      "https://abptestpages.org", ContentType::Image, SiteKey(),
-      FilterCategory::Blocking));
+      GURL("https://wwww.example.com:8888/js"), "https://abptestpages.org",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_IPWithPortAndWildcard) {
@@ -636,9 +624,8 @@ TEST_F(AdblockConverterTest, UrlFilter_IPWithPortAndWildcard) {
       GURL("https://1.2.3.4:8060/path"), "https://abptestpages.org",
       ContentType::Image, SiteKey(), FilterCategory::Blocking));
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("https://1.2.3.4:8060/path/file.js"),
-      "https://abptestpages.org", ContentType::Image, SiteKey(),
-      FilterCategory::Blocking));
+      GURL("https://1.2.3.4:8060/path/file.js"), "https://abptestpages.org",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
 }
 
 TEST_F(AdblockConverterTest, UrlFilter_DomainWithPortAndCarret) {
@@ -648,10 +635,9 @@ TEST_F(AdblockConverterTest, UrlFilter_DomainWithPortAndCarret) {
   EXPECT_TRUE(subscription->HasUrlFilter(
       GURL("https://example.com:8862"), "https://abptestpages.org",
       ContentType::Image, SiteKey(), FilterCategory::Blocking));
-  EXPECT_TRUE(subscription->HasUrlFilter(GURL("https://example.com:8862/path"),
-                                         "https://abptestpages.org",
-                                         ContentType::Image, SiteKey(),
-                                         FilterCategory::Blocking));
+  EXPECT_TRUE(subscription->HasUrlFilter(
+      GURL("https://example.com:8862/path"), "https://abptestpages.org",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
   EXPECT_FALSE(subscription->HasUrlFilter(
       GURL("https://example.com:886"), "https://abptestpages.org",
       ContentType::Image, SiteKey(), FilterCategory::Blocking));
@@ -731,8 +717,8 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_Other) {
     $other,domain=abptestpages.org
   )");
   EXPECT_TRUE(VerifyRequestBlocked(
-      subscription, GURL("https://whatever.com/script.js"),
-      "abptestpages.org", ContentType::Other, ContentTypeIsSpecific));
+      subscription, GURL("https://whatever.com/script.js"), "abptestpages.org",
+      ContentType::Other, ContentTypeIsSpecific));
 }
 
 TEST_F(AdblockConverterTest, UrlFilterBlocking_Ping) {
@@ -740,8 +726,8 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_Ping) {
     abptestpages.org/*^$ping
   )");
   EXPECT_TRUE(VerifyRequestBlocked(
-      subscription, GURL("https://abptestpages.org/ping"),
-      "abptestpages.org", ContentType::Ping, ContentTypeIsSpecific));
+      subscription, GURL("https://abptestpages.org/ping"), "abptestpages.org",
+      ContentType::Ping, ContentTypeIsSpecific));
 }
 
 TEST_F(AdblockConverterTest, UrlFilterBlocking_XmlHttpRequest) {
@@ -752,8 +738,7 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_XmlHttpRequest) {
       subscription,
       GURL("https://abptestpages.org/testfiles/xmlhttprequest/"
            "request.xml"),
-      "abptestpages.org", ContentType::Xmlhttprequest,
-      ContentTypeIsSpecific));
+      "abptestpages.org", ContentType::Xmlhttprequest, ContentTypeIsSpecific));
 }
 
 TEST_F(AdblockConverterTest, UrlFilterBlocking_ThirdParty) {
@@ -809,9 +794,8 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_NotThirdParty) {
   )");
 
   EXPECT_TRUE(subscription->HasUrlFilter(
-      GURL("https://abptestpages.org/abb-logo.png"),
-      "abptestpages.org", ContentType::Image, SiteKey(),
-      FilterCategory::Blocking));
+      GURL("https://abptestpages.org/abb-logo.png"), "abptestpages.org",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
   // Does not apply on different domain.
   EXPECT_FALSE(subscription->HasUrlFilter(
       GURL("https://abptestpages.org/abb-logo.png"), "domain.com",
@@ -825,14 +809,12 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_Popup) {
 
   EXPECT_TRUE(subscription->HasPopupFilter(
       GURL("https://abptestpages.org/testfiles/popup/link.html"),
-      GURL("https://abptestpages.org"), SiteKey(),
-      FilterCategory::Blocking));
+      GURL("https://abptestpages.org"), SiteKey(), FilterCategory::Blocking));
 
   // No allowing filter:
   EXPECT_FALSE(subscription->HasPopupFilter(
       GURL("https://abptestpages.org/testfiles/popup/link.html"),
-      GURL("https://abptestpages.org"), SiteKey(),
-      FilterCategory::Allowing));
+      GURL("https://abptestpages.org"), SiteKey(), FilterCategory::Allowing));
 
   // Does not match if the content type is different.
   EXPECT_FALSE(subscription->HasUrlFilter(
@@ -848,8 +830,7 @@ TEST_F(AdblockConverterTest, UrlFilterBlocking_MultipleTypes) {
 
   EXPECT_TRUE(subscription->HasPopupFilter(
       GURL("https://abptestpages.org/testfiles/popup/link.html"),
-      GURL("https://abptestpages.org"), SiteKey(),
-      FilterCategory::Blocking));
+      GURL("https://abptestpages.org"), SiteKey(), FilterCategory::Blocking));
 
   EXPECT_TRUE(subscription->HasUrlFilter(
       GURL("https://abptestpages.org/testfiles/popup/link.html"),
@@ -956,15 +937,13 @@ TEST_F(AdblockConverterTest, UrlFilterException_Popup) {
   EXPECT_TRUE(subscription->HasPopupFilter(
       GURL("https://abptestpages.org/testfiles/popup_exception/"
            "link.html"),
-      GURL("https://abptestpages.org"), SiteKey(),
-      FilterCategory::Blocking));
+      GURL("https://abptestpages.org"), SiteKey(), FilterCategory::Blocking));
 
   // But also finds the allowing filter:
   EXPECT_TRUE(subscription->HasPopupFilter(
       GURL("https://abptestpages.org/testfiles/popup_exception/"
            "link.html"),
-      GURL("https://abptestpages.org"), SiteKey(),
-      FilterCategory::Allowing));
+      GURL("https://abptestpages.org"), SiteKey(), FilterCategory::Allowing));
 }
 
 TEST_F(AdblockConverterTest, UrlFilterException_XmlHttpRequest) {
@@ -974,11 +953,11 @@ TEST_F(AdblockConverterTest, UrlFilterException_XmlHttpRequest) {
     @@abptestpages.org/testfiles/xmlhttprequest_exception/$xmlhttprequest
   )");
 
-  EXPECT_TRUE(VerifyRequestAllowed(
-      subscription,
-      GURL("https://abptestpages.org/testfiles/"
-           "xmlhttprequest_exception/link.html"),
-      "https://abptestpages.org", ContentType::Xmlhttprequest));
+  EXPECT_TRUE(VerifyRequestAllowed(subscription,
+                                   GURL("https://abptestpages.org/testfiles/"
+                                        "xmlhttprequest_exception/link.html"),
+                                   "https://abptestpages.org",
+                                   ContentType::Xmlhttprequest));
 }
 
 TEST_F(AdblockConverterTest, UrlFilterException_Ping) {
@@ -1053,9 +1032,9 @@ TEST_F(AdblockConverterTest, UrlFilterException_WebSocket) {
     @@$websocket,domain=abptestpages.org
   )");
 
-  EXPECT_TRUE(VerifyRequestAllowed(
-      subscription, GURL("https://whatever.org/socket.wss"),
-      "abptestpages.org", ContentType::Websocket));
+  EXPECT_TRUE(VerifyRequestAllowed(subscription,
+                                   GURL("https://whatever.org/socket.wss"),
+                                   "abptestpages.org", ContentType::Websocket));
 }
 
 TEST_F(AdblockConverterTest, UrlRegexAnythingEndingOnline) {
@@ -1489,6 +1468,28 @@ TEST_F(AdblockConverterTest, Elementhideemu_on_top_level_domain) {
       subscriptions->GetElemhideEmulationSelectors(GURL("https://test.com/"));
 
   EXPECT_EQ(FilterSelectors(selectors).size(), 0u);
+}
+
+TEST_F(AdblockConverterTest, Elementhide_non_ascii_characters) {
+  // Non-ASCII characters are allowed in selectors. They should be preserved.
+  auto subscriptions = ConvertAndLoadRules(R"(
+    test.com##.ad_bÖx
+    )");
+  const auto selectors =
+      subscriptions->GetElemhideSelectors(GURL("https://test.com/"), false);
+
+  EXPECT_EQ(FilterSelectors(selectors), std::set<base::StringPiece>{".ad_bÖx"});
+}
+
+TEST_F(AdblockConverterTest, Elementhideemu_non_ascii_characters) {
+  // Non-ASCII characters are allowed in selectors. They should be preserved.
+  auto subscriptions = ConvertAndLoadRules(R"(
+    test.com#?#.ad_bÖx
+    )");
+  const auto selectors =
+      subscriptions->GetElemhideEmulationSelectors(GURL("https://test.com/"));
+
+  EXPECT_EQ(FilterSelectors(selectors), std::set<base::StringPiece>{".ad_bÖx"});
 }
 
 TEST_F(AdblockConverterTest, SnippetEmpty) {

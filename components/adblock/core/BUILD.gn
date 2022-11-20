@@ -156,13 +156,10 @@ source_set("unit_tests") {
   sources = [
     "test/activeping_telemetry_topic_provider_test.cc",
     "test/adblock_controller_impl_test.cc",
+    "test/adblock_telemetry_service_unittest.cc",
     "test/bundled_subscription_test.cc",
     "test/sitekey_storage_impl_test.cc",
   ]
-
-  if (eyeo_telemetry_client_id != "") {
-    sources += [ "test/adblock_telemetry_service_unittest.cc" ]
-  }
 
   deps = [
     ":core",

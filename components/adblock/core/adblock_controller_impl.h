@@ -105,7 +105,6 @@ class AdblockControllerImpl : public AdblockController {
   PrefService* prefs_{nullptr};
   BooleanPrefMember enable_adblock_;
   BooleanPrefMember enable_aa_;
-  StringPrefMember allowed_connection_type_;
   StringListPrefMember allowed_domains_;
   StringListPrefMember custom_filters_;
   StringListPrefMember subscriptions_;

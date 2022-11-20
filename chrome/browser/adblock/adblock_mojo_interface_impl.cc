@@ -169,16 +169,16 @@ void AdblockMojoInterfaceImpl::OnRequestUrlClassified(
   if (result == mojom::FilterMatchResult::kBlockRule) {
     content::RenderProcessHost* process_host =
         content::RenderProcessHost::FromID(render_process_id_);
-    if (process_host) {
+    content::RenderFrameHost* frame_host =
+        content::RenderFrameHost::FromID(render_process_id_, render_frame_id);
+    if (process_host && frame_host) {
       adblock::ElementHider* element_hider =
           adblock::ElementHiderFactory::GetForBrowserContext(
               process_host->GetBrowserContext());
       const auto adblock_resource_type =
           utils::ConvertToAdblockResourceType(request_url, resource_type);
       if (element_hider->IsElementTypeHideable(adblock_resource_type)) {
-        element_hider->HideBlockedElement(
-            request_url, content::RenderFrameHost::FromID(render_process_id_,
-                                                          render_frame_id));
+        element_hider->HideBlockedElement(request_url, frame_host);
       }
     }
   }
@@ -194,7 +194,10 @@ void AdblockMojoInterfaceImpl::OnResponseHeadersClassified(
     mojom::FilterMatchResult result) {
   content::RenderProcessHost* process_host =
       content::RenderProcessHost::FromID(render_process_id_);
-  if (!process_host || result == mojom::FilterMatchResult::kDisabled) {
+  content::RenderFrameHost* frame_host =
+      content::RenderFrameHost::FromID(render_process_id_, render_frame_id);
+  if (!process_host || !frame_host ||
+      result == mojom::FilterMatchResult::kDisabled) {
     PostResponseHeadersCallbackToUI(std::move(callback), result, nullptr);
     return;
   }
@@ -205,9 +208,7 @@ void AdblockMojoInterfaceImpl::OnResponseHeadersClassified(
             process_host->GetBrowserContext());
     auto adblock_resource_type = utils::DetectResourceType(response_url);
     if (element_hider->IsElementTypeHideable(adblock_resource_type)) {
-      element_hider->HideBlockedElement(
-          response_url, content::RenderFrameHost::FromID(render_process_id_,
-                                                         render_frame_id));
+      element_hider->HideBlockedElement(response_url, frame_host);
     }
     PostResponseHeadersCallbackToUI(std::move(callback), result, nullptr);
     return;

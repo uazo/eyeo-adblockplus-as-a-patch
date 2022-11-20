@@ -38,9 +38,11 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
+using testing::NiceMock;
+
 namespace adblock {
 
-class MockOngoingRequest : public OngoingSubscriptionRequest {
+class MockOngoingRequest : public NiceMock<OngoingSubscriptionRequest> {
  public:
   MOCK_METHOD(void,
               Start,

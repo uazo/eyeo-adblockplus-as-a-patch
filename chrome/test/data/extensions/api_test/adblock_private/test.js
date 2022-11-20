@@ -65,45 +65,6 @@ function verifyEventData(event, expectedSubscription) {
 }
 
 var availableTests = [
-  function updateConsent() {
-    chrome.adblockPrivate.getUpdateConsent(function(consent) {
-      if (consent == 'WIFI_ONLY') {
-        chrome.adblockPrivate.setUpdateConsent('ALWAYS');
-        chrome.adblockPrivate.getUpdateConsent(function(consent) {
-          if (consent != 'ALWAYS') {
-            chrome.test.fail('Failed: Consent not set');
-            return;
-          }
-          chrome.adblockPrivate.setUpdateConsent('WIFI_ONLY');
-          chrome.adblockPrivate.getUpdateConsent(function(consent) {
-            if (consent == 'WIFI_ONLY') {
-              chrome.test.succeed();
-            } else {
-              chrome.test.fail('Failed: Consent not set');
-            }
-          });
-        });
-      } else if (consent == 'ALWAYS') {
-        chrome.adblockPrivate.setUpdateConsent('WIFI_ONLY');
-        chrome.adblockPrivate.getUpdateConsent(function(consent) {
-          if (consent != 'WIFI_ONLY') {
-            chrome.test.fail('Failed: Consent not set');
-            return;
-          }
-          chrome.adblockPrivate.setUpdateConsent('ALWAYS');
-          chrome.adblockPrivate.getUpdateConsent(function(consent) {
-            if (consent == 'ALWAYS') {
-              chrome.test.succeed();
-            } else {
-              chrome.test.fail('Failed: Consent not set');
-            }
-          });
-        });
-      } else {
-        chrome.test.fail('Failed: Unknown consent');
-      }
-    });
-  },
   function setEnabled_isEnabled() {
     chrome.adblockPrivate.setEnabled(true);
     chrome.adblockPrivate.isEnabled(function(enabled) {

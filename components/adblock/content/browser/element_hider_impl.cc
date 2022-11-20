@@ -175,11 +175,6 @@ ElementHider::ElemhideInjectionData PrepareElemhideEmulationData(
     SiteKey sitekey) {
   TRACE_EVENT1("eyeo", "PrepareElemhideEmulationData", "url", gurl.spec());
 
-  // user domains allowing is implemented as adding exception filter for
-  // domain so we can just use filter engine to do the work.
-  if (!gurl.SchemeIsHTTPOrHTTPS())
-    return {};
-
   bool doc_allowlisted = !!subscription_collection->FindBySpecialFilter(
       SpecialFilterType::Document, gurl, frame_hierarchy, sitekey);
   bool ehe_allowlisted =

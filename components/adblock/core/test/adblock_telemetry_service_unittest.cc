@@ -20,6 +20,7 @@
 #include <memory>
 
 #include "base/test/task_environment.h"
+#include "base/time/time.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/prefs/testing_pref_service.h"
 #include "net/base/load_flags.h"
@@ -33,19 +34,25 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
+using testing::NiceMock;
 using testing::Return;
 
 namespace adblock {
+
 namespace {
 
-class MockTopicProvider : public AdblockTelemetryService::TopicProvider {
+class MockTopicProvider
+    : public NiceMock<AdblockTelemetryService::TopicProvider> {
  public:
   MOCK_METHOD(GURL, GetEndpointURL, (), (const, override));
   MOCK_METHOD(std::string, GetAuthToken, (), (const, override));
-  MOCK_METHOD(std::string, GetPayload, (), (const, override));
-  MOCK_METHOD(base::TimeDelta, GetTimeToNextRequest, (), (const, override));
+  MOCK_METHOD(void, GetPayload, (PayloadCallback), (override));
+  MOCK_METHOD(base::Time, GetTimeOfNextRequest, (), (const, override));
   MOCK_METHOD(void, ParseResponse, (std::unique_ptr<std::string>), (override));
 };
+
+const auto kInitialDelay = base::Seconds(30);
+const auto kCheckInterval = base::Minutes(5);
 }  // namespace
 
 class AdblockTelemetryServiceTest : public testing::Test {
@@ -53,16 +60,20 @@ class AdblockTelemetryServiceTest : public testing::Test {
   void SetUp() override {
     prefs::RegisterProfilePrefs(pref_service_.registry());
     telemetry_service_ = std::make_unique<AdblockTelemetryService>(
-        &pref_service_, test_shared_url_loader_factory_);
+        &pref_service_, test_shared_url_loader_factory_, kInitialDelay,
+        kCheckInterval);
   }
 
   MockTopicProvider* RegisterFooMock() {
     auto* mock_provider = RegisterNewMockTopicProvider();
     ON_CALL(*mock_provider, GetEndpointURL()).WillByDefault(Return(kFooUrl));
     ON_CALL(*mock_provider, GetAuthToken()).WillByDefault(Return("foo_token"));
-    ON_CALL(*mock_provider, GetTimeToNextRequest())
-        .WillByDefault(Return(kFooDelay));
-    ON_CALL(*mock_provider, GetPayload()).WillByDefault(Return("foo_data"));
+    ON_CALL(*mock_provider, GetPayload(testing::_))
+        .WillByDefault([](MockTopicProvider::PayloadCallback callback) {
+          std::move(callback).Run("foo_data");
+        });
+    ON_CALL(*mock_provider, GetTimeOfNextRequest())
+        .WillByDefault(Return(base::Time::Now() + kFooDelay));
     return mock_provider;
   }
 
@@ -79,9 +90,12 @@ class AdblockTelemetryServiceTest : public testing::Test {
     auto* mock_provider = RegisterNewMockTopicProvider();
     ON_CALL(*mock_provider, GetEndpointURL()).WillByDefault(Return(kBarUrl));
     ON_CALL(*mock_provider, GetAuthToken()).WillByDefault(Return("bar_token"));
-    ON_CALL(*mock_provider, GetTimeToNextRequest())
-        .WillByDefault(Return(kBarDelay));
-    ON_CALL(*mock_provider, GetPayload()).WillByDefault(Return("bar_data"));
+    ON_CALL(*mock_provider, GetPayload(testing::_))
+        .WillByDefault([](MockTopicProvider::PayloadCallback callback) {
+          std::move(callback).Run("bar_data");
+        });
+    ON_CALL(*mock_provider, GetTimeOfNextRequest())
+        .WillByDefault(Return(base::Time::Now() + kBarDelay));
     return mock_provider;
   }
 
@@ -143,13 +157,33 @@ class AdblockTelemetryServiceTest : public testing::Test {
       test_shared_url_loader_factory_{
           base::MakeRefCounted<network::WeakWrapperSharedURLLoaderFactory>(
               &test_url_loader_factory_)};
-  constexpr static base::TimeDelta kFooDelay{base::Seconds(5)};
-  constexpr static base::TimeDelta kBarDelay{base::Seconds(6)};
+  constexpr static base::TimeDelta kFooDelay{base::Minutes(4)};
+  constexpr static base::TimeDelta kBarDelay{base::Minutes(6)};
   const GURL kFooUrl{"https://telemetry.com/topic/eyeo_foo/version/3"};
   const GURL kBarUrl{"https://telemetry.com/topic/eyeo_bar/version/2"};
 
   std::unique_ptr<AdblockTelemetryService> telemetry_service_;
 };
+
+TEST_F(AdblockTelemetryServiceTest, RequestNotMadeBeforeInitialDelay) {
+  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+
+  auto* mock = RegisterFooMock();
+  EXPECT_CALL(*mock, GetTimeOfNextRequest())
+      .WillOnce(Return(base::Time::Now()));
+
+  telemetry_service_->Start();
+
+  // Despite the Foo topic provider declaring a next request time of Now(),
+  // we wait until kInitialDelay has passed.
+  task_environment_.RunUntilIdle();
+  ASSERT_EQ(test_url_loader_factory_.NumPending(), 0);
+
+  // Only after initial delay has passed, there's a network request made.
+  task_environment_.FastForwardBy(kInitialDelay);
+  ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
+  ExpectFooMadeRequest(0);
+}
 
 TEST_F(AdblockTelemetryServiceTest,
        ScheduleStartsImmediatelyWhenAdblockEnabled) {
@@ -159,12 +193,13 @@ TEST_F(AdblockTelemetryServiceTest,
 
   telemetry_service_->Start();
 
-  // No requests initially.
+  // There are no TopicProviders that are due already after the initial delay.
+  task_environment_.FastForwardBy(kInitialDelay);
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 0);
 
   // The topic should have scheduled a request according to its
-  // GetTimeToNextRequest().
-  task_environment_.FastForwardBy(kBarDelay);
+  // GetTimeOfNextRequest(). It will be checked after kCheckInterval.
+  task_environment_.FastForwardBy(kCheckInterval);
 
   // A request was sent to a URL built according to topic provider's data.
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
@@ -182,15 +217,15 @@ TEST_F(AdblockTelemetryServiceTest, ScheduleStartupDelayedWhenAdblockDisabled) {
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 0);
 
   // A lot of time passes.
-  task_environment_.FastForwardBy(kBarDelay * 5);
+  task_environment_.FastForwardBy(kCheckInterval * 5);
   // There was no network request made, because prefs::kEnableAdblock is false.
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 0);
 
   // kEnableAdblock becomes true:
   pref_service_.SetBoolean(prefs::kEnableAdblock, true);
 
-  // Schedule is started, first request made after kBarDelay.
-  task_environment_.FastForwardBy(kBarDelay);
+  // Schedule is started, first request made after kInitialDelay.
+  task_environment_.FastForwardBy(kInitialDelay);
 
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
   ExpectFooMadeRequest(0);
@@ -206,7 +241,7 @@ TEST_F(AdblockTelemetryServiceTest, ScheduleAbortedWhenAdblockDisabled) {
   pref_service_.SetBoolean(prefs::kEnableAdblock, false);
 
   // A lot of time passes with no requests, schedule is stopped.
-  task_environment_.FastForwardBy(kBarDelay * 5);
+  task_environment_.FastForwardBy(kCheckInterval * 5);
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 0);
 }
 
@@ -222,12 +257,13 @@ TEST_F(AdblockTelemetryServiceTest, MultipleProvidersMakeRequests) {
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 0);
 
   // Time for Foo topic provider to make a request.
-  task_environment_.FastForwardBy(kFooDelay);
+  task_environment_.FastForwardBy(kInitialDelay);
+  task_environment_.FastForwardBy(kCheckInterval);
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
   ExpectFooMadeRequest(0);
 
   // Time for Bar topic provider to make a request.
-  task_environment_.FastForwardBy(kBarDelay - kFooDelay);
+  task_environment_.FastForwardBy(kCheckInterval);
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 2);
   ExpectBarMadeRequest(1);
 }
@@ -239,7 +275,8 @@ TEST_F(AdblockTelemetryServiceTest, SuccessfulResponseReceived) {
 
   telemetry_service_->Start();
 
-  task_environment_.FastForwardBy(kFooDelay);
+  task_environment_.FastForwardBy(kInitialDelay);
+  task_environment_.FastForwardBy(kCheckInterval);
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
   ExpectFooMadeRequest(0);
 
@@ -258,7 +295,8 @@ TEST_F(AdblockTelemetryServiceTest, Non200ResponseStillParsed) {
 
   telemetry_service_->Start();
 
-  task_environment_.FastForwardBy(kFooDelay);
+  task_environment_.FastForwardBy(kInitialDelay);
+  task_environment_.FastForwardBy(kCheckInterval);
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
   ExpectFooMadeRequest(0);
 
@@ -277,12 +315,13 @@ TEST_F(AdblockTelemetryServiceTest, RequestAbortedWhenAdblockDisabled) {
   pref_service_.SetBoolean(prefs::kEnableAdblock, true);
   auto* mock = RegisterFooMock();
   telemetry_service_->Start();
-  task_environment_.FastForwardBy(kFooDelay);
+  task_environment_.FastForwardBy(kInitialDelay);
+  task_environment_.FastForwardBy(kCheckInterval);
   // Request is made:
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
   ExpectFooMadeRequest(0);
 
-  // Adblocking is disabled before respnose arrives:
+  // Adblocking is disabled before response arrives:
   pref_service_.SetBoolean(prefs::kEnableAdblock, false);
 
   // Now, TopicProvider is not triggered even when response arrives.
@@ -299,13 +338,11 @@ TEST_F(AdblockTelemetryServiceTest, NegativeTimeToNextRequest) {
   // TopicProvider returns a negative time to next request, as if the request
   // was supposed to happen in the past. This is a normal scenario, ex. when
   // the browser was shut down for longer than the duration of request interval.
-  EXPECT_CALL(*mock, GetTimeToNextRequest())
-      .WillOnce(testing::Return(-base::Seconds(30)));
+  EXPECT_CALL(*mock, GetTimeOfNextRequest())
+      .WillOnce(testing::Return(base::Time::Now() - base::Seconds(30)));
 
   telemetry_service_->Start();
-
-  // Request is scheduled immediately.
-  task_environment_.FastForwardBy(base::TimeDelta());
+  task_environment_.FastForwardBy(kInitialDelay);
   // Request is made:
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
   ExpectFooMadeRequest(0);

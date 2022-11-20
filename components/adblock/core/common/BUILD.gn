@@ -26,7 +26,7 @@ source_set("common") {
     "sitekey.h",
   ]
 
-  public_deps= [
+  public_deps = [
     ":base",
     "//base",
     "//components/adblock/core:schema",

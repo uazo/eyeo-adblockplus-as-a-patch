@@ -208,7 +208,7 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
                           mojom::FilterMatchResult::kBlockRule);
 
   classification_runner_->CheckRequestFilterMatchForWebSocket(
-      std::move(mock_subscription_collection_), kWebsocketUrl, main_rfh(),
+      std::move(mock_subscription_collection_), kWebsocketUrl, main_rfh()->GetGlobalId(),
       callback.Get());
   task_environment()->RunUntilIdle();
 }

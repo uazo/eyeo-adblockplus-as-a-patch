@@ -64,6 +64,7 @@
   X("cast.mdns")                                                         \
   X("cast.mdns.socket")                                                  \
   X("cast.stream")                                                       \
+  X("catan_investigation")                                               \
   X("cc")                                                                \
   X("cc.debug")                                                          \
   X("cdp.perf")                                                          \
@@ -106,7 +107,6 @@
   X("ime")                                                               \
   X("IndexedDB")                                                         \
   X("input")                                                             \
-  X("catan_investigation")                                               \
   X("io")                                                                \
   X("ipc")                                                               \
   X("Java")                                                              \

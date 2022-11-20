@@ -181,7 +181,8 @@ class AdblockMojoInterfaceImplTest : public ChromeRenderViewHostTestHarness {
   std::vector<base::OnceClosure> deferred_tasks_;
 };
 
-TEST_F(AdblockMojoInterfaceImplTest, CheckFilterMatch) {
+// TODO(DPD-1295): Remove these tests
+TEST_F(AdblockMojoInterfaceImplTest, DISABLED_CheckFilterMatch) {
   MockCheckFilterMatchCallback callback;
   mojom::AdblockInterface::CheckFilterMatchCallback callback_captured_by_rq;
   const GURL request_url("https://request_url.com");
@@ -211,7 +212,7 @@ TEST_F(AdblockMojoInterfaceImplTest, CheckFilterMatch) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, ChecktFilterMatchDeferred) {
+TEST_F(AdblockMojoInterfaceImplTest, DISABLED_ChecktFilterMatchDeferred) {
   MockCheckFilterMatchCallback callback;
   mojom::AdblockInterface::CheckFilterMatchCallback callback_captured_by_rq;
   const GURL request_url("https://request_url.com");
@@ -244,7 +245,7 @@ TEST_F(AdblockMojoInterfaceImplTest, ChecktFilterMatchDeferred) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, CheckFilterMatchNoProcessHost) {
+TEST_F(AdblockMojoInterfaceImplTest, DISABLED_CheckFilterMatchNoProcessHost) {
   MockCheckFilterMatchCallback callback;
   const GURL request_url("https://request_url.com");
 
@@ -263,7 +264,7 @@ TEST_F(AdblockMojoInterfaceImplTest, CheckFilterMatchNoProcessHost) {
 }
 
 TEST_F(AdblockMojoInterfaceImplTest,
-       ChecktFilterMatch_RenderFrameHostDiesWhileTaskDeferred) {
+       DISABLED_ChecktFilterMatch_RenderFrameHostDiesWhileTaskDeferred) {
   MockCheckFilterMatchCallback callback;
   const GURL request_url("https://request_url.com");
 
@@ -286,7 +287,7 @@ TEST_F(AdblockMojoInterfaceImplTest,
 }
 
 TEST_F(AdblockMojoInterfaceImplTest,
-       ProcessResponseHeaders_BlockedWithHeaderFilter) {
+       DISABLED_ProcessResponseHeaders_BlockedWithHeaderFilter) {
   MockProcessResponseHeadersCallback callback;
   const GURL response_url("https://request_url.com");
   auto headers = net::HttpResponseHeaders::TryToCreate("");
@@ -328,7 +329,8 @@ TEST_F(AdblockMojoInterfaceImplTest,
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, ProcessResponseHeaders_CspInjection) {
+TEST_F(AdblockMojoInterfaceImplTest,
+       DISABLED_ProcessResponseHeaders_CspInjection) {
   MockProcessResponseHeadersCallback callback;
   const GURL response_url("https://request_url.com");
   auto headers = net::HttpResponseHeaders::TryToCreate("");
@@ -383,7 +385,8 @@ TEST_F(AdblockMojoInterfaceImplTest, ProcessResponseHeaders_CspInjection) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, ProcessResponseHeadersNoProcessHost) {
+TEST_F(AdblockMojoInterfaceImplTest,
+       DISABLED_ProcessResponseHeadersNoProcessHost) {
   MockProcessResponseHeadersCallback callback;
   const GURL response_url("https://request_url.com");
   auto headers = net::HttpResponseHeaders::TryToCreate("");
@@ -403,7 +406,8 @@ TEST_F(AdblockMojoInterfaceImplTest, ProcessResponseHeadersNoProcessHost) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_BlockedRequestHidden) {
+TEST_F(AdblockMojoInterfaceImplTest,
+       DISABLED_ElementHiding_BlockedRequestHidden) {
   MockCheckFilterMatchCallback mock_check_filter_match_callback;
   const GURL request_url("https://request_url.com");
   auto resource_type = static_cast<int32_t>(blink::mojom::ResourceType::kImage);
@@ -436,7 +440,8 @@ TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_BlockedRequestHidden) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_RequestNotHideable) {
+TEST_F(AdblockMojoInterfaceImplTest,
+       DISABLED_ElementHiding_RequestNotHideable) {
   MockCheckFilterMatchCallback mock_check_filter_match_callback;
   const GURL request_url("https://request_url.com");
   auto resource_type = static_cast<int32_t>(blink::mojom::ResourceType::kPing);
@@ -469,7 +474,8 @@ TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_RequestNotHideable) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_AllowedRequestNotHidden) {
+TEST_F(AdblockMojoInterfaceImplTest,
+       DISABLED_ElementHiding_AllowedRequestNotHidden) {
   MockCheckFilterMatchCallback mock_check_filter_match_callback;
   const GURL request_url("https://request_url.com");
   auto resource_type = static_cast<int32_t>(blink::mojom::ResourceType::kImage);
@@ -501,7 +507,8 @@ TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_AllowedRequestNotHidden) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_BlockedResponseHidden) {
+TEST_F(AdblockMojoInterfaceImplTest,
+       DISABLED_ElementHiding_BlockedResponseHidden) {
   MockProcessResponseHeadersCallback mock_process_response_headers_callback;
   const GURL response_url("https://request_url.com/image.png");
   auto headers = net::HttpResponseHeaders::TryToCreate("");
@@ -535,7 +542,8 @@ TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_BlockedResponseHidden) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_ResponseNotHideable) {
+TEST_F(AdblockMojoInterfaceImplTest,
+       DISABLED_ElementHiding_ResponseNotHideable) {
   MockProcessResponseHeadersCallback mock_process_response_headers_callback;
   const GURL response_url("https://request_url.com/script.js");
   auto headers = net::HttpResponseHeaders::TryToCreate("");
@@ -569,7 +577,8 @@ TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_ResponseNotHideable) {
   task_environment()->RunUntilIdle();
 }
 
-TEST_F(AdblockMojoInterfaceImplTest, ElementHiding_AllowedResponseNotHidden) {
+TEST_F(AdblockMojoInterfaceImplTest,
+       DISABLED_ElementHiding_AllowedResponseNotHidden) {
   MockProcessResponseHeadersCallback mock_process_response_headers_callback;
   const GURL response_url("https://request_url.com/image.png");
   auto headers = net::HttpResponseHeaders::TryToCreate("");

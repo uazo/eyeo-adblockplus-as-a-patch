@@ -202,12 +202,6 @@
       <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ALLOWED_DOMAINS" desc="Text of TextView above the list of allowed domains in allowed domains fragment">
         Allowlist
       </message>
-      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ALLOWED_CONNECTION_TYPE" desc="Title of the toggle to allow adblock to do updates on wifi only or any connectivity">
-        Update only on Wi-Fi
-      </message>
-      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ALLOWED_CONNECTION_TYPE_SUMMARY" desc="Summary of ListPreference to configure update connection type">
-        Saves data by downloading ad blocking filters only when you're on Wi-Fi. This may affect the ad blocking quality.
-      </message>
       <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_MORE_OPTIONS_TITLE" desc="Title of the Preference and fragment additional options are shown at">
         More blocking options
       </message>

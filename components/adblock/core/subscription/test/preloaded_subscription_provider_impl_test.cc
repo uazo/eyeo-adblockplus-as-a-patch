@@ -19,9 +19,9 @@
 
 #include "base/ranges/algorithm.h"
 #include "base/test/task_environment.h"
-#include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/subscription/subscription.h"
+#include "components/adblock/core/subscription/subscription_config.h"
 #include "components/prefs/testing_pref_service.h"
 #include "testing/gtest/include/gtest/gtest.h"
 

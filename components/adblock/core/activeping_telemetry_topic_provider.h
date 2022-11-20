@@ -48,14 +48,22 @@ class ActivepingTelemetryTopicProvider final
 
   GURL GetEndpointURL() const final;
   std::string GetAuthToken() const final;
-  std::string GetPayload() const final;
+  void GetPayload(PayloadCallback callback) final;
 
   // Normally 8 hours since last ping, 1 hour in case of retries.
-  base::TimeDelta GetTimeToNextRequest() const final;
+  base::Time GetTimeOfNextRequest() const final;
 
   // Attempts to parse "token" (an opaque server description of last ping time)
   // from |response_content|.
   void ParseResponse(std::unique_ptr<std::string> response_content) final;
+
+  // Sets the port used by the embedded http server required for browser tests.
+  // Must be called before the first call to DefaultBaseUrl().
+  static void SetHttpPortForTesting(int http_port_for_testing);
+
+  // Sets the internal timing for sending pings required for browser tests.
+  // Must be called before AdblockTelemetryService::Start().
+  static void SetIntervalsForTesting(base::TimeDelta time_delta);
 
  private:
   void ScheduleNextPing(base::TimeDelta delay);

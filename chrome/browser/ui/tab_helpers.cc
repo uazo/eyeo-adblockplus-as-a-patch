@@ -59,8 +59,6 @@
 #include "chrome/browser/page_info/page_info_features.h"
 #include "chrome/browser/page_load_metrics/page_load_metrics_initialize.h"
 #include "chrome/browser/password_manager/chrome_password_manager_client.h"
-#include "chrome/browser/performance_hints/performance_hints_features.h"
-#include "chrome/browser/performance_hints/performance_hints_observer.h"
 #include "chrome/browser/permissions/last_tab_standing_tracker_tab_helper.h"
 #include "chrome/browser/permissions/unused_site_permissions_service_factory.h"
 #include "chrome/browser/predictors/loading_predictor_factory.h"
@@ -79,7 +77,6 @@
 #include "chrome/browser/safe_browsing/tailored_security/tailored_security_url_observer.h"
 #include "chrome/browser/safe_browsing/trigger_creator.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
-#include "chrome/browser/segmentation_platform/segmentation_platform_service_factory.h"
 #include "chrome/browser/sessions/session_tab_helper_factory.h"
 #include "chrome/browser/ssl/chrome_security_blocking_page_factory.h"
 #include "chrome/browser/ssl/connection_help_tab_helper.h"
@@ -147,7 +144,6 @@
 #include "components/safe_browsing/content/browser/safe_browsing_tab_observer.h"
 #include "components/safe_browsing/core/common/features.h"
 #include "components/search/ntp_features.h"
-#include "components/segmentation_platform/content/segmentation_platform_tab_helper.h"
 #include "components/site_engagement/content/site_engagement_helper.h"
 #include "components/site_engagement/content/site_engagement_service.h"
 #include "components/tracing/common/tracing_switches.h"
@@ -366,7 +362,7 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
       ISOLATED_WORLD_ID_CHROME_INTERNAL);
   ConnectionHelpTabHelper::CreateForWebContents(web_contents);
   CoreTabHelper::CreateForWebContents(web_contents);
-  DIPSBounceDetector::CreateForWebContents(web_contents);
+  DIPSWebContentsObserver::CreateForWebContents(web_contents);
   if (DIPSService* dips_service = DIPSService::Get(profile)) {
     DIPSTabHelper::CreateForWebContents(web_contents, dips_service);
   }
@@ -458,10 +454,6 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   ReputationWebContentsObserver::CreateForWebContents(web_contents);
   SearchEngineTabHelper::CreateForWebContents(web_contents);
   SecurityStateTabHelper::CreateForWebContents(web_contents);
-  segmentation_platform::SegmentationPlatformTabHelper::CreateForWebContents(
-      web_contents,
-      segmentation_platform::SegmentationPlatformServiceFactory::GetForProfile(
-          profile));
   if (site_engagement::SiteEngagementService::IsEnabled()) {
     site_engagement::SiteEngagementService::Helper::CreateForWebContents(
         web_contents,
@@ -507,10 +499,6 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   }
   PolicyAuditorBridge::CreateForWebContents(web_contents);
   PluginObserverAndroid::CreateForWebContents(web_contents);
-  if (performance_hints::features::IsPerformanceHintsObserverEnabled()) {
-    performance_hints::PerformanceHintsObserver::CreateForWebContents(
-        web_contents);
-  }
   video_tutorials::VideoTutorialTabHelper::CreateForWebContents(web_contents);
 #else
   if (accuracy_tips::AccuracyWebContentsObserver::IsEnabled(web_contents)) {
@@ -534,7 +522,7 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
     LastTabStandingTrackerTabHelper::CreateForWebContents(web_contents);
   }
   ManagePasswordsUIController::CreateForWebContents(web_contents);
-  if (PrivacySandboxPromptHelper::ProfileRequiresDialog(profile))
+  if (PrivacySandboxPromptHelper::ProfileRequiresPrompt(profile))
     PrivacySandboxPromptHelper::CreateForWebContents(web_contents);
   SadTabHelper::CreateForWebContents(web_contents);
   SearchTabHelper::CreateForWebContents(web_contents);
@@ -557,8 +545,10 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   if (base::FeatureList::IsEnabled(
           permissions::features::kRecordPermissionExpirationTimestamps)) {
     auto* service = UnusedSitePermissionsServiceFactory::GetForProfile(profile);
-    permissions::UnusedSitePermissionsService::TabHelper::CreateForWebContents(
-        web_contents, service);
+    if (service) {
+      permissions::UnusedSitePermissionsService::TabHelper::
+          CreateForWebContents(web_contents, service);
+    }
   }
 #endif
 

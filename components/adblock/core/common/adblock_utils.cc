@@ -135,6 +135,7 @@ bool RegexMatches(base::StringPiece pattern,
   options.set_case_sensitive(case_sensitive);
   options.set_never_capture(true);
   options.set_log_errors(false);
+  options.set_encoding(re2::RE2::Options::EncodingLatin1);
   const re2::RE2 re2_pattern(pattern.data(), options);
   if (re2_pattern.ok())
     return re2::RE2::PartialMatch(input.data(), re2_pattern);

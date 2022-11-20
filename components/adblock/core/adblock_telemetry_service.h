@@ -47,17 +47,18 @@ class AdblockTelemetryService : public KeyedService {
   // be "counting users" or "reporting filter list hits" for example.
   class TopicProvider {
    public:
+    using PayloadCallback = base::OnceCallback<void(std::string payload)>;
     virtual ~TopicProvider() = default;
     // Endpoint URL on the Telemetry server onto which requests should be sent.
     virtual GURL GetEndpointURL() const = 0;
     // Authorization bearer token for the endpoint defined by GetEndpointURL().
     virtual std::string GetAuthToken() const = 0;
     // Data uploaded with the request, should be valid for the schema
-    // present on the server.
-    virtual std::string GetPayload() const = 0;
-    // Returns the desired delay until AdblockTelemetryService makes the next
-    // network request.
-    virtual base::TimeDelta GetTimeToNextRequest() const = 0;
+    // present on the server. Async to allow querying asynchronous data sources.
+    virtual void GetPayload(PayloadCallback callback) = 0;
+    // Returns the desired time when AdblockTelemetryService should make the
+    // next network request.
+    virtual base::Time GetTimeOfNextRequest() const = 0;
     // Parses the response returned by the Telemetry server. |response_content|
     // may be null. Implementation is free to implement a "retry" in case of
     // response errors via GetTimeToNextRequest().
@@ -66,7 +67,9 @@ class AdblockTelemetryService : public KeyedService {
   };
   AdblockTelemetryService(
       PrefService* prefs,
-      scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory);
+      scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
+      base::TimeDelta initial_delay,
+      base::TimeDelta check_interval);
   ~AdblockTelemetryService() override;
 
   // Add all required topic providers before calling Start().
@@ -82,13 +85,17 @@ class AdblockTelemetryService : public KeyedService {
 
  private:
   void OnEnableAdblockChanged();
+  void RunPeriodicCheck();
 
   SEQUENCE_CHECKER(sequence_checker_);
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
+  base::TimeDelta initial_delay_;
+  base::TimeDelta check_interval_;
 
   class Conversation;
   std::vector<std::unique_ptr<Conversation>> ongoing_conversations_;
   BooleanPrefMember enable_adblock_;
+  base::OneShotTimer timer_;
 };
 
 }  // namespace adblock

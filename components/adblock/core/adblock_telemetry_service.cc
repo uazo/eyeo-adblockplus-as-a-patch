@@ -20,6 +20,8 @@
 #include <string>
 
 #include "base/bind.h"
+#include "base/functional/bind.h"
+#include "base/memory/weak_ptr.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
@@ -82,39 +84,44 @@ class AdblockTelemetryService::Conversation {
       : topic_provider_(std::move(topic_provider)),
         url_loader_factory_(url_loader_factory) {}
 
-  void Start() {
+  bool IsRequestDue() {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    if (IsRunning())
-      return;
-    ScheduleNextRequest();
+    const auto due_time = topic_provider_->GetTimeOfNextRequest();
+    if (due_time > base::Time::Now()) {
+      VLOG(1) << "[eyeo] Telemetry request for "
+              << topic_provider_->GetEndpointURL()
+              << " not due yet, should run at " << due_time;
+      return false;
+    }
+    if (IsRequestInFlight()) {
+      VLOG(1) << "[eyeo] Telemetry request for "
+              << topic_provider_->GetEndpointURL() << " already in-flight";
+      return false;
+    }
+    VLOG(1) << "[eyeo] Telemetry request for "
+            << topic_provider_->GetEndpointURL() << " is due";
+    return true;
+  }
+
+  void StartRequest() {
+    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+    VLOG(1) << "[eyeo] Telemetry request for "
+            << topic_provider_->GetEndpointURL() << " starting now";
+    topic_provider_->GetPayload(base::BindOnce(&Conversation::MakeRequest,
+                                               weak_ptr_factory_.GetWeakPtr()));
   }
 
   void Stop() {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    if (!IsRunning())
-      return;
-    timer_.Stop();
     url_loader_.reset();
   }
 
-  bool IsRunning() const { return timer_.IsRunning() || url_loader_; }
-
  private:
-  void ScheduleNextRequest() {
-    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    // A TopicProvider could return a negative time to next request. Clamp it
-    // to "zero".
-    const auto delay =
-        std::max(topic_provider_->GetTimeToNextRequest(), base::TimeDelta());
-    VLOG(1) << "[eyeo] Next Telemetry request for "
-            << topic_provider_->GetEndpointURL() << " scheduled for "
-            << base::Time::Now() + delay;
-    timer_.Start(
-        FROM_HERE, delay,
-        base::BindOnce(&Conversation::MakeRequest, base::Unretained(this)));
+  bool IsRequestInFlight() {
+    return url_loader_ != nullptr || weak_ptr_factory_.HasWeakPtrs();
   }
 
-  void MakeRequest() {
+  void MakeRequest(std::string payload) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
     auto request = std::make_unique<network::ResourceRequest>();
     request->url = topic_provider_->GetEndpointURL();
@@ -142,7 +149,6 @@ class AdblockTelemetryService::Conversation {
     url_loader_ = network::SimpleURLLoader::Create(std::move(request),
                                                    kTrafficAnnotation);
 
-    const auto payload = topic_provider_->GetPayload();
     VLOG(2) << "[eyeo] Payload: " << payload;
     url_loader_->AttachStringForUpload(payload, kDataType);
     // The Telemetry server responds with a JSON that contains a description of
@@ -161,7 +167,6 @@ class AdblockTelemetryService::Conversation {
   void OnResponseArrived(std::unique_ptr<std::string> server_response) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
     topic_provider_->ParseResponse(std::move(server_response));
-    ScheduleNextRequest();
     url_loader_.reset();
   }
 
@@ -169,13 +174,17 @@ class AdblockTelemetryService::Conversation {
   std::unique_ptr<TopicProvider> topic_provider_;
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
   std::unique_ptr<network::SimpleURLLoader> url_loader_;
-  base::OneShotTimer timer_;
+  base::WeakPtrFactory<Conversation> weak_ptr_factory_{this};
 };
 
 AdblockTelemetryService::AdblockTelemetryService(
     PrefService* prefs,
-    scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory)
-    : url_loader_factory_(url_loader_factory) {
+    scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
+    base::TimeDelta initial_delay,
+    base::TimeDelta check_interval)
+    : url_loader_factory_(url_loader_factory),
+      initial_delay_(initial_delay),
+      check_interval_(check_interval) {
   enable_adblock_.Init(
       prefs::kEnableAdblock, prefs,
       base::BindRepeating(&AdblockTelemetryService::OnEnableAdblockChanged,
@@ -199,16 +208,27 @@ void AdblockTelemetryService::OnEnableAdblockChanged() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (enable_adblock_.GetValue()) {
     VLOG(1) << "[eyeo] Starting periodic Telemetry requests";
-    for (auto& conversation : ongoing_conversations_)
-      conversation->Start();
+    timer_.Start(FROM_HERE, initial_delay_,
+                 base::BindRepeating(&AdblockTelemetryService::RunPeriodicCheck,
+                                     base::Unretained(this)));
   } else if (!enable_adblock_.GetValue()) {
     VLOG(1) << "[eyeo] Stopping periodic Telemetry requests";
-    for (auto& conversation : ongoing_conversations_)
-      conversation->Stop();
+    Shutdown();
   }
 }
 
+void AdblockTelemetryService::RunPeriodicCheck() {
+  for (auto& conversation : ongoing_conversations_) {
+    if (conversation->IsRequestDue())
+      conversation->StartRequest();
+  }
+  timer_.Start(FROM_HERE, check_interval_,
+               base::BindRepeating(&AdblockTelemetryService::RunPeriodicCheck,
+                                   base::Unretained(this)));
+}
+
 void AdblockTelemetryService::Shutdown() {
+  timer_.Stop();
   for (auto& conversation : ongoing_conversations_)
     conversation->Stop();
 }

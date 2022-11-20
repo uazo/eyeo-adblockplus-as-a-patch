@@ -25,8 +25,6 @@
 #include "base/threading/sequenced_task_runner_handle.h"
 #include "base/trace_event/trace_event.h"
 #include "chrome/browser/adblock/subscription_persistent_metadata_factory.h"
-#include "chrome/browser/browser_process.h"
-#include "chrome/browser/net/system_network_context_manager.h"
 #include "chrome/browser/profiles/incognito_helpers.h"
 #include "chrome/browser/profiles/profile.h"
 #include "components/adblock/core/common/adblock_constants.h"
@@ -42,6 +40,7 @@
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/storage_partition.h"
 
 namespace adblock {
 namespace {
@@ -115,10 +114,8 @@ KeyedService* SubscriptionServiceFactory::BuildServiceInstanceFor(
   auto* persistent_metadata =
       SubscriptionPersistentMetadataFactory::GetForBrowserContext(context);
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory =
-      g_browser_process && g_browser_process->system_network_context_manager()
-          ? g_browser_process->system_network_context_manager()
-                ->GetSharedURLLoaderFactory()
-          : nullptr;
+      context->GetDefaultStoragePartition()
+          ->GetURLLoaderFactoryForBrowserProcess();
 
   auto storage = std::make_unique<SubscriptionPersistentStorageImpl>(
       context->GetPath().AppendASCII("adblock_subscriptions"),

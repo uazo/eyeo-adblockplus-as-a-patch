@@ -22,7 +22,6 @@ import androidx.preference.PreferenceFragmentCompat;
 
 import org.chromium.build.BuildConfig;
 import org.chromium.components.adblock.AdblockController;
-import org.chromium.components.adblock.AdblockController.ConnectionType;
 import org.chromium.components.adblock.R;
 import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
 
@@ -34,7 +33,6 @@ public class AdblockSettingsFragment
     private ChromeSwitchPreference mAcceptableAdsEnabled;
     private Preference mFilterLists;
     private Preference mAllowedDomains;
-    private ChromeSwitchPreference mAllowedConnectionType;
     private Preference mMoreOptions;
 
     private static final String SETTINGS_ENABLED_KEY = "fragment_adblock_settings_enabled_key";
@@ -44,8 +42,6 @@ public class AdblockSettingsFragment
             "fragment_adblock_settings_aa_enabled_key";
     private static final String SETTINGS_ALLOWED_DOMAINS_KEY =
             "fragment_adblock_settings_allowed_domains_key";
-    private static final String SETTINGS_ALLOWED_CONNECTION_TYPE_KEY =
-            "fragment_adblock_settings_allowed_connection_type_key";
     private static final String SETTINGS_MORE_OPTIONS_KEY =
             "fragment_adblock_settings_more_options_key";
 
@@ -59,8 +55,6 @@ public class AdblockSettingsFragment
         mFilterLists = findPreference(SETTINGS_FILTER_LISTS_KEY);
         mAcceptableAdsEnabled = (ChromeSwitchPreference) findPreference(SETTINGS_AA_ENABLED_KEY);
         mAllowedDomains = findPreference(SETTINGS_ALLOWED_DOMAINS_KEY);
-        mAllowedConnectionType =
-                (ChromeSwitchPreference) findPreference(SETTINGS_ALLOWED_CONNECTION_TYPE_KEY);
         mMoreOptions = findPreference(SETTINGS_MORE_OPTIONS_KEY);
     }
 
@@ -68,7 +62,6 @@ public class AdblockSettingsFragment
         mFilterLists.setEnabled(enabledValue);
         mAcceptableAdsEnabled.setEnabled(enabledValue);
         mAllowedDomains.setEnabled(enabledValue);
-        mAllowedConnectionType.setEnabled(enabledValue);
         mMoreOptions.setEnabled(enabledValue);
         mMoreOptions.setVisible(AdblockController.getInstance().areMoreOptionsEnabled());
     }
@@ -81,10 +74,6 @@ public class AdblockSettingsFragment
 
         mAcceptableAdsEnabled.setChecked(AdblockController.getInstance().isAcceptableAdsEnabled());
         mAcceptableAdsEnabled.setOnPreferenceChangeListener(this);
-
-        mAllowedConnectionType.setChecked(AdblockController.getInstance().getAllowedConnectionType()
-                == AdblockController.ConnectionType.WIFI);
-        mAllowedConnectionType.setOnPreferenceChangeListener(this);
     }
 
     private void maybeEnableMoreOptions() {
@@ -133,14 +122,6 @@ public class AdblockSettingsFragment
             maybeEnableMoreOptions();
 
             applyAdblockEnabled((Boolean) newValue);
-        } else if (preference.getKey().equals(SETTINGS_ALLOWED_CONNECTION_TYPE_KEY)) {
-            if ((Boolean) newValue) {
-                AdblockController.getInstance().setAllowedConnectionType(
-                        AdblockController.ConnectionType.WIFI);
-            } else {
-                AdblockController.getInstance().setAllowedConnectionType(
-                        AdblockController.ConnectionType.ANY);
-            }
         } else {
             assert preference.getKey().equals(SETTINGS_AA_ENABLED_KEY);
             AdblockController.getInstance().setAcceptableAdsEnabled((Boolean) newValue);

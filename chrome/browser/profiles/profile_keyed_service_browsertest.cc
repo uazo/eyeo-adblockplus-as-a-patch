@@ -8,6 +8,7 @@
 
 #include <sstream>
 
+#include "base/ranges/algorithm.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/enterprise/connectors/connectors_service.h"
@@ -24,10 +25,10 @@
 
 namespace {
 
-// Creates a Profile and it's underlying OTR Profile for testing.
-// Waits for all tasks to be done to get as much services created as possible.
+// Creates a Profile and its underlying OTR Profile for testing.
+// Waits for all tasks to be done to get as many services created as possible.
 // Returns the Original Profile.
-Profile* CreateProfileAndWaitForAllTaks(const base::FilePath& profile_path) {
+Profile* CreateProfileAndWaitForAllTasks(const base::FilePath& profile_path) {
   ProfileManager* profile_manager = g_browser_process->profile_manager();
   ProfileWaiter profile_waiter;
   profile_manager->CreateProfileAsync(profile_path, {});
@@ -50,19 +51,19 @@ std::vector<KeyedServiceBaseFactory*> GetKeyedServiceBaseFactories() {
 
   std::vector<KeyedServiceBaseFactory*> keyedServiceFactories;
   keyedServiceFactories.reserve(nodes.size());
-  std::transform(nodes.begin(), nodes.end(),
-                 std::back_inserter(keyedServiceFactories),
-                 [](DependencyNode* node) {
-                   return static_cast<KeyedServiceBaseFactory*>(node);
-                 });
+  base::ranges::transform(nodes, std::back_inserter(keyedServiceFactories),
+                          [](DependencyNode* node) {
+                            return static_cast<KeyedServiceBaseFactory*>(node);
+                          });
   return keyedServiceFactories;
 }
 
+// Returns a string representation of the elements of `set1` which are absent
+// from `set2`.
 std::string GetDifferenceString(const std::set<std::string>& set1,
                                 const std::set<std::string>& set2) {
   std::vector<std::string> differences;
-  std::set_difference(set1.begin(), set1.end(), set2.begin(), set2.end(),
-                      std::back_inserter(differences));
+  base::ranges::set_difference(set1, set2, std::back_inserter(differences));
 
   return differences.empty() ? "None" : base::JoinString(differences, ", ");
 }
@@ -76,13 +77,13 @@ std::string DisplaySetDifference(
   error << "Differences between expected and reached services:" << std::endl;
 
   error << "-- Missing Expected Services:" << std::endl;
-  error << GetDifferenceString(active_services_names,
-                               expected_active_services_names)
+  error << GetDifferenceString(expected_active_services_names,
+                               active_services_names)
         << std::endl;
 
   error << "-- Added Extra Services:" << std::endl;
-  error << GetDifferenceString(expected_active_services_names,
-                               active_services_names)
+  error << GetDifferenceString(active_services_names,
+                               expected_active_services_names)
         << std::endl;
 
   return error.str();
@@ -92,7 +93,7 @@ std::string DisplaySetDifference(
 void TestKeyedProfileServicesActives(
     Profile* profile,
     const std::set<std::string>& expected_active_services_names) {
-  static const std::vector<KeyedServiceBaseFactory*> keyedServiceFactories =
+  const std::vector<KeyedServiceBaseFactory*> keyedServiceFactories =
       GetKeyedServiceBaseFactories();
 
   std::set<std::string> active_services_names;
@@ -108,6 +109,25 @@ void TestKeyedProfileServicesActives(
 }
 
 }  // namespace
+
+TEST(ProfileKeyedService_DisplaySetDifferenceTest, UnexpectedActiveService) {
+  std::string message =
+      DisplaySetDifference(/*expected_active_services_names=*/{},
+                           /*active_services_names=*/{"unexpected"});
+  EXPECT_THAT(message,
+              testing::ContainsRegex("Missing Expected Services:\\s+None"));
+  EXPECT_THAT(message,
+              testing::ContainsRegex("Added Extra Services:\\s+unexpected"));
+}
+
+TEST(ProfileKeyedService_DisplaySetDifferenceTest, MissingExpectedService) {
+  std::string message =
+      DisplaySetDifference(/*expected_active_services_names=*/{"missing"},
+                           /*active_services_names=*/{});
+  EXPECT_THAT(message,
+              testing::ContainsRegex("Missing Expected Services:\\s+missing"));
+  EXPECT_THAT(message, testing::ContainsRegex("Added Extra Services:\\s+None"));
+}
 
 // If you are adding a new keyed service and this test fails:
 // - determine if your service is intended to be created for the System profile
@@ -198,7 +218,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
   // clang-format on
 
   Profile* system_profile =
-      CreateProfileAndWaitForAllTaks(ProfileManager::GetSystemProfilePath());
+      CreateProfileAndWaitForAllTasks(ProfileManager::GetSystemProfilePath());
   ASSERT_TRUE(system_profile->HasAnyOffTheRecordProfile());
   Profile* system_profile_otr = system_profile->GetPrimaryOTRProfile(false);
   ASSERT_TRUE(system_profile_otr->IsOffTheRecord());
@@ -229,7 +249,6 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN)
     "AboutSigninInternals",
     "AboutThisSiteServiceFactory",
-    "AccessibilityLabelsService",
     "AccountInvestigator",
     "AccountPasswordStore",
     "AccountReconcilor",
@@ -298,6 +317,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "FaviconService",
     "FeedbackPrivateAPI",
     "FileSystemAccessPermissionContext",
+    "FirstPartySetsPolicyService",
     "FontPrefChangeNotifier",
     "FontSettingsAPI",
     "GAIAInfoUpdateService",
@@ -405,7 +425,6 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "TCPSocketEventDispatcher",
     "TabGroupsEventRouter",
     "TabsWindowsAPI",
-    "TemplateURLServiceFactory",
     "ThemeService",
     "ToolbarActionsModel",
     "TranslateRanker",
@@ -443,7 +462,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
   // clang-format on
 
   Profile* system_profile =
-      CreateProfileAndWaitForAllTaks(ProfileManager::GetSystemProfilePath());
+      CreateProfileAndWaitForAllTasks(ProfileManager::GetSystemProfilePath());
   ASSERT_FALSE(system_profile->IsOffTheRecord());
   ASSERT_TRUE(system_profile->IsSystemProfile());
   TestKeyedProfileServicesActives(system_profile, system_active_services);
@@ -507,7 +526,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
   // clang-format on
 
   Profile* guest_profile =
-      CreateProfileAndWaitForAllTaks(ProfileManager::GetGuestProfilePath());
+      CreateProfileAndWaitForAllTasks(ProfileManager::GetGuestProfilePath());
   ASSERT_TRUE(guest_profile->HasAnyOffTheRecordProfile());
   Profile* guest_profile_otr = guest_profile->GetPrimaryOTRProfile(false);
   ASSERT_TRUE(guest_profile_otr->IsOffTheRecord());
@@ -537,7 +556,6 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN)
     "AboutSigninInternals",
     "AboutThisSiteServiceFactory",
-    "AccessibilityLabelsService",
     "AccountInvestigator",
     "AccountPasswordStore",
     "AccountReconcilor",
@@ -607,6 +625,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
     "FaviconService",
     "FeedbackPrivateAPI",
     "FileSystemAccessPermissionContext",
+    "FirstPartySetsPolicyService",
     "FontPrefChangeNotifier",
     "FontSettingsAPI",
     "GAIAInfoUpdateService",
@@ -755,7 +774,7 @@ IN_PROC_BROWSER_TEST_F(ProfileKeyedServiceBrowserTest,
   // clang-format on
 
   Profile* guest_profile =
-      CreateProfileAndWaitForAllTaks(ProfileManager::GetGuestProfilePath());
+      CreateProfileAndWaitForAllTasks(ProfileManager::GetGuestProfilePath());
   ASSERT_FALSE(guest_profile->IsOffTheRecord());
   ASSERT_TRUE(guest_profile->IsGuestSession());
   TestKeyedProfileServicesActives(guest_profile, guest_active_services);

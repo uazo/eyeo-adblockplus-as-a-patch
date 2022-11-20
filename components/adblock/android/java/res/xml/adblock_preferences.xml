@@ -47,13 +47,6 @@
         app:iconSpaceReserved="false"
         android:summary="@string/fragment_adblock_settings_allowed_domains_summary" />
 
-    <!-- Allowed connection type for updates -->
-     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
-        android:key="fragment_adblock_settings_allowed_connection_type_key"
-        android:title="@string/fragment_adblock_settings_allowed_connection_type"
-        android:summary="@string/fragment_adblock_settings_allowed_connection_type_summary"
-        app:iconSpaceReserved="false"/>
-
     <androidx.preference.Preference
         android:fragment="org.chromium.components.adblock.settings.AdblockMoreOptionsFragment"
         android:key="fragment_adblock_settings_more_options_key"

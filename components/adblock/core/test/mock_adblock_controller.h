@@ -24,9 +24,11 @@
 #include "components/adblock/core/subscription/installed_subscription.h"
 #include "testing/gmock/include/gmock/gmock.h"
 
+using testing::NiceMock;
+
 namespace adblock {
 
-class MockAdblockController : public AdblockController {
+class MockAdblockController : public NiceMock<AdblockController> {
  public:
   MockAdblockController();
   ~MockAdblockController() override;

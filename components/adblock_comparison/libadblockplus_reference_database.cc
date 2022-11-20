@@ -104,7 +104,10 @@ void LibadblockplusReferenceDatabase::StoreInputsFromFile(
   TestRequestReader request_reader;
   request_reader.Open(request_data_file);
   sql::Transaction transaction(&db_);
-  transaction.Begin();
+  if (!transaction.Begin()) {
+    LOG(ERROR) << "sql::Transaction failed!";
+    return;
+  }
   while (auto request = request_reader.GetNextRequest()) {
     if (request->content_type > 32768) {
       // This isn't a real content type, it's a *filter type*. Old core would

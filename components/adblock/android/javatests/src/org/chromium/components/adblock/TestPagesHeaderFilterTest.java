@@ -76,7 +76,7 @@ public class TestPagesHeaderFilterTest {
     @Feature({"adblock"})
     public void testHeaderFilterImage() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "||abptestpages.org/testfiles/header/$header=content-type=image/png");
+                "||abptestpages.org/testfiles/header/image.png$header=content-type=image/png");
         mHelper.loadUrl("https://abptestpages.org/en/filters/header");
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_IMAGE));

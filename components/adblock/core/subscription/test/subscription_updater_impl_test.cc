@@ -22,8 +22,8 @@
 #include <vector>
 
 #include "base/test/task_environment.h"
-#include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_prefs.h"
+#include "components/adblock/core/subscription/subscription_config.h"
 #include "components/adblock/core/subscription/test/mock_subscription.h"
 #include "components/adblock/core/subscription/test/mock_subscription_persistent_metadata.h"
 #include "components/adblock/core/subscription/test/mock_subscription_service.h"
@@ -95,8 +95,8 @@ class AdblockSubscriptionUpdaterImplTest : public testing::Test {
   base::test::TaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   TestingPrefServiceSimple pref_service_;
-  testing::StrictMock<MockSubscriptionPersistentMetadata> persistent_metadata_;
-  testing::StrictMock<MockSubscriptionService> subscription_service_;
+  MockSubscriptionPersistentMetadata persistent_metadata_;
+  MockSubscriptionService subscription_service_;
 };
 
 TEST_F(AdblockSubscriptionUpdaterImplTest,

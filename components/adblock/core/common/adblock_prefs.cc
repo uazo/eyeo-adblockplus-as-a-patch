@@ -18,7 +18,6 @@
 #include "components/adblock/core/common/adblock_prefs.h"
 
 #include "base/logging.h"
-#include "components/adblock/core/common/allowed_connection_type.h"
 #include "components/prefs/pref_registry_simple.h"
 
 namespace adblock::prefs {
@@ -40,9 +39,6 @@ const char kAdblockSubscriptions[] = "adblock.subscriptions";
 
 // List of custom (user defined) subscriptions
 const char kAdblockCustomSubscriptions[] = "adblock.custom_subscriptions";
-
-// Connection type allowed to be used for updates
-const char kAdblockAllowedConnectionType[] = "adblock.allowed_connection_type";
 
 // Whether more options item is enabled in the UI
 const char kAdblockMoreOptionsEnabled[] = "adblock.more_options";
@@ -112,9 +108,6 @@ void RegisterProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterListPref(kAdblockCustomFilters, {});
   registry->RegisterListPref(kAdblockSubscriptions, {});
   registry->RegisterListPref(kAdblockCustomSubscriptions, {});
-  registry->RegisterStringPref(
-      kAdblockAllowedConnectionType,
-      AllowedConnectionTypeToString(AllowedConnectionType::kDefault));
   registry->RegisterBooleanPref(kInstallFirstStartSubscriptions, true);
   registry->RegisterDictionaryPref(kSubscriptionSignatures);
   registry->RegisterStringPref(kLastUsedSchemaVersion, "");

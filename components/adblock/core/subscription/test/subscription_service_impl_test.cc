@@ -36,6 +36,7 @@
 #include "components/adblock/core/common/sitekey.h"
 #include "components/adblock/core/converter/converter.h"
 #include "components/adblock/core/subscription/installed_subscription.h"
+#include "components/adblock/core/subscription/subscription_config.h"
 #include "components/adblock/core/subscription/test/mock_subscription.h"
 #include "components/adblock/core/subscription/test/mock_subscription_downloader.h"
 #include "components/adblock/core/subscription/test/mock_subscription_persistent_metadata.h"
@@ -44,10 +45,13 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
+using testing::NiceMock;
+
 namespace adblock {
 namespace {
 
-class FakePersistentStorage final : public SubscriptionPersistentStorage {
+class FakePersistentStorage final
+    : public NiceMock<SubscriptionPersistentStorage> {
  public:
   MOCK_METHOD(void, MockLoadSubscriptions, ());
 
@@ -160,7 +164,8 @@ class FakeSubscription final : public InstalledSubscription {
   ~FakeSubscription() final = default;
 };
 
-class MockPreloadedSubscriptionProvider : public PreloadedSubscriptionProvider {
+class MockPreloadedSubscriptionProvider
+    : public NiceMock<PreloadedSubscriptionProvider> {
  public:
   MOCK_METHOD(void,
               UpdateSubscriptions,

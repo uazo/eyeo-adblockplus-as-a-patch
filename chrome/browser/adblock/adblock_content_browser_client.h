@@ -82,8 +82,16 @@ class AdblockContentBrowserClient : public ChromeContentBrowserClient {
       network::mojom::URLLoaderFactoryOverridePtr* factory_override) override;
 
  private:
+  void CreateWebSocketInternal(
+      content::GlobalRenderFrameHostId render_frame_host_id,
+      WebSocketFactory factory,
+      const GURL& url,
+      const net::SiteForCookies& site_for_cookies,
+      const absl::optional<std::string>& user_agent,
+      mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
+          handshake_client);
   void OnWebSocketFilterCheckCompleted(
-      content::RenderFrameHost* frame,
+      content::GlobalRenderFrameHostId render_frame_host_id,
       ChromeContentBrowserClient::WebSocketFactory factory,
       const GURL& url,
       const net::SiteForCookies& site_for_cookies,

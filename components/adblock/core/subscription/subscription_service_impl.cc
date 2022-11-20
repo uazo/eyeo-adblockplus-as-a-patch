@@ -30,11 +30,11 @@
 #include "base/ranges/algorithm.h"
 #include "base/trace_event/common/trace_event_common.h"
 #include "base/trace_event/trace_event.h"
-#include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/common/adblock_utils.h"
 #include "components/adblock/core/subscription/subscription.h"
 #include "components/adblock/core/subscription/subscription_collection_impl.h"
+#include "components/adblock/core/subscription/subscription_config.h"
 
 namespace adblock {
 namespace {
