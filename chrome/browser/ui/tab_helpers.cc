@@ -20,6 +20,7 @@
 #include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/adblock/element_hider_factory.h"
 #include "chrome/browser/adblock/sitekey_storage_factory.h"
+#include "chrome/browser/adblock/subscription_service_factory.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/breadcrumbs/breadcrumb_manager_tab_helper.h"
 #include "chrome/browser/browser_process.h"
@@ -33,7 +34,6 @@
 #include "chrome/browser/content_settings/page_specific_content_settings_delegate.h"
 #include "chrome/browser/content_settings/sound_content_setting_observer.h"
 #include "chrome/browser/dips/dips_bounce_detector.h"
-#include "chrome/browser/dips/dips_helper.h"
 #include "chrome/browser/dips/dips_service.h"
 #include "chrome/browser/external_protocol/external_protocol_observer.h"
 #include "chrome/browser/favicon/favicon_utils.h"
@@ -326,17 +326,14 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   }
 #endif
 
-  adblock::AdblockController* controller =
-      adblock::AdblockControllerFactory::GetForBrowserContext(
-          web_contents->GetBrowserContext());
-  adblock::ElementHider* element_hider =
-      adblock::ElementHiderFactory::GetForBrowserContext(
-          web_contents->GetBrowserContext());
-  adblock::SitekeyStorage* sitekey_storage =
-      adblock::SitekeyStorageFactory::GetForBrowserContext(
-          web_contents->GetBrowserContext());
   AdblockWebContentObserver::CreateForWebContents(
-      web_contents, controller, element_hider, sitekey_storage,
+      web_contents,
+      adblock::SubscriptionServiceFactory::GetForBrowserContext(
+          web_contents->GetBrowserContext()),
+      adblock::ElementHiderFactory::GetForBrowserContext(
+          web_contents->GetBrowserContext()),
+      adblock::SitekeyStorageFactory::GetForBrowserContext(
+          web_contents->GetBrowserContext()),
       std::make_unique<adblock::FrameHierarchyBuilder>());
   autofill::ChromeAutofillClient::CreateForWebContents(web_contents);
   autofill::ContentAutofillDriverFactory::CreateForWebContentsAndDelegate(
@@ -362,10 +359,7 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
       ISOLATED_WORLD_ID_CHROME_INTERNAL);
   ConnectionHelpTabHelper::CreateForWebContents(web_contents);
   CoreTabHelper::CreateForWebContents(web_contents);
-  DIPSWebContentsObserver::CreateForWebContents(web_contents);
-  if (DIPSService* dips_service = DIPSService::Get(profile)) {
-    DIPSTabHelper::CreateForWebContents(web_contents, dips_service);
-  }
+  DIPSWebContentsObserver::MaybeCreateForWebContents(web_contents);
   ExternalProtocolObserver::CreateForWebContents(web_contents);
   favicon::CreateContentFaviconDriverForWebContents(web_contents);
   FileSystemAccessPermissionRequestManager::CreateForWebContents(web_contents);

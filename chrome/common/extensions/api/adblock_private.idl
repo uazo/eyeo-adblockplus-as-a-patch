@@ -82,26 +82,14 @@ dictionary AdInfo {
   long window_id;
 };
 
-// Deprecated, to be removed in version 109.
-[deprecated="Updates can no longer be disabled on slow connections"]
-enum UpdateConsent {
-  ALWAYS,
-  WIFI_ONLY
-};
-
 callback BuiltInSubscriptionsCallback = void(BuiltInSubscription[] result);
 callback SubscriptionsCallback = void(Subscription[] result);
 callback StateCallback = void(boolean result);
 callback CompletionCallback = void();
 callback ListCallback = void(DOMString[] result);
-callback UpdateConsentCallback = void(UpdateConsent consent);
 callback SessionStatsCallback = void(SessionStatsEntry[] result);
 
 interface Functions {
-// Deprecated, to be removed in version 109.
-  [deprecated="Updates can no longer be disabled on slow connections"] static void setUpdateConsent(UpdateConsent consent);
-// Deprecated, to be removed in version 109.
-  [deprecated="Updates can no longer be disabled on slow connections"] static void getUpdateConsent(UpdateConsentCallback callback);
   // Allows to turn Adblock on or off.
   static void setEnabled(boolean enabled);
   // Returns whether Adblock is on.
@@ -113,20 +101,32 @@ interface Functions {
   // Gets the list of built-in subscriptions.
   static void getBuiltInSubscriptions(BuiltInSubscriptionsCallback callback);
   // Returns a list of built-in subscriptions a user is subscribed to.
+  // Deprecated, to be removed in version 111.
+  [deprecated="Use getInstalledSubscriptions() instead"]
   static void getSelectedBuiltInSubscriptions(SubscriptionsCallback callback);
   // Subscribes to a built-in subscription.
   // |url| must be one from the built-in subscriptions list.
+  // Deprecated, to be removed in version 111.
+  [deprecated="Use installSubscription() instead"]
   static void selectBuiltInSubscription(DOMString url,
                                         optional CompletionCallback feedback);
   // Unsubscribes from a built-in subscription.
+  // Deprecated, to be removed in version 111.
+  [deprecated="Use uninstallSubscription() instead"]
   static void unselectBuiltInSubscription(DOMString url,
                                           optional CompletionCallback feedback);
   // Returns a list of custom subscriptions a user is subscribed to.
+  // Deprecated, to be removed in version 111.
+  [deprecated="Use getInstalledSubscriptions() instead"]
   static void getCustomSubscriptions(SubscriptionsCallback callback);
   // Subscribes to a custom subscription. |url| may point to any URL.
+  // Deprecated, to be removed in version 111.
+  [deprecated="Use installSubscription() instead"]
   static void addCustomSubscription(DOMString url,
                                     optional CompletionCallback feedback);
   // Unsubscribes from a custom subscription.
+  // Deprecated, to be removed in version 111.
+  [deprecated="Use uninstallSubscription() instead"]
   static void removeCustomSubscription(DOMString url,
                                        optional CompletionCallback feedback);
   // Adds a domain ads should not be blocked on.
@@ -145,6 +145,20 @@ interface Functions {
   static void getSessionAllowedAdsCount(SessionStatsCallback callback);
   // Returns number of blocked requests in a current session (runtime).
   static void getSessionBlockedAdsCount(SessionStatsCallback callback);
+  // Compiles a list of currently installed subscriptions. Filter lists that are
+  // still being installed and don't yet participate in ad filtering also appear
+  // on this list and can be discerned by their installation_state.
+  static void getInstalledSubscriptions(SubscriptionsCallback callback);
+  // Subscribes to a filter list. If subscription was already done and not
+  // removed later by "uninstallSubscription()" call then this is a no-op call,
+  // otherwise it initiates a download. |url| must point to a https URL.
+  static void installSubscription(DOMString url,
+                                  optional CompletionCallback feedback);
+  // Removes a subscription to a filter list downloaded from |url| and deletes
+  // corresponding files from disk. Does nothing if the filter list was never
+  // subscribed to.
+  static void uninstallSubscription(DOMString url,
+                                    optional CompletionCallback feedback);
 };
 
 interface Events {

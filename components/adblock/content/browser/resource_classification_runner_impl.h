@@ -42,7 +42,7 @@ class ResourceClassificationRunnerImpl final
   void RemoveObserver(Observer* observer) final;
 
   // Performs a *synchronous* check, this can block the UI for a while!
-  mojom::FilterMatchResult ShouldBlockPopup(
+  FilterMatchResult ShouldBlockPopup(
       std::unique_ptr<SubscriptionCollection> subscription_collection,
       const GURL& opener,
       const GURL& popup_url,
@@ -51,26 +51,23 @@ class ResourceClassificationRunnerImpl final
       std::unique_ptr<SubscriptionCollection> subscription_collection,
       const GURL& request_url,
       int32_t resource_type,
-      int32_t process_id,
-      int32_t render_frame_id,
-      mojom::AdblockInterface::CheckFilterMatchCallback callback) final;
+      content::GlobalRenderFrameHostId render_frame_host_id,
+      CheckFilterMatchCallback callback) final;
   void CheckRequestFilterMatchForWebSocket(
       std::unique_ptr<SubscriptionCollection> subscription_collection,
       const GURL& request_url,
       content::GlobalRenderFrameHostId render_frame_host_id,
-      mojom::AdblockInterface::CheckFilterMatchCallback callback) final;
+      CheckFilterMatchCallback callback) final;
   void CheckResponseFilterMatch(
       std::unique_ptr<SubscriptionCollection> subscription_collection,
       const GURL& response_url,
-      int32_t process_id,
-      int32_t render_frame_id,
+      content::GlobalRenderFrameHostId render_frame_host_id,
       const scoped_refptr<net::HttpResponseHeaders>& headers,
-      mojom::AdblockInterface::CheckFilterMatchCallback callback) final;
+      CheckFilterMatchCallback callback) final;
   void CheckRewriteFilterMatch(
       std::unique_ptr<SubscriptionCollection> subscription_collection,
       const GURL& request_url,
-      int32_t process_id,
-      int32_t render_frame_id,
+      content::GlobalRenderFrameHostId render_frame_host_id,
       base::OnceCallback<void(const absl::optional<GURL>&)> result) final;
 
  private:
@@ -79,10 +76,10 @@ class ResourceClassificationRunnerImpl final
       const GURL& request_url,
       ContentType adblock_type,
       content::GlobalRenderFrameHostId frame_host_id,
-      mojom::AdblockInterface::CheckFilterMatchCallback cb);
+      CheckFilterMatchCallback cb);
 
   struct CheckResourceFilterMatchResult {
-    CheckResourceFilterMatchResult(mojom::FilterMatchResult status,
+    CheckResourceFilterMatchResult(FilterMatchResult status,
                                    const GURL& subscription);
     ~CheckResourceFilterMatchResult();
     CheckResourceFilterMatchResult(const CheckResourceFilterMatchResult&);
@@ -91,7 +88,7 @@ class ResourceClassificationRunnerImpl final
     CheckResourceFilterMatchResult(CheckResourceFilterMatchResult&&);
     CheckResourceFilterMatchResult& operator=(CheckResourceFilterMatchResult&&);
 
-    mojom::FilterMatchResult status;
+    FilterMatchResult status;
     GURL subscription;
   };
 
@@ -108,7 +105,7 @@ class ResourceClassificationRunnerImpl final
       const std::vector<GURL>& frame_hierarchy,
       ContentType adblock_resource_type,
       content::GlobalRenderFrameHostId render_frame_host_id,
-      mojom::AdblockInterface::CheckFilterMatchCallback callback,
+      CheckFilterMatchCallback callback,
       const CheckResourceFilterMatchResult& result);
 
   static CheckResourceFilterMatchResult CheckResponseFilterMatchInternal(
@@ -120,15 +117,14 @@ class ResourceClassificationRunnerImpl final
       const scoped_refptr<net::HttpResponseHeaders> response_headers);
 
   void NotifyAdMatched(const GURL& url,
-                       mojom::FilterMatchResult result,
+                       FilterMatchResult result,
                        const std::vector<GURL>& parent_frame_urls,
                        ContentType content_type,
                        content::RenderFrameHost* render_frame_host,
                        const GURL& subscription);
 
-  void PostFilterMatchCallbackToUI(
-      mojom::AdblockInterface::CheckFilterMatchCallback callback,
-      mojom::FilterMatchResult result);
+  void PostFilterMatchCallbackToUI(CheckFilterMatchCallback callback,
+                                   FilterMatchResult result);
 
   void PostRewriteCallbackToUI(
       base::OnceCallback<void(const absl::optional<GURL>&)> callback,
@@ -140,8 +136,7 @@ class ResourceClassificationRunnerImpl final
 
   void ProcessDocumentAllowlistedResponse(
       const GURL& request_url,
-      int32_t process_id,
-      int32_t render_frame_id,
+      content::GlobalRenderFrameHostId render_frame_host_id,
       absl::optional<GURL> allowing_subscription);
 
   SEQUENCE_CHECKER(sequence_checker_);

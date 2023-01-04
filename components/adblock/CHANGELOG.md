@@ -1,5 +1,27 @@
 # Release Notes
 
+## eyeo Chromium SDK 109.0
+* Updated to Chromium 109.0.5414.46
+* Removed deprecated Allowed Connection Type API (DPD-1582)
+* Deprecated the distinction between installing Built-In vs Custom subscriptions (DPD-1441)
+  - Added API functions to install/uninstall/get subscriptions regardless of their provenance
+  - Deprecated API functions that select/unselect/get "built-in" subscriptions
+  - Deprecated API functions that add/remove/get "custom" subscriptions
+  - The deprecated API functions will disappear in version 111
+  - Identifying recommended filter lists is still possible via separate API functions
+* Fixed parsing URL filters with # symbol (DPD-1632)
+* Removed unneeded AdblockMojoInterface (DPD-1295)
+* Replaced some usage of render frame ID + render process ID with GlobalRenderFrameHostId (DPD-1130)
+* Fixed build issues on Windows
+* Initial work for enabling independent Filtering Configurations (DPD-1567)
+  - Filtering Configurations will allow supporting independently set up filter engine users, e.g.
+    an "ad-filtering" setting alongside a "privacy boosting" setting or "parental control" setting.
+  - Each may have independent filter lists, custom filters, allowed domains etc.
+  - The "ad-filtering" configuration remains the only possible configuration currently, maintaining
+    all existing semantics and APIs
+  - Support for multiple configurations is planned for a future release
+
+
 ## eyeo Chromium SDK 108.0
 * Updated to Chromium 108.0.5359.28
 * Allow Telemetry TopicProviders to collect payload asynchronously (DPD-1507)

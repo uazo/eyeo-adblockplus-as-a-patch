@@ -22,19 +22,23 @@
 #include <numeric>
 #include <vector>
 
+#include "absl/types/optional.h"
 #include "base/bind.h"
+#include "base/command_line.h"
 #include "base/logging.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/string_util.h"
 #include "base/version.h"
+#include "components/adblock/core/adblock_switches.h"
 #include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/common/adblock_utils.h"
-#include "components/adblock/core/common/allowed_connection_type.h"
 #include "components/adblock/core/subscription/installed_subscription.h"
 #include "components/adblock/core/subscription/subscription.h"
 #include "components/adblock/core/subscription/subscription_config.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "components/language/core/common/locale_util.h"
+#include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/version_info/version_info.h"
 #include "url/gurl.h"
@@ -43,73 +47,51 @@ namespace adblock {
 
 namespace {
 
-bool AddToPref(const std::string& to_add, StringListPrefMember* member) {
-  if (to_add.empty())
-    return false;
-  auto current_value = member->GetValue();
-  if (std::find(current_value.begin(), current_value.end(), to_add) !=
-      current_value.end()) {
-    return false;
+bool IsKnownSubscription(
+    const std::vector<KnownSubscriptionInfo>& known_subscriptions,
+    const GURL& url) {
+  return base::ranges::any_of(known_subscriptions,
+                              [&](const auto& known_subscription) {
+                                return known_subscription.url == url;
+                              });
+}
+
+template <typename T>
+std::vector<T> MigrateItemsFromList(PrefService* pref_service,
+                                    const std::string& pref_name) {
+  std::vector<T> results;
+  if (pref_service->FindPreference(pref_name)->HasUserSetting()) {
+    const auto& list = pref_service->GetList(pref_name);
+    for (const auto& item : list)
+      if (item.is_string())
+        results.emplace_back(item.GetString());
+    pref_service->ClearPref(pref_name);
   }
-  current_value.emplace_back(to_add);
-  member->SetValue(current_value);
-  return true;
+  return results;
 }
 
-bool RemoveFromPref(const std::string& to_remove,
-                    StringListPrefMember* member) {
-  if (to_remove.empty())
-    return false;
-  auto current_value = member->GetValue();
-  auto elem = std::find(current_value.begin(), current_value.end(), to_remove);
-  if (elem == current_value.end())
-    return false;
-  current_value.erase(elem);
-  member->SetValue(current_value);
-  return true;
-}
-
-std::vector<GURL> UrlsFromPref(const StringListPrefMember& member) {
-  std::vector<GURL> subscriptions_in_prefs;
-  for (const auto& sub : *member)
-    subscriptions_in_prefs.emplace_back(sub);
-  return subscriptions_in_prefs;
-}
-
-void SortAndRemoveDuplicates(std::vector<GURL>& collection) {
-  std::sort(collection.begin(), collection.end());
-  auto last = std::unique(collection.begin(), collection.end());
-  if (last != collection.end())
-    collection.erase(last, collection.end());
+absl::optional<bool> MigrateBoolFromPrefs(PrefService* pref_service,
+                                          const std::string& pref_name) {
+  if (pref_service->FindPreference(pref_name)->HasUserSetting()) {
+    bool value = pref_service->GetBoolean(pref_name);
+    pref_service->ClearPref(pref_name);
+    return value;
+  }
+  return absl::nullopt;
 }
 
 }  // namespace
 
 AdblockControllerImpl::AdblockControllerImpl(
-    PrefService* pref_service,
+    FilteringConfiguration* adblock_filtering_configuration,
     SubscriptionService* subscription_service,
-    const std::string& locale)
-    : prefs_(pref_service),
+    const std::string& locale,
+    std::vector<KnownSubscriptionInfo> known_subscriptions)
+    : adblock_filtering_configuration_(adblock_filtering_configuration),
       subscription_service_(subscription_service),
-      language_(language::ExtractBaseLanguage(locale)) {
-  auto on_change_cb = base::BindRepeating(
-      &AdblockControllerImpl::SynchronizeWithSubscriptionService,
-      base::Unretained(this));
-
-  enable_adblock_.Init(adblock::prefs::kEnableAdblock, pref_service,
-                       on_change_cb);
-  enable_aa_.Init(adblock::prefs::kEnableAcceptableAds, pref_service,
-                  on_change_cb);
-
-  allowed_domains_.Init(adblock::prefs::kAdblockAllowedDomains, pref_service,
-                        on_change_cb);
-  custom_filters_.Init(adblock::prefs::kAdblockCustomFilters, pref_service,
-                       on_change_cb);
-  subscriptions_.Init(adblock::prefs::kAdblockSubscriptions, pref_service,
-                      on_change_cb);
-  custom_subscriptions_.Init(adblock::prefs::kAdblockCustomSubscriptions,
-                             pref_service, on_change_cb);
-
+      language_(language::ExtractBaseLanguage(locale)),
+      known_subscriptions_(std::move(known_subscriptions)) {
+  subscription_service_->AddObserver(this);
   // language::ExtractBaseLanguage is pretty basic, if it doesn't return
   // something that looks like a valid language, fallback to English and use the
   // default EasyList.
@@ -117,7 +99,9 @@ AdblockControllerImpl::AdblockControllerImpl(
     language_ = "en";
 }
 
-AdblockControllerImpl::~AdblockControllerImpl() = default;
+AdblockControllerImpl::~AdblockControllerImpl() {
+  subscription_service_->RemoveObserver(this);
+}
 
 void AdblockControllerImpl::AddObserver(AdblockController::Observer* observer) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -131,331 +115,224 @@ void AdblockControllerImpl::RemoveObserver(
 }
 
 void AdblockControllerImpl::SetAdblockEnabled(bool enabled) {
-  enable_adblock_.SetValue(enabled);
+  adblock_filtering_configuration_->SetEnabled(enabled);
+  for (auto& observer : observers_)
+    observer.OnEnabledStateChanged();
 }
 
 bool AdblockControllerImpl::IsAdblockEnabled() const {
-  return enable_adblock_.GetValue();
+  return adblock_filtering_configuration_->IsEnabled();
 }
 
 void AdblockControllerImpl::SetAcceptableAdsEnabled(bool enabled) {
-  enable_aa_.SetValue(enabled);
-  if (!subscription_service_->IsInitialized()) {
-    // Subscription will be installed or removed in SynchronizeSubscriptions().
-    return;
-  }
-  const bool has_acceptable_ads_installed = HasAcceptableAdsInstalled();
-  if (IsAcceptableAdsEnabled() && !has_acceptable_ads_installed)
-    DownloadAndInstallSubscription(AcceptableAdsUrl());
-  else if (!IsAcceptableAdsEnabled() && has_acceptable_ads_installed)
+  if (enabled) {
+    InstallSubscription(AcceptableAdsUrl());
+  } else {
     UninstallSubscription(AcceptableAdsUrl());
+  }
 }
 
 bool AdblockControllerImpl::IsAcceptableAdsEnabled() const {
-  return enable_aa_.GetValue();
+  return base::ranges::any_of(
+      adblock_filtering_configuration_->GetFilterLists(),
+      [&](const auto& url) { return url == AcceptableAdsUrl(); });
+}
+
+void AdblockControllerImpl::InstallSubscription(const GURL& url) {
+  adblock_filtering_configuration_->AddFilterList(url);
+}
+
+void AdblockControllerImpl::UninstallSubscription(const GURL& url) {
+  adblock_filtering_configuration_->RemoveFilterList(url);
 }
 
 void AdblockControllerImpl::SelectBuiltInSubscription(const GURL& url) {
-  if (url == AcceptableAdsUrl()) {
-    SetAcceptableAdsEnabled(true);
-  } else if (AddToPref(url.spec(), &subscriptions_)) {
-    DownloadAndInstallSubscription(url);
-  }
+  InstallSubscription(url);
 }
 
 void AdblockControllerImpl::UnselectBuiltInSubscription(const GURL& url) {
-  if (url == AcceptableAdsUrl()) {
-    SetAcceptableAdsEnabled(false);
-  } else if (RemoveFromPref(url.spec(), &subscriptions_)) {
-    UninstallSubscription(url);
-  }
+  UninstallSubscription(url);
+}
+
+void AdblockControllerImpl::AddCustomSubscription(const GURL& url) {
+  InstallSubscription(url);
+}
+
+void AdblockControllerImpl::RemoveCustomSubscription(const GURL& url) {
+  UninstallSubscription(url);
+}
+
+std::vector<scoped_refptr<Subscription>>
+AdblockControllerImpl::GetInstalledSubscriptions() const {
+  if (subscription_service_->GetStatus() != FilteringStatus::Active)
+    return {};
+  return GetSubscriptionsThatMatchConfiguration();
 }
 
 std::vector<scoped_refptr<Subscription>>
 AdblockControllerImpl::GetSelectedBuiltInSubscriptions() const {
-  if (!subscription_service_->IsInitialized())
-    return {};
-  auto selected = GetSubscriptionsThatMatchPref(subscriptions_);
-  // The Acceptable Ads subscription is not stored in the |subscriptions_| pref,
-  // it's installation is implied by |enable_aa_| pref being true. Simplify
-  // during DPD-1269.
-  if (IsAcceptableAdsEnabled()) {
-    const auto current_subscriptions =
-        subscription_service_->GetCurrentSubscriptions();
-    const auto aa_it = base::ranges::find(
-        current_subscriptions, AcceptableAdsUrl(), &Subscription::GetSourceUrl);
-    // If Acceptable Ads pref is true *and* the subscription is installed in
-    // SubscriptionService, report it along with other built-in subscriptions.
-    if (aa_it != current_subscriptions.end())
-      selected.push_back(*aa_it);
-  }
+  auto selected = GetInstalledSubscriptions();
+  std::vector<KnownSubscriptionInfo> known = GetKnownSubscriptions();
+  selected.erase(base::ranges::remove_if(selected,
+                                         [&](const auto& subscription) {
+                                           return !IsKnownSubscription(
+                                               known,
+                                               subscription->GetSourceUrl());
+                                         }),
+                 selected.end());
   return selected;
-}
-
-void AdblockControllerImpl::AddCustomSubscription(const GURL& url) {
-  if (AddToPref(url.spec(), &custom_subscriptions_))
-    DownloadAndInstallSubscription(url);
-}
-
-void AdblockControllerImpl::RemoveCustomSubscription(const GURL& url) {
-  if (RemoveFromPref(url.spec(), &custom_subscriptions_))
-    UninstallSubscription(url);
 }
 
 std::vector<scoped_refptr<Subscription>>
 AdblockControllerImpl::GetCustomSubscriptions() const {
-  if (!subscription_service_->IsInitialized())
-    return {};
-  return GetSubscriptionsThatMatchPref(custom_subscriptions_);
+  auto selected = GetInstalledSubscriptions();
+  std::vector<KnownSubscriptionInfo> known = GetKnownSubscriptions();
+  selected.erase(base::ranges::remove_if(selected,
+                                         [&](const auto& subscription) {
+                                           return IsKnownSubscription(
+                                               known,
+                                               subscription->GetSourceUrl());
+                                         }),
+                 selected.end());
+  return selected;
 }
 
 void AdblockControllerImpl::AddAllowedDomain(const std::string& domain) {
-  if (AddToPref(base::ToLowerASCII(domain), &allowed_domains_) &&
-      subscription_service_->IsInitialized())
-    SynchronizeCustomFiltersAndAllowedDomains();
+  adblock_filtering_configuration_->AddAllowedDomain(domain);
 }
 
 void AdblockControllerImpl::RemoveAllowedDomain(const std::string& domain) {
-  if (RemoveFromPref(base::ToLowerASCII(domain), &allowed_domains_) &&
-      subscription_service_->IsInitialized())
-    SynchronizeCustomFiltersAndAllowedDomains();
+  adblock_filtering_configuration_->RemoveAllowedDomain(domain);
 }
 
 std::vector<std::string> AdblockControllerImpl::GetAllowedDomains() const {
-  return allowed_domains_.GetValue();
-}
-
-void AdblockControllerImpl::SetUpdateConsent(AllowedConnectionType value) {
-  // Deprecated, entire function will be removed in 109
-}
-
-AllowedConnectionType AdblockControllerImpl::GetUpdateConsent() const {
-  // Deprecated, entire function will be removed in 109
-  return AllowedConnectionType::kAny;
+  return adblock_filtering_configuration_->GetAllowedDomains();
 }
 
 void AdblockControllerImpl::AddCustomFilter(const std::string& filter) {
-  if (AddToPref(filter, &custom_filters_) &&
-      subscription_service_->IsInitialized())
-    SynchronizeCustomFiltersAndAllowedDomains();
+  adblock_filtering_configuration_->AddCustomFilter(filter);
 }
 
 void AdblockControllerImpl::RemoveCustomFilter(const std::string& filter) {
-  if (RemoveFromPref(filter, &custom_filters_) &&
-      subscription_service_->IsInitialized())
-    SynchronizeCustomFiltersAndAllowedDomains();
+  adblock_filtering_configuration_->RemoveCustomFilter(filter);
 }
 
 std::vector<std::string> AdblockControllerImpl::GetCustomFilters() const {
-  return custom_filters_.GetValue();
+  return adblock_filtering_configuration_->GetCustomFilters();
 }
 
 std::vector<KnownSubscriptionInfo>
 AdblockControllerImpl::GetKnownSubscriptions() const {
-  auto subscriptions = config::GetKnownSubscriptions();
-  subscriptions.emplace_back(AcceptableAdsUrl(), std::string("Acceptable Ads"),
-                             std::vector<std::string>{},
-                             SubscriptionUiVisibility::Invisible,
-                             SubscriptionFirstRunBehavior::Subscribe,
-                             SubscriptionPrivilegedFilterStatus::Forbidden);
-  return subscriptions;
+  return known_subscriptions_;
 }
 
-void AdblockControllerImpl::SynchronizeWithPrefsWhenPossible() {
-  if (subscription_service_->IsInitialized()) {
-    SynchronizeWithSubscriptionService();
-  } else {
-    subscription_service_->RunWhenInitialized(base::BindOnce(
-        &AdblockControllerImpl::SynchronizeWithSubscriptionService,
-        weak_ptr_factory_.GetWeakPtr()));
-  }
-}
-
-bool AdblockControllerImpl::HasAcceptableAdsInstalled() const {
-  const auto current_subscriptions =
-      subscription_service_->GetCurrentSubscriptions();
-  return base::ranges::find(current_subscriptions, AcceptableAdsUrl(),
-                            &Subscription::GetSourceUrl) !=
-         current_subscriptions.end();
-}
-
-void AdblockControllerImpl::NotifySubscriptionChanged(
+void AdblockControllerImpl::OnSubscriptionInstalled(
     const GURL& subscription_url) {
   for (auto& observer : observers_)
     observer.OnSubscriptionUpdated(subscription_url);
 }
 
-void AdblockControllerImpl::UninstallSubscription(
-    const GURL& subscription_url) {
-  if (!subscription_service_->IsInitialized()) {
-    // The subscription will be removed in SynchronizeSubscriptions().
-    return;
-  }
-  NotifySubscriptionChanged(subscription_url);
-  subscription_service_->UninstallSubscription(subscription_url);
-}
-
-void AdblockControllerImpl::DownloadAndInstallSubscription(
-    const GURL& subscription_url) {
-  if (!subscription_service_->IsInitialized()) {
-    // The download will be started in SynchronizeSubscriptions().
-    return;
-  }
-  subscription_service_->DownloadAndInstallSubscription(
-      subscription_url,
-      base::BindOnce(&AdblockControllerImpl::OnSubscriptionDownloaded,
-                     weak_ptr_factory_.GetWeakPtr(), subscription_url));
-}
-
-void AdblockControllerImpl::OnSubscriptionDownloaded(
-    const GURL& subscription_url,
-    bool success) {
-  // Currently, we have no means of notifying the user about an unsuccessful
-  // installation, so we ignore the value of |success|.
-  // The content of the Prefs (and the lists returned by this Controller)
-  // represent the *intent*, rf what the user wants installed, not the *current
-  // state*, which may be different if downloads failed or if they were not
-  // allowed to start. Failed downloads will be retried
-  // (SynchronizeSubscriptions()) and we hope for eventual consistency.
-  NotifySubscriptionChanged(subscription_url);
-}
-
-void AdblockControllerImpl::SynchronizeWithSubscriptionService() {
-  if (!subscription_service_->IsInitialized()) {
-    return;
-  }
-  SynchronizeCustomFiltersAndAllowedDomains();
-  SynchronizeSubscriptions();
-}
-
-void AdblockControllerImpl::SynchronizeCustomFiltersAndAllowedDomains() {
-  std::vector<std::string> custom_filters_and_allowed_domains =
-      custom_filters_.GetValue();
-  for (const auto& domain : allowed_domains_.GetValue())
-    custom_filters_and_allowed_domains.push_back(
-        utils::CreateDomainAllowlistingFilter(domain));
-  subscription_service_->SetCustomFilters(custom_filters_and_allowed_domains);
-}
-
-void AdblockControllerImpl::SynchronizeSubscriptions() {
+void AdblockControllerImpl::RunFirstRunLogic(PrefService* pref_service) {
   // If the state of installed subscriptions in SubscriptionService is different
   // than the state in prefs, prefs take precedence.
-  std::vector<GURL> subscriptions_in_prefs;
-  if (prefs_->GetBoolean(prefs::kInstallFirstStartSubscriptions)) {
+  if (pref_service->GetBoolean(prefs::kInstallFirstStartSubscriptions)) {
     // On first run, install additional subscriptions.
-    for (const auto& cur : config::GetKnownSubscriptions()) {
+    for (const auto& cur : known_subscriptions_) {
       if (cur.first_run == SubscriptionFirstRunBehavior::Subscribe) {
-        AddToPref(cur.url.spec(), &subscriptions_);
+        if (cur.url == AcceptableAdsUrl() &&
+            base::CommandLine::ForCurrentProcess()->HasSwitch(
+                switches::kDisableAcceptableAds)) {
+          // Do not install Acceptable Ads on first run because a command line
+          // switch forbids it. Mostly used for testing.
+          continue;
+        }
+        InstallSubscription(cur.url);
       }
     }
-    AddToPref(FindLanguageBasedRecommendedSubscription().spec(),
-              &subscriptions_);
-    prefs_->SetBoolean(prefs::kInstallFirstStartSubscriptions, false);
-  }
 
-  for (const auto& sub : *subscriptions_)
-    subscriptions_in_prefs.emplace_back(sub);
-  for (const auto& sub : *custom_subscriptions_)
-    subscriptions_in_prefs.emplace_back(sub);
-
-  if (enable_aa_.GetValue()) {
-    // If prefs::kEnableAcceptableAds is true, also expect the Acceptable Ads
-    // subscription to be installed.
-    subscriptions_in_prefs.push_back(AcceptableAdsUrl());
-  }
-  SortAndRemoveDuplicates(subscriptions_in_prefs);
-
-  std::vector<GURL> subscriptions_in_service;
-  base::ranges::transform(subscription_service_->GetCurrentSubscriptions(),
-                          std::back_inserter(subscriptions_in_service),
-                          &Subscription::GetSourceUrl);
-  base::ranges::sort(subscriptions_in_service);
-
-  InstallMissingSubscriptions(subscriptions_in_prefs, subscriptions_in_service);
-  RemoveUnexpectedSubscriptions(subscriptions_in_prefs,
-                                subscriptions_in_service);
-}
-
-void AdblockControllerImpl::InstallMissingSubscriptions(
-    const std::vector<GURL>& subscriptions_in_prefs,
-    const std::vector<GURL>& subscriptions_in_service) {
-  // Prefs can contain subscriptions not present in SubscriptionService when:
-  // - This is a first run with flatbuffer-based implementation after
-  // libadblockplus-based implementation (migration).
-  // - The schema changed in a non-backward-compatible way and installed
-  // subscriptions were invalidated.
-  // - Calls were made to Controller's methods before the SubscriptionService
-  // was initialized.
-  std::vector<GURL> subscriptions_to_install;
-  std::set_difference(
-      subscriptions_in_prefs.begin(), subscriptions_in_prefs.end(),
-      subscriptions_in_service.begin(), subscriptions_in_service.end(),
-      std::back_inserter(subscriptions_to_install));
-  for (const auto& sub : subscriptions_to_install) {
-    DLOG(INFO) << "[eyeo] Installing missing subscription: " << sub;
-    DownloadAndInstallSubscription(sub);
+    InstallLanguageBasedRecommendedSubscriptions();
+    pref_service->SetBoolean(prefs::kInstallFirstStartSubscriptions, false);
   }
 }
 
-void AdblockControllerImpl::RemoveUnexpectedSubscriptions(
-    const std::vector<GURL>& subscriptions_in_prefs,
-    const std::vector<GURL>& subscriptions_in_service) {
-  // A Subscription can be present in Service (which means: on disk) but not
-  // present in Prefs when:
-  // - Uninstallation has started, and it removed the subscription from Prefs
-  // immediately, but the async filesystem task didn't execute before browser
-  // shut down.
-  // - Calls were made to Controller's methods before the SubscriptionService
-  // was initialized.
-  std::vector<GURL> subscriptions_to_uninstall;
-  std::set_difference(
-      subscriptions_in_service.begin(), subscriptions_in_service.end(),
-      subscriptions_in_prefs.begin(), subscriptions_in_prefs.end(),
-      std::back_inserter(subscriptions_to_uninstall));
-  for (const auto& sub : subscriptions_to_uninstall) {
-    DLOG(INFO) << "[eyeo] Uninstalling unexpected subscription: " << sub;
-    UninstallSubscription(sub);
+void AdblockControllerImpl::MigrateLegacyPrefs(PrefService* pref_service) {
+  if (auto aa_value = MigrateBoolFromPrefs(pref_service,
+                                           prefs::kEnableAcceptableAdsLegacy)) {
+    SetAcceptableAdsEnabled(*aa_value);
+    VLOG(1) << "[eyeo] Migrated kEnableAcceptableAdsLegacy pref";
+  }
+
+  if (auto enable_value =
+          MigrateBoolFromPrefs(pref_service, prefs::kEnableAdblockLegacy)) {
+    SetAdblockEnabled(*enable_value);
+    VLOG(1) << "[eyeo] Migrated kEnableAdblockLegacy pref";
+  }
+
+  for (const auto& url : MigrateItemsFromList<GURL>(
+           pref_service, prefs::kAdblockCustomSubscriptionsLegacy)) {
+    adblock_filtering_configuration_->AddFilterList(url);
+    VLOG(1) << "[eyeo] Migrated " << url
+            << " from kAdblockCustomSubscriptionsLegacy pref";
+  }
+
+  for (const auto& url : MigrateItemsFromList<GURL>(
+           pref_service, prefs::kAdblockSubscriptionsLegacy)) {
+    adblock_filtering_configuration_->AddFilterList(url);
+    VLOG(1) << "[eyeo] Migrated " << url
+            << " from kAdblockSubscriptionsLegacy pref";
+  }
+
+  for (const auto& domain : MigrateItemsFromList<std::string>(
+           pref_service, prefs::kAdblockAllowedDomainsLegacy)) {
+    adblock_filtering_configuration_->AddAllowedDomain(domain);
+    VLOG(1) << "[eyeo] Migrated " << domain
+            << " from kAdblockAllowedDomainsLegacy pref";
+  }
+
+  for (const auto& filter : MigrateItemsFromList<std::string>(
+           pref_service, prefs::kAdblockCustomFiltersLegacy)) {
+    adblock_filtering_configuration_->AddCustomFilter(filter);
+    VLOG(1) << "[eyeo] Migrated " << filter
+            << " from kAdblockCustomFiltersLegacy pref";
   }
 }
 
-GURL AdblockControllerImpl::FindLanguageBasedRecommendedSubscription() const {
-  const auto& recommended_subscriptions = config::GetKnownSubscriptions();
-  auto language_specific_subscription = std::find_if(
-      recommended_subscriptions.begin(), recommended_subscriptions.end(),
-      [&](const KnownSubscriptionInfo& subscription) {
-        return subscription.first_run ==
-                   SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch &&
-               std::find(subscription.languages.begin(),
-                         subscription.languages.end(),
-                         language_) != subscription.languages.end();
-      });
-  if (language_specific_subscription == recommended_subscriptions.end()) {
-    DLOG(INFO) << "[eyeo] Using the default subscription for language \""
-               << language_ << "\"";
-    return DefaultSubscriptionUrl();
+void AdblockControllerImpl::InstallLanguageBasedRecommendedSubscriptions() {
+  bool language_specific_subscription_installed = false;
+  for (const auto& subscription : known_subscriptions_) {
+    if (subscription.first_run ==
+            SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch &&
+        std::find(subscription.languages.begin(), subscription.languages.end(),
+                  language_) != subscription.languages.end()) {
+      VLOG(1) << "[eyeo] Using recommended subscription for language \""
+              << language_ << "\": " << subscription.title;
+      language_specific_subscription_installed = true;
+      InstallSubscription(subscription.url);
+    }
   }
-  DLOG(INFO) << "[eyeo] Using recommended subscription for language \""
-             << language_ << "\": " << language_specific_subscription->title;
-  return language_specific_subscription->url;
+  if (language_specific_subscription_installed)
+    return;
+
+  // If there's no language-specific recommended subscription, see if we may
+  // install the default subscription..
+  if (base::ranges::any_of(
+          known_subscriptions_, [&](const KnownSubscriptionInfo& subscription) {
+            return subscription.url == DefaultSubscriptionUrl() &&
+                   subscription.first_run !=
+                       SubscriptionFirstRunBehavior::Ignore;
+          })) {
+    VLOG(1) << "[eyeo] Using the default subscription for language \""
+            << language_ << "\"";
+    InstallSubscription(DefaultSubscriptionUrl());
+  }
+  VLOG(1) << "[eyeo] No default subscription found, neither "
+             "language-specific, nor generic.";
 }
 
 std::vector<scoped_refptr<Subscription>>
-AdblockControllerImpl::GetSubscriptionsThatMatchPref(
-    const StringListPrefMember& url_list) const {
-  const auto subscription_urls_in_prefs = UrlsFromPref(url_list);
-  auto current_subscriptions = subscription_service_->GetCurrentSubscriptions();
-  // Remove Subscriptions that have URLs not present in
-  // subscription_urls_in_prefs.
-  current_subscriptions.erase(
-      base::ranges::remove_if(current_subscriptions,
-                              [&](const auto& installed_sub) {
-                                return base::ranges::find(
-                                           subscription_urls_in_prefs,
-                                           installed_sub->GetSourceUrl()) ==
-                                       subscription_urls_in_prefs.end();
-                              }),
-      current_subscriptions.end());
-  return current_subscriptions;
+AdblockControllerImpl::GetSubscriptionsThatMatchConfiguration() const {
+  return subscription_service_->GetCurrentSubscriptions(
+      adblock_filtering_configuration_);
 }
 
 }  // namespace adblock

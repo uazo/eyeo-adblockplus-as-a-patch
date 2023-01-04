@@ -17,12 +17,13 @@
 
 #include "components/adblock/content/browser/frame_hierarchy_builder.h"
 
-#include "chrome/browser/adblock/subscription_service_factory.h"
+#include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
-#include "components/adblock/core/subscription/subscription_service.h"
+#include "components/adblock/core/adblock_controller.h"
+#include "components/adblock/core/common/adblock_constants.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/dns/mock_host_resolver.h"
@@ -53,9 +54,12 @@ class AdblockFrameHierarchyBrowserTest : public InProcessBrowserTest {
   }
 
   void SetFilters(std::vector<std::string> filters) {
-    auto* subscription_service =
-        SubscriptionServiceFactory::GetForBrowserContext(browser()->profile());
-    subscription_service->SetCustomFilters(std::move(filters));
+    auto* controller =
+        AdblockControllerFactory::GetForBrowserContext(browser()->profile());
+    controller->RemoveCustomFilter(kAllowlistEverythingFilter);
+    for (auto& filter : filters) {
+      controller->AddCustomFilter(filter);
+    }
   }
 
   void NavigateToOutermostFrame() {

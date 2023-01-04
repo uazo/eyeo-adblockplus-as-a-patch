@@ -18,6 +18,7 @@
 #ifndef COMPONENTS_ADBLOCK_CORE_SUBSCRIPTION_TEST_MOCK_SUBSCRIPTION_SERVICE_H_
 #define COMPONENTS_ADBLOCK_CORE_SUBSCRIPTION_TEST_MOCK_SUBSCRIPTION_SERVICE_H_
 
+#include "components/adblock/core/configuration/filtering_configuration.h"
 #include "components/adblock/core/subscription/subscription_service.h"
 
 #include "testing/gmock/include/gmock/gmock.h"
@@ -30,33 +31,22 @@ class MockSubscriptionService : public NiceMock<SubscriptionService> {
  public:
   MockSubscriptionService();
   ~MockSubscriptionService() override;
-  MOCK_METHOD(bool, IsInitialized, (), (override, const));
+  MOCK_METHOD(FilteringStatus, GetStatus, (), (override, const));
   MOCK_METHOD(void, RunWhenInitialized, (base::OnceClosure task), (override));
   MOCK_METHOD(std::vector<scoped_refptr<Subscription>>,
               GetCurrentSubscriptions,
-              (),
+              (FilteringConfiguration*),
               (override, const));
-  MOCK_METHOD(std::unique_ptr<SubscriptionCollection>,
-              GetCurrentSnapshot,
-              (),
-              (override, const));
+  MOCK_METHOD(Snapshot, GetCurrentSnapshot, (), (override, const));
   MOCK_METHOD(void,
-              DownloadAndInstallSubscription,
-              (const GURL& subscription_url,
-               SubscriptionService::InstallationCallback on_finished),
+              InstallFilteringConfiguration,
+              (std::unique_ptr<FilteringConfiguration> configuration),
               (override));
-  MOCK_METHOD(void,
-              PingAcceptableAds,
-              (SubscriptionService::PingCallback on_finished),
-              (override));
-  MOCK_METHOD(void,
-              UninstallSubscription,
-              (const GURL& subscription_url),
-              (override));
-  MOCK_METHOD(void,
-              SetCustomFilters,
-              (const std::vector<std::string>& filters),
-              (override));
+
+  void AddObserver(SubscriptionObserver* observer) final;
+  void RemoveObserver(SubscriptionObserver* observer) final;
+
+  SubscriptionObserver* observer_ = nullptr;
 };
 
 }  // namespace adblock

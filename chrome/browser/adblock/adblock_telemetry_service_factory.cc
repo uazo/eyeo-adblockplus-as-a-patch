@@ -20,6 +20,7 @@
 #include <memory>
 
 #include "base/no_destructor.h"
+#include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/profiles/incognito_helpers.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/pref_names.h"
@@ -64,7 +65,9 @@ AdblockTelemetryServiceFactory* AdblockTelemetryServiceFactory::GetInstance() {
 AdblockTelemetryServiceFactory::AdblockTelemetryServiceFactory()
     : BrowserContextKeyedServiceFactory(
           "AdblockTelemetryService",
-          BrowserContextDependencyManager::GetInstance()) {}
+          BrowserContextDependencyManager::GetInstance()) {
+  DependsOn(AdblockControllerFactory::GetInstance());
+}
 
 AdblockTelemetryServiceFactory::~AdblockTelemetryServiceFactory() = default;
 
@@ -79,9 +82,11 @@ KeyedService* AdblockTelemetryServiceFactory::BuildServiceInstanceFor(
           ->GetURLLoaderFactoryForBrowserProcess();
   auto* prefs = Profile::FromBrowserContext(context)->GetPrefs();
   auto service = std::make_unique<AdblockTelemetryService>(
-      prefs, url_loader_factory, GetInitialDelay(), GetCheckInterval());
+      AdblockControllerFactory::GetForBrowserContext(context),
+      url_loader_factory, GetInitialDelay(), GetCheckInterval());
   service->AddTopicProvider(std::make_unique<ActivepingTelemetryTopicProvider>(
       utils::GetAppInfo(), prefs,
+      AdblockControllerFactory::GetForBrowserContext(context),
       ActivepingTelemetryTopicProvider::DefaultBaseUrl(),
       ActivepingTelemetryTopicProvider::DefaultAuthToken()));
 

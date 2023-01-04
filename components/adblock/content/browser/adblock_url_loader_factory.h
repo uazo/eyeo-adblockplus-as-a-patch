@@ -15,23 +15,39 @@
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef COMPONENTS_ADBLOCK_CONTENT_COMMON_ADBLOCK_URL_LOADER_FACTORY_H_
-#define COMPONENTS_ADBLOCK_CONTENT_COMMON_ADBLOCK_URL_LOADER_FACTORY_H_
+#ifndef COMPONENTS_ADBLOCK_CONTENT_BROWSER_ADBLOCK_URL_LOADER_FACTORY_H_
+#define COMPONENTS_ADBLOCK_CONTENT_BROWSER_ADBLOCK_URL_LOADER_FACTORY_H_
 
 #include "base/containers/unique_ptr_adapters.h"
-#include "components/adblock/content/common/mojom/adblock.mojom.h"
+#include "components/adblock/content/browser/adblock_filter_match.h"
 #include "mojo/public/cpp/bindings/receiver_set.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "services/network/public/mojom/url_loader_factory.mojom.h"
 
 namespace adblock {
 
+class SubscriptionService;
+class ResourceClassificationRunner;
+class ElementHider;
+class SitekeyStorage;
+class ContentSecurityPolicyInjector;
+
+struct AdblockURLLoaderFactoryConfig {
+  SubscriptionService* subscription_service = nullptr;
+  ResourceClassificationRunner* resource_classifier = nullptr;
+  ElementHider* element_hider = nullptr;
+  SitekeyStorage* sitekey_storage = nullptr;
+  ContentSecurityPolicyInjector* csp_injector = nullptr;
+};
+
+// Processing network requests and responses.
 class AdblockURLLoaderFactory : public network::mojom::URLLoaderFactory {
  public:
   using DisconnectCallback = base::OnceCallback<void(AdblockURLLoaderFactory*)>;
 
   AdblockURLLoaderFactory(
-      std::unique_ptr<mojom::AdblockInterface> adblock_interface,
+      AdblockURLLoaderFactoryConfig config,
+      int32_t render_process_id,
       int frame_tree_node_id,
       mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
       mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
@@ -49,6 +65,9 @@ class AdblockURLLoaderFactory : public network::mojom::URLLoaderFactory {
       override;
   void Clone(::mojo::PendingReceiver<URLLoaderFactory> factory) override;
 
+  virtual bool CheckRenderProcessValid() const;
+  virtual bool CheckRenderProcessAndFrameValid(int32_t render_frame_id) const;
+
  private:
   class InProgressRequest;
   friend class InProgressRequest;
@@ -58,8 +77,9 @@ class AdblockURLLoaderFactory : public network::mojom::URLLoaderFactory {
   void RemoveRequest(InProgressRequest* request);
   void MaybeDestroySelf();
 
-  std::unique_ptr<mojom::AdblockInterface> adblock_interface_;
+  AdblockURLLoaderFactoryConfig config_;
   int frame_tree_node_id_;
+  int32_t render_process_id_;
   mojo::ReceiverSet<network::mojom::URLLoaderFactory> proxy_receivers_;
   std::set<std::unique_ptr<InProgressRequest>, base::UniquePtrComparator>
       requests_;
@@ -70,4 +90,4 @@ class AdblockURLLoaderFactory : public network::mojom::URLLoaderFactory {
 
 }  // namespace adblock
 
-#endif  // COMPONENTS_ADBLOCK_CONTENT_COMMON_ADBLOCK_URL_LOADER_FACTORY_H_
+#endif  // COMPONENTS_ADBLOCK_CONTENT_BROWSER_ADBLOCK_URL_LOADER_FACTORY_H_

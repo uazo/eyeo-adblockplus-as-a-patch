@@ -19,6 +19,7 @@
 #define COMPONENTS_ADBLOCK_CORE_ACTIVEPING_TELEMETRY_TOPIC_PROVIDER_H_
 
 #include "base/time/time.h"
+#include "components/adblock/core/adblock_controller.h"
 #include "components/adblock/core/adblock_telemetry_service.h"
 #include "components/adblock/core/common/adblock_utils.h"
 #include "components/prefs/pref_service.h"
@@ -39,6 +40,7 @@ class ActivepingTelemetryTopicProvider final
  public:
   ActivepingTelemetryTopicProvider(utils::AppInfo app_info,
                                    PrefService* pref_service,
+                                   AdblockController* adblock_controller,
                                    const GURL& base_url,
                                    const std::string& auth_token);
   ~ActivepingTelemetryTopicProvider() final;
@@ -71,6 +73,7 @@ class ActivepingTelemetryTopicProvider final
 
   const utils::AppInfo app_info_;
   PrefService* pref_service_;
+  AdblockController* adblock_controller_;
   const GURL base_url_;
   const std::string auth_token_;
 };

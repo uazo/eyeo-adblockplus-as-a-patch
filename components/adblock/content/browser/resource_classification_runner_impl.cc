@@ -45,7 +45,7 @@ absl::optional<GURL> HasRewriteHelper(
 }  // namespace
 
 ResourceClassificationRunnerImpl::CheckResourceFilterMatchResult::
-    CheckResourceFilterMatchResult(mojom::FilterMatchResult status,
+    CheckResourceFilterMatchResult(FilterMatchResult status,
                                    const GURL& subscription)
     : status(status), subscription(subscription) {}
 ResourceClassificationRunnerImpl::CheckResourceFilterMatchResult::
@@ -83,7 +83,7 @@ void ResourceClassificationRunnerImpl::RemoveObserver(Observer* observer) {
   observers_.RemoveObserver(observer);
 }
 
-mojom::FilterMatchResult ResourceClassificationRunnerImpl::ShouldBlockPopup(
+FilterMatchResult ResourceClassificationRunnerImpl::ShouldBlockPopup(
     std::unique_ptr<SubscriptionCollection> subscription_collection,
     const GURL& opener,
     const GURL& url,
@@ -99,13 +99,13 @@ mojom::FilterMatchResult ResourceClassificationRunnerImpl::ShouldBlockPopup(
       *subscription_collection, url, opener,
       sitekey ? sitekey->second : SiteKey());
   if (classification_result.decision == ClassificationDecision::Ignored) {
-    return mojom::FilterMatchResult::kNoRule;
+    return FilterMatchResult::kNoRule;
   }
-  const mojom::FilterMatchResult result =
+  const FilterMatchResult result =
       classification_result.decision == ClassificationDecision::Allowed
-          ? mojom::FilterMatchResult::kAllowRule
-          : mojom::FilterMatchResult::kBlockRule;
-  if (result == mojom::FilterMatchResult::kBlockRule)
+          ? FilterMatchResult::kAllowRule
+          : FilterMatchResult::kBlockRule;
+  if (result == FilterMatchResult::kBlockRule)
     LOG(INFO) << "[eyeo] !!! Prevented loading of pop-up " << url.spec();
   else
     LOG(INFO) << "[eyeo] Pop-up allowed (exception)";
@@ -120,12 +120,12 @@ void ResourceClassificationRunnerImpl::CheckRequestFilterMatchForWebSocket(
     std::unique_ptr<SubscriptionCollection> subscription_collection,
     const GURL& request_url,
     content::GlobalRenderFrameHostId render_frame_host_id,
-    mojom::AdblockInterface::CheckFilterMatchCallback callback) {
+    CheckFilterMatchCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(request_url.SchemeIsWSOrWSS());
-  CheckRequestFilterMatchImpl(
-      std::move(subscription_collection), request_url, ContentType::Websocket,
-      render_frame_host_id, std::move(callback));
+  CheckRequestFilterMatchImpl(std::move(subscription_collection), request_url,
+                              ContentType::Websocket, render_frame_host_id,
+                              std::move(callback));
 }
 
 absl::optional<GURL> ResourceClassificationRunnerImpl::CheckDocumentAllowlisted(
@@ -137,12 +137,11 @@ absl::optional<GURL> ResourceClassificationRunnerImpl::CheckDocumentAllowlisted(
 
 void ResourceClassificationRunnerImpl::ProcessDocumentAllowlistedResponse(
     const GURL& request_url,
-    int32_t process_id,
-    int32_t render_frame_id,
+    content::GlobalRenderFrameHostId render_frame_host_id,
     absl::optional<GURL> allowing_subscription) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   content::RenderFrameHost* host =
-      content::RenderFrameHost::FromID(process_id, render_frame_id);
+      content::RenderFrameHost::FromID(render_frame_host_id);
   if (allowing_subscription && host) {
     VLOG(1) << "[eyeo] Calling OnPageAllowed() for " << request_url;
     for (auto& observer : observers_) {
@@ -155,9 +154,8 @@ void ResourceClassificationRunnerImpl::CheckRequestFilterMatch(
     std::unique_ptr<SubscriptionCollection> subscription_collection,
     const GURL& request_url,
     int32_t resource_type,
-    int32_t process_id,
-    int32_t render_frame_id,
-    mojom::AdblockInterface::CheckFilterMatchCallback callback) {
+    content::GlobalRenderFrameHostId render_frame_host_id,
+    CheckFilterMatchCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(!request_url.SchemeIsWSOrWSS())
       << "Use CheckRequestFilterMatchForWebSocket()";
@@ -165,7 +163,7 @@ void ResourceClassificationRunnerImpl::CheckRequestFilterMatch(
       static_cast<int32_t>(blink::mojom::ResourceType::kMainFrame)) {
     // We pass main frame no matter what
     DVLOG(1) << "[eyeo] Main document. Passing it through: " << request_url;
-    std::move(callback).Run(mojom::FilterMatchResult::kNoRule);
+    std::move(callback).Run(FilterMatchResult::kNoRule);
     base::ThreadPool::PostTaskAndReplyWithResult(
         FROM_HERE, {},
         base::BindOnce(
@@ -173,8 +171,8 @@ void ResourceClassificationRunnerImpl::CheckRequestFilterMatch(
             std::move(subscription_collection), request_url),
         base::BindOnce(&ResourceClassificationRunnerImpl::
                            ProcessDocumentAllowlistedResponse,
-                       weak_ptr_factory_.GetWeakPtr(), request_url, process_id,
-                       render_frame_id));
+                       weak_ptr_factory_.GetWeakPtr(), request_url,
+                       render_frame_host_id));
     return;
   }
 
@@ -183,17 +181,17 @@ void ResourceClassificationRunnerImpl::CheckRequestFilterMatch(
   DVLOG(3) << "[eyeo] Mapped type=" << resource_type
            << " to adblock type=" << adblock_resource_type;
   content::RenderFrameHost* host =
-      frame_hierarchy_builder_->FindRenderFrameHost(process_id,
-                                                    render_frame_id);
+      frame_hierarchy_builder_->FindRenderFrameHost(render_frame_host_id);
   if (!host) {
     // We're unable to verify if the resource is allowed or blocked without a
     // frame hierarchy, so err on the side of safety and allow the load.
     // This happens for Ping-type requests, for reasons unknown.
     VLOG(1) << "[eyeo] Unable to build frame hierarchy for " << request_url
-            << " \t: process id " << process_id << ", render frame id "
-            << render_frame_id << ", adblock_resource_type "
-            << adblock_resource_type << ": Allowing load";
-    std::move(callback).Run(mojom::FilterMatchResult::kNoRule);
+            << " \t: process id " << render_frame_host_id.child_id
+            << ", render frame id " << render_frame_host_id.frame_routing_id
+            << ", adblock_resource_type " << adblock_resource_type
+            << ": Allowing load";
+    std::move(callback).Run(FilterMatchResult::kNoRule);
     return;
   }
 
@@ -207,7 +205,7 @@ void ResourceClassificationRunnerImpl::CheckRequestFilterMatchImpl(
     const GURL& request_url,
     ContentType adblock_resource_type,
     content::GlobalRenderFrameHostId frame_host_id,
-    mojom::AdblockInterface::CheckFilterMatchCallback callback) {
+    CheckFilterMatchCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DVLOG(1) << "[eyeo] CheckRequestFilterMatchImpl for " << request_url.spec();
@@ -216,7 +214,7 @@ void ResourceClassificationRunnerImpl::CheckRequestFilterMatchImpl(
   if (!host) {
     // Host has died, likely because this is a deferred execution. It does not
     // matter anymore whether the resource is blocked, the page is gone.
-    std::move(callback).Run(mojom::FilterMatchResult::kNoRule);
+    std::move(callback).Run(FilterMatchResult::kNoRule);
     return;
   }
   const std::vector<GURL> frame_hierarchy_chain =
@@ -269,18 +267,18 @@ ResourceClassificationRunnerImpl::CheckRequestFilterMatchInternal(
   if (classification_result.decision == ClassificationDecision::Allowed) {
     VLOG(1) << "[eyeo] Document allowed due to allowing filter " << request_url;
     return CheckResourceFilterMatchResult(
-        mojom::FilterMatchResult::kAllowRule,
+        FilterMatchResult::kAllowRule,
         {classification_result.decisive_subscription});
   }
 
   if (classification_result.decision == ClassificationDecision::Blocked) {
     VLOG(1) << "[eyeo] Document blocked " << request_url;
     return CheckResourceFilterMatchResult(
-        mojom::FilterMatchResult::kBlockRule,
+        FilterMatchResult::kBlockRule,
         {classification_result.decisive_subscription});
   }
 
-  return CheckResourceFilterMatchResult(mojom::FilterMatchResult::kNoRule, {});
+  return CheckResourceFilterMatchResult(FilterMatchResult::kNoRule, {});
 }
 
 void ResourceClassificationRunnerImpl::OnCheckResourceFilterMatchComplete(
@@ -288,7 +286,7 @@ void ResourceClassificationRunnerImpl::OnCheckResourceFilterMatchComplete(
     const std::vector<GURL>& frame_hierarchy,
     ContentType adblock_resource_type,
     content::GlobalRenderFrameHostId render_frame_host_id,
-    mojom::AdblockInterface::CheckFilterMatchCallback callback,
+    CheckFilterMatchCallback callback,
     const CheckResourceFilterMatchResult& result) {
   // Notify |callback| as soon as we know whether we should block, as this
   // unblocks loading of network resources.
@@ -298,8 +296,8 @@ void ResourceClassificationRunnerImpl::OnCheckResourceFilterMatchComplete(
   if (render_frame_host) {
     // Only notify the UI if we explicitly blocked or allowed the resource, not
     // when there was NO_RULE.
-    if (result.status == mojom::FilterMatchResult::kAllowRule ||
-        result.status == mojom::FilterMatchResult::kBlockRule) {
+    if (result.status == FilterMatchResult::kAllowRule ||
+        result.status == FilterMatchResult::kBlockRule) {
       NotifyAdMatched(request_url, result.status, frame_hierarchy,
                       adblock_resource_type, render_frame_host,
                       result.subscription);
@@ -309,7 +307,7 @@ void ResourceClassificationRunnerImpl::OnCheckResourceFilterMatchComplete(
 
 void ResourceClassificationRunnerImpl::NotifyAdMatched(
     const GURL& url,
-    mojom::FilterMatchResult result,
+    FilterMatchResult result,
     const std::vector<GURL>& parent_frame_urls,
     ContentType content_type,
     content::RenderFrameHost* render_frame_host,
@@ -327,19 +325,17 @@ void ResourceClassificationRunnerImpl::NotifyAdMatched(
 void ResourceClassificationRunnerImpl::CheckResponseFilterMatch(
     std::unique_ptr<SubscriptionCollection> subscription_collection,
     const GURL& response_url,
-    int32_t process_id,
-    int32_t render_frame_id,
+    content::GlobalRenderFrameHostId render_frame_host_id,
     const scoped_refptr<net::HttpResponseHeaders>& headers,
-    mojom::AdblockInterface::CheckFilterMatchCallback callback) {
+    CheckFilterMatchCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DVLOG(1) << "[eyeo] CheckResponseFilterMatch for " << response_url.spec();
   content::RenderFrameHost* host =
-      frame_hierarchy_builder_->FindRenderFrameHost(process_id,
-                                                    render_frame_id);
+      frame_hierarchy_builder_->FindRenderFrameHost(render_frame_host_id);
   if (!host) {
     // This request is likely dead, since there's no associated RenderFrameHost.
-    std::move(callback).Run(mojom::FilterMatchResult::kNoRule);
+    std::move(callback).Run(FilterMatchResult::kNoRule);
     return;
   }
 
@@ -375,32 +371,30 @@ ResourceClassificationRunnerImpl::CheckResponseFilterMatchInternal(
     VLOG(1) << "[eyeo] Document allowed due to allowing filter "
             << response_url;
     return CheckResourceFilterMatchResult(
-        mojom::FilterMatchResult::kAllowRule,
+        FilterMatchResult::kAllowRule,
         {classification_result.decisive_subscription});
   }
 
   if (classification_result.decision == ClassificationDecision::Blocked) {
     VLOG(1) << "[eyeo] Document blocked " << response_url;
     return CheckResourceFilterMatchResult(
-        mojom::FilterMatchResult::kBlockRule,
+        FilterMatchResult::kBlockRule,
         {classification_result.decisive_subscription});
   }
 
-  return CheckResourceFilterMatchResult(mojom::FilterMatchResult::kNoRule, {});
+  return CheckResourceFilterMatchResult(FilterMatchResult::kNoRule, {});
 }
 
 void ResourceClassificationRunnerImpl::CheckRewriteFilterMatch(
     std::unique_ptr<SubscriptionCollection> subscription_collection,
     const GURL& request_url,
-    int32_t process_id,
-    int32_t render_frame_id,
+    content::GlobalRenderFrameHostId render_frame_host_id,
     base::OnceCallback<void(const absl::optional<GURL>&)> callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   DVLOG(1) << "[eyeo] CheckRewriteFilterMatch for " << request_url.spec();
 
   content::RenderFrameHost* host =
-      frame_hierarchy_builder_->FindRenderFrameHost(process_id,
-                                                    render_frame_id);
+      frame_hierarchy_builder_->FindRenderFrameHost(render_frame_host_id);
   if (!host) {
     std::move(callback).Run(absl::optional<GURL>{});
     return;

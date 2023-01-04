@@ -64,19 +64,16 @@ OngoingSubscriptionRequestImpl::OngoingSubscriptionRequestImpl(
       url_loader_factory_(url_loader_factory),
       retry_timer_(std::make_unique<base::OneShotTimer>()),
       number_of_redirects_(0) {
-  net::NetworkChangeNotifier::AddNetworkChangeObserver(this);
   adblocking_enabled_.Init(
-      prefs::kEnableAdblock, prefs,
+      prefs::kEnableAdblockLegacy, prefs,
       base::BindRepeating(
           &OngoingSubscriptionRequestImpl::CheckConnectionAllowed,
-          // Unretained is safe because destruction of |this| will
-          // remove |allowed_connection_type_| and abort the callback.
+          // Unretained is safe because destruction of |this| will abort the
+          // callback.
           base::Unretained(this)));
 }
 
-OngoingSubscriptionRequestImpl::~OngoingSubscriptionRequestImpl() {
-  net::NetworkChangeNotifier::RemoveNetworkChangeObserver(this);
-}
+OngoingSubscriptionRequestImpl::~OngoingSubscriptionRequestImpl() = default;
 
 void OngoingSubscriptionRequestImpl::Start(GURL url,
                                            Method method,
@@ -124,12 +121,6 @@ void OngoingSubscriptionRequestImpl::Redirect(GURL redirect_url) {
 
 size_t OngoingSubscriptionRequestImpl::GetNumberOfRedirects() const {
   return number_of_redirects_;
-}
-
-void OngoingSubscriptionRequestImpl::OnNetworkChanged(
-    net::NetworkChangeNotifier::ConnectionType) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  CheckConnectionAllowed();
 }
 
 bool OngoingSubscriptionRequestImpl::IsStarted() const {

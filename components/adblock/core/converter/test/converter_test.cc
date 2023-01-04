@@ -2121,6 +2121,27 @@ TEST_F(AdblockConverterTest, UrlFilterWildcardUrlShortKeywords) {
       ContentType::Script, SiteKey(), FilterCategory::Blocking));
 }
 
+TEST_F(AdblockConverterTest, UrlFilterWithHashSign) {
+  auto subscription = ConvertAndLoadRules(R"(
+    @@||search.twcc.com/#web/$elemhide
+  )");
+
+  EXPECT_TRUE(subscription->HasSpecialFilter(
+      SpecialFilterType::Elemhide, GURL("https://search.twcc.com/#web/"), "",
+      SiteKey()));
+}
+
+TEST_F(AdblockConverterTest, IdnUrl) {
+  auto subscription = ConvertAndLoadRules(R"(
+    xn----dtbfdbwspgnceulm.xn--p1ai##div[class="форум"]
+  )");
+
+  auto selectors = subscription->GetElemhideSelectors(
+      GURL(u"https://форум-трейдеров.рф/"), false);
+  EXPECT_EQ(FilterSelectors(selectors),
+            std::set<base::StringPiece>({"div[class=\"форум\"]"}));
+}
+
 // TODO(mpawlowski) support multiple CSP filters per URL + frame hierarchy:
 // DPD-1145.
 

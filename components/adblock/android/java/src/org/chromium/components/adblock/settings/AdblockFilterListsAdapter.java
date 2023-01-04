@@ -79,9 +79,10 @@ public class AdblockFilterListsAdapter extends BaseAdapter implements OnClickLis
         view.setTag(item.url());
 
         CheckBox checkBox = view.findViewById(R.id.checkbox);
-        List<AdblockController.Subscription> subscriptions = mController.getSelectedSubscriptions();
+        final List<AdblockController.Subscription> subscriptions =
+                mController.getInstalledSubscriptions();
         boolean subscribed = false;
-        for (AdblockController.Subscription subscription : subscriptions) {
+        for (final AdblockController.Subscription subscription : subscriptions) {
             if (subscription.url().equals(item.url())) {
                 subscribed = true;
                 break;
@@ -104,9 +105,9 @@ public class AdblockFilterListsAdapter extends BaseAdapter implements OnClickLis
 
         CheckBox checkBox = view.findViewById(R.id.checkbox);
         if (checkBox.isChecked()) {
-            mController.unselectSubscription(new AdblockController.Subscription(url, title));
+            mController.uninstallSubscription(url);
         } else {
-            mController.selectSubscription(new AdblockController.Subscription(url, title));
+            mController.installSubscription(url);
         }
 
         notifyDataSetChanged();

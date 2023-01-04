@@ -30,6 +30,9 @@ class SubscriptionServiceFactory : public BrowserContextKeyedServiceFactory {
   static SubscriptionService* GetForBrowserContext(
       content::BrowserContext* context);
   static SubscriptionServiceFactory* GetInstance();
+  static void SetUpdateCheckAndDelayIntervalsForTesting(
+      base::TimeDelta check_interval,
+      base::TimeDelta initial_delay);
 
  private:
   friend class base::NoDestructor<SubscriptionServiceFactory>;
@@ -41,6 +44,8 @@ class SubscriptionServiceFactory : public BrowserContextKeyedServiceFactory {
       content::BrowserContext* context) const override;
   content::BrowserContext* GetBrowserContextToUse(
       content::BrowserContext* context) const override;
+  void RegisterProfilePrefs(
+      user_prefs::PrefRegistrySyncable* registry) override;
 };
 
 }  // namespace adblock

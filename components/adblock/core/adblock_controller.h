@@ -22,7 +22,6 @@
 #include <vector>
 
 #include "base/observer_list.h"
-#include "components/adblock/core/common/allowed_connection_type.h"
 #include "components/adblock/core/subscription/installed_subscription.h"
 #include "components/adblock/core/subscription/subscription_config.h"
 #include "components/keyed_service/core/keyed_service.h"
@@ -40,6 +39,7 @@ class AdblockController : public KeyedService {
   class Observer : public base::CheckedObserver {
    public:
     virtual void OnSubscriptionUpdated(const GURL& url) {}
+    virtual void OnEnabledStateChanged() {}
   };
   ~AdblockController() override = default;
 
@@ -51,29 +51,42 @@ class AdblockController : public KeyedService {
   virtual void SetAcceptableAdsEnabled(bool enabled) = 0;
   virtual bool IsAcceptableAdsEnabled() const = 0;
 
-  virtual void SelectBuiltInSubscription(const GURL& url) = 0;
-  virtual void UnselectBuiltInSubscription(const GURL& url) = 0;
-  virtual std::vector<scoped_refptr<Subscription>>
-  GetSelectedBuiltInSubscriptions() const = 0;
-
-  virtual void AddCustomSubscription(const GURL& url) = 0;
-  virtual void RemoveCustomSubscription(const GURL& url) = 0;
-  virtual std::vector<scoped_refptr<Subscription>> GetCustomSubscriptions()
+  virtual void InstallSubscription(const GURL& url) = 0;
+  virtual void UninstallSubscription(const GURL& url) = 0;
+  virtual std::vector<scoped_refptr<Subscription>> GetInstalledSubscriptions()
       const = 0;
 
   virtual void AddAllowedDomain(const std::string& domain) = 0;
   virtual void RemoveAllowedDomain(const std::string& domain) = 0;
   virtual std::vector<std::string> GetAllowedDomains() const = 0;
 
-  // Deprecated, AllowedConnectionType will be removed in 109
-  virtual void SetUpdateConsent(AllowedConnectionType consent) = 0;
-  virtual AllowedConnectionType GetUpdateConsent() const = 0;
-
   virtual void AddCustomFilter(const std::string& filter) = 0;
   virtual void RemoveCustomFilter(const std::string& filter) = 0;
   virtual std::vector<std::string> GetCustomFilters() const = 0;
 
   virtual std::vector<KnownSubscriptionInfo> GetKnownSubscriptions() const = 0;
+
+  // Deprecated, SelectBuiltInSubscription will be removed in version 111
+  // Use InstallSubscription(const GURL& url) instead.
+  virtual void SelectBuiltInSubscription(const GURL& url) = 0;
+  // Deprecated, UnselectBuiltInSubscription will be removed in version 111
+  // Use UninstallSubscription(const GURL& url) instead.
+  virtual void UnselectBuiltInSubscription(const GURL& url) = 0;
+  // Deprecated, GetSelectedBuiltInSubscriptions will be removed in version 111
+  // Use GetInstalledSubscriptions() instead.
+  virtual std::vector<scoped_refptr<Subscription>>
+  GetSelectedBuiltInSubscriptions() const = 0;
+
+  // Deprecated, AddCustomSubscription will be removed in version 111
+  // Use InstallSubscription(const GURL& url) instead.
+  virtual void AddCustomSubscription(const GURL& url) = 0;
+  // Deprecated, RemoveCustomSubscription will be removed in version 111
+  // Use UninstallSubscription(const GURL& url) instead.
+  virtual void RemoveCustomSubscription(const GURL& url) = 0;
+  // Deprecated, GetCustomSubscriptions will be removed in version 111
+  // Use GetInstalledSubscriptions() instead.
+  virtual std::vector<scoped_refptr<Subscription>> GetCustomSubscriptions()
+      const = 0;
 };
 
 }  // namespace adblock

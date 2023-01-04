@@ -48,7 +48,7 @@ class MockObserver : public ResourceClassificationRunner::Observer {
   MOCK_METHOD(void,
               OnAdMatched,
               (const GURL& url,
-               mojom::FilterMatchResult match_result,
+               FilterMatchResult match_result,
                const std::vector<GURL>& parent_frame_urls,
                ContentType content_type,
                content::RenderFrameHost* render_frame_host,
@@ -63,7 +63,7 @@ class MockObserver : public ResourceClassificationRunner::Observer {
   MOCK_METHOD(void,
               OnPopupMatched,
               (const GURL& url,
-               mojom::FilterMatchResult match_result,
+               FilterMatchResult match_result,
                const GURL& opener_url,
                content::RenderFrameHost* render_frame_host,
                const GURL& subscription),
@@ -102,8 +102,7 @@ class AdblockResourceClassificationRunnerImplTest
 
   void FrameHierarchyWillBeBuilt() {
     EXPECT_CALL(*mock_frame_hierarchy_builder_,
-                FindRenderFrameHost(main_rfh()->GetProcess()->GetID(),
-                                    main_rfh()->GetRoutingID()))
+                FindRenderFrameHost(main_rfh()->GetGlobalId()))
         .WillOnce(testing::Return(main_rfh()));
     EXPECT_CALL(*mock_frame_hierarchy_builder_, BuildFrameHierarchy(main_rfh()))
         .WillOnce(Return(kFrameHierarchy));
@@ -131,7 +130,7 @@ class AdblockResourceClassificationRunnerImplTest
 
   void AdMatchedWillBeNotified(GURL url,
                                ContentType content_type,
-                               mojom::FilterMatchResult result) {
+                               FilterMatchResult result) {
     EXPECT_CALL(mock_observer_,
                 OnAdMatched(url, result, kFrameHierarchy, content_type,
                             main_rfh(), kSubscriptionUrl));
@@ -171,18 +170,16 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
                                          Decision::Blocked);
 
   // The final callback will be called with kBlockRule result.
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kBlockRule));
+  base::MockCallback<CheckFilterMatchCallback> callback;
+  EXPECT_CALL(callback, Run(FilterMatchResult::kBlockRule));
 
   AdMatchedWillBeNotified(kUrl, ContentType::Image,
-                          mojom::FilterMatchResult::kBlockRule);
+                          FilterMatchResult::kBlockRule);
 
   classification_runner_->CheckRequestFilterMatch(
       std::move(mock_subscription_collection_), kUrl,
       static_cast<int>(blink::mojom::ResourceType::kImage),
-      main_rfh()->GetProcess()->GetID(), main_rfh()->GetRoutingID(),
-      callback.Get());
+      main_rfh()->GetGlobalId(), callback.Get());
 
   task_environment()->RunUntilIdle();
 }
@@ -200,16 +197,15 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
                                          Decision::Blocked);
 
   // The final callback will be called with kBlockRule result.
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kBlockRule));
+  base::MockCallback<CheckFilterMatchCallback> callback;
+  EXPECT_CALL(callback, Run(FilterMatchResult::kBlockRule));
 
   AdMatchedWillBeNotified(kWebsocketUrl, ContentType::Websocket,
-                          mojom::FilterMatchResult::kBlockRule);
+                          FilterMatchResult::kBlockRule);
 
   classification_runner_->CheckRequestFilterMatchForWebSocket(
-      std::move(mock_subscription_collection_), kWebsocketUrl, main_rfh()->GetGlobalId(),
-      callback.Get());
+      std::move(mock_subscription_collection_), kWebsocketUrl,
+      main_rfh()->GetGlobalId(), callback.Get());
   task_environment()->RunUntilIdle();
 }
 
@@ -217,22 +213,19 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
        CheckRequestFilterMatch_RenderFrameHostNotFound) {
   // FrameHierarchyBuilder will be unable to find a RFH for the provided IDs.
   EXPECT_CALL(*mock_frame_hierarchy_builder_,
-              FindRenderFrameHost(main_rfh()->GetProcess()->GetID(),
-                                  main_rfh()->GetRoutingID()))
+              FindRenderFrameHost(main_rfh()->GetGlobalId()))
       .WillOnce(testing::Return(nullptr));
 
   // The final callback will be called with kNoRule result, because
   // we aren't able to query filters without a frame hierarchy. Frame hierarchy
   // is necessary ex. to establish allowlisting.
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kNoRule));
+  base::MockCallback<CheckFilterMatchCallback> callback;
+  EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
 
   classification_runner_->CheckRequestFilterMatch(
       std::move(mock_subscription_collection_), kUrl,
       static_cast<int>(blink::mojom::ResourceType::kImage),
-      main_rfh()->GetProcess()->GetID(), main_rfh()->GetRoutingID(),
-      callback.Get());
+      main_rfh()->GetGlobalId(), callback.Get());
 
   task_environment()->RunUntilIdle();
 }
@@ -241,9 +234,8 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
        CheckRequestFilterMatch_MainFrameAlwaysAllowed) {
   // The final callback will be called with kNoRule result, because
   // we don't allow any blocking rules for main frames.
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kNoRule));
+  base::MockCallback<CheckFilterMatchCallback> callback;
+  EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
   EXPECT_CALL(*mock_subscription_collection_,
               FindBySpecialFilter(SpecialFilterType::Document, kUrl,
                                   std::vector<GURL>(), SiteKey()));
@@ -251,8 +243,7 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
   classification_runner_->CheckRequestFilterMatch(
       std::move(mock_subscription_collection_), kUrl,
       static_cast<int>(blink::mojom::ResourceType::kMainFrame),
-      main_rfh()->GetProcess()->GetID(), main_rfh()->GetRoutingID(),
-      callback.Get());
+      main_rfh()->GetGlobalId(), callback.Get());
 
   task_environment()->RunUntilIdle();
 }
@@ -260,9 +251,8 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
 TEST_F(AdblockResourceClassificationRunnerImplTest,
        CheckRequestFilterMatch_AllowlistedMainframe) {
   // The final callback will be called with kNoRule result.
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kNoRule));
+  base::MockCallback<CheckFilterMatchCallback> callback;
+  EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
   PageAllowedWillBeNotified(kUrl);
 
   EXPECT_CALL(*mock_subscription_collection_,
@@ -273,8 +263,7 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
   classification_runner_->CheckRequestFilterMatch(
       std::move(mock_subscription_collection_), kUrl,
       static_cast<int>(blink::mojom::ResourceType::kMainFrame),
-      main_rfh()->GetProcess()->GetID(), main_rfh()->GetRoutingID(),
-      callback.Get());
+      main_rfh()->GetGlobalId(), callback.Get());
 
   task_environment()->RunUntilIdle();
 }
@@ -288,23 +277,20 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
                                          Decision::Blocked);
 
   // The final callback will be called with kBlockRule result.
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kBlockRule));
+  base::MockCallback<CheckFilterMatchCallback> callback;
+  EXPECT_CALL(callback, Run(FilterMatchResult::kBlockRule));
 
   classification_runner_->CheckRequestFilterMatch(
       std::move(mock_subscription_collection_), kUrl,
       static_cast<int>(blink::mojom::ResourceType::kImage),
-      main_rfh()->GetProcess()->GetID(), main_rfh()->GetRoutingID(),
-      callback.Get());
+      main_rfh()->GetGlobalId(), callback.Get());
 
   // Before running the thread loop, destroy the RFH.
   DeleteContents();
   // Observer will be notified with null RFH.
-  EXPECT_CALL(
-      mock_observer_,
-      OnAdMatched(kUrl, mojom::FilterMatchResult::kBlockRule, kFrameHierarchy,
-                  ContentType::Image, nullptr, kSubscriptionUrl))
+  EXPECT_CALL(mock_observer_,
+              OnAdMatched(kUrl, FilterMatchResult::kBlockRule, kFrameHierarchy,
+                          ContentType::Image, nullptr, kSubscriptionUrl))
       .Times(0);
 
   task_environment()->RunUntilIdle();
@@ -312,20 +298,17 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
 
 TEST_F(AdblockResourceClassificationRunnerImplTest,
        CheckResponseFilterMatch_NoRenderFrameHost) {
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
+  base::MockCallback<CheckFilterMatchCallback> callback;
 
   EXPECT_CALL(*mock_frame_hierarchy_builder_,
-              FindRenderFrameHost(main_rfh()->GetProcess()->GetID(),
-                                  main_rfh()->GetRoutingID()))
+              FindRenderFrameHost(main_rfh()->GetGlobalId()))
       .WillOnce(Return(nullptr));
 
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kNoRule));
+  EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
 
   classification_runner_->CheckResponseFilterMatch(
-      std::move(mock_subscription_collection_), kUrl,
-      main_rfh()->GetProcess()->GetID(), main_rfh()->GetRoutingID(), {},
-      callback.Get());
+      std::move(mock_subscription_collection_), kUrl, main_rfh()->GetGlobalId(),
+      {}, callback.Get());
 
   task_environment()->RunUntilIdle();
 }
@@ -334,26 +317,23 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
        CheckResponseFilterMatch_ResponseFilterMatchResultBlocked) {
   auto headers = net::HttpResponseHeaders::TryToCreate("whatever");
   ASSERT_TRUE(headers);
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
+  base::MockCallback<CheckFilterMatchCallback> callback;
 
   EXPECT_CALL(*mock_frame_hierarchy_builder_,
-              FindRenderFrameHost(main_rfh()->GetProcess()->GetID(),
-                                  main_rfh()->GetRoutingID()))
+              FindRenderFrameHost(main_rfh()->GetGlobalId()))
       .WillOnce(testing::Return(main_rfh()));
   EXPECT_CALL(*mock_frame_hierarchy_builder_, BuildFrameHierarchy(main_rfh()))
       .WillOnce(Return(kFrameHierarchy));
   ClassifierReturnsResponseClassification(kUrl, headers, Decision::Blocked);
 
   classification_runner_->CheckResponseFilterMatch(
-      std::move(mock_subscription_collection_), kUrl,
-      main_rfh()->GetProcess()->GetID(), main_rfh()->GetRoutingID(), headers,
-      callback.Get());
+      std::move(mock_subscription_collection_), kUrl, main_rfh()->GetGlobalId(),
+      headers, callback.Get());
 
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kBlockRule));
+  EXPECT_CALL(callback, Run(FilterMatchResult::kBlockRule));
   EXPECT_CALL(mock_observer_,
-              OnAdMatched(kUrl, mojom::FilterMatchResult::kBlockRule,
-                          kFrameHierarchy, _, _, kSubscriptionUrl));
+              OnAdMatched(kUrl, FilterMatchResult::kBlockRule, kFrameHierarchy,
+                          _, _, kSubscriptionUrl));
   task_environment()->RunUntilIdle();
 }
 
@@ -361,26 +341,23 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
        CheckResponseFilterMatch_ResponseFilterMatchResultAllowed) {
   auto headers = net::HttpResponseHeaders::TryToCreate("whatever");
   ASSERT_TRUE(headers);
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
+  base::MockCallback<CheckFilterMatchCallback> callback;
 
   EXPECT_CALL(*mock_frame_hierarchy_builder_,
-              FindRenderFrameHost(main_rfh()->GetProcess()->GetID(),
-                                  main_rfh()->GetRoutingID()))
+              FindRenderFrameHost(main_rfh()->GetGlobalId()))
       .WillOnce(testing::Return(main_rfh()));
   EXPECT_CALL(*mock_frame_hierarchy_builder_, BuildFrameHierarchy(main_rfh()))
       .WillOnce(Return(kFrameHierarchy));
   ClassifierReturnsResponseClassification(kUrl, headers, Decision::Allowed);
 
   classification_runner_->CheckResponseFilterMatch(
-      std::move(mock_subscription_collection_), kUrl,
-      main_rfh()->GetProcess()->GetID(), main_rfh()->GetRoutingID(), headers,
-      callback.Get());
+      std::move(mock_subscription_collection_), kUrl, main_rfh()->GetGlobalId(),
+      headers, callback.Get());
 
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kAllowRule));
+  EXPECT_CALL(callback, Run(FilterMatchResult::kAllowRule));
   EXPECT_CALL(mock_observer_,
-              OnAdMatched(kUrl, mojom::FilterMatchResult::kAllowRule,
-                          kFrameHierarchy, _, _, kSubscriptionUrl));
+              OnAdMatched(kUrl, FilterMatchResult::kAllowRule, kFrameHierarchy,
+                          _, _, kSubscriptionUrl));
   task_environment()->RunUntilIdle();
 }
 
@@ -388,23 +365,20 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
        CheckResponseFilterMatch_ResponseFilterMatchResultIgnored) {
   auto headers = net::HttpResponseHeaders::TryToCreate("whatever");
   ASSERT_TRUE(headers);
-  base::MockCallback<mojom::AdblockInterface::CheckFilterMatchCallback>
-      callback;
+  base::MockCallback<CheckFilterMatchCallback> callback;
 
   EXPECT_CALL(*mock_frame_hierarchy_builder_,
-              FindRenderFrameHost(main_rfh()->GetProcess()->GetID(),
-                                  main_rfh()->GetRoutingID()))
+              FindRenderFrameHost(main_rfh()->GetGlobalId()))
       .WillOnce(testing::Return(main_rfh()));
   EXPECT_CALL(*mock_frame_hierarchy_builder_, BuildFrameHierarchy(main_rfh()))
       .WillOnce(Return(kFrameHierarchy));
   ClassifierReturnsResponseClassification(kUrl, headers, Decision::Ignored);
 
   classification_runner_->CheckResponseFilterMatch(
-      std::move(mock_subscription_collection_), kUrl,
-      main_rfh()->GetProcess()->GetID(), main_rfh()->GetRoutingID(), headers,
-      callback.Get());
+      std::move(mock_subscription_collection_), kUrl, main_rfh()->GetGlobalId(),
+      headers, callback.Get());
 
-  EXPECT_CALL(callback, Run(mojom::FilterMatchResult::kNoRule));
+  EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
   task_environment()->RunUntilIdle();
 }
 

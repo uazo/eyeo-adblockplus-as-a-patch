@@ -72,7 +72,7 @@ calling `AdblockController.getInstance().removeOnAdBlockedObserver()`. Do not ad
 
 ## How to add and remove subscription(s) to my filter lists?
 
-Call [AdblockController](chrome/android/java/src/org/chromium/chrome/browser/adblock/AdblockController.java)'s `addCustomSubscription()` method.
+Call [AdblockController](chrome/android/java/src/org/chromium/chrome/browser/adblock/AdblockController.java)'s `installSubscription()` method.
 
 The following example makes eyeo Chromium SDK install (download and parse) the filter list:
 
@@ -80,7 +80,7 @@ The following example makes eyeo Chromium SDK install (download and parse) the f
 import org.chromium.components.adblock.AdblockController;
 
 URL myFilterList = new URL("http://example.com/my_list.txt");
-AdblockController.getInstance().addCustomSubscription(myFilterList);
+AdblockController.getInstance().installSubscription(myFilterList);
 ```
 
 To remove a custom filter list:
@@ -89,7 +89,7 @@ To remove a custom filter list:
 import org.chromium.components.adblock.AdblockController;
 
 URL myFilterList = new URL("http://example.com/my_list.txt");
-AdblockController.getInstance().removeCustomSubscription(myFilterList);
+AdblockController.getInstance().uninstallSubscription(myFilterList);
 ```
 
 

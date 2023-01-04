@@ -18,6 +18,7 @@
 #ifndef COMPONENTS_ADBLOCK_CORE_SUBSCRIPTION_TEST_MOCK_SUBSCRIPTION_UPDATER_H_
 #define COMPONENTS_ADBLOCK_CORE_SUBSCRIPTION_TEST_MOCK_SUBSCRIPTION_UPDATER_H_
 
+#include "base/functional/callback.h"
 #include "components/adblock/core/subscription/subscription_updater.h"
 
 #include "testing/gmock/include/gmock/gmock.h"
@@ -28,7 +29,8 @@ class MockSubscriptionUpdater : public SubscriptionUpdater {
  public:
   MockSubscriptionUpdater();
   ~MockSubscriptionUpdater() override;
-  MOCK_METHOD(void, StartSchedule, (), (override));
+  MOCK_METHOD(void, StartSchedule, (base::RepeatingClosure), (override));
+  MOCK_METHOD(void, StopSchedule, (), (override));
 };
 
 }  // namespace adblock

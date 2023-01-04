@@ -21,9 +21,9 @@
 #include "build/buildflag.h"
 #include "chrome/browser/chrome_content_browser_client.h"
 
-namespace adblock::mojom {
+namespace adblock {
 enum class FilterMatchResult;
-}  // namespace adblock::mojom
+}  // namespace adblock
 
 /**
  * @brief Intercepts network and UI events to inject ad-filtering.
@@ -98,7 +98,7 @@ class AdblockContentBrowserClient : public ChromeContentBrowserClient {
       const absl::optional<std::string>& user_agent,
       mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
           handshake_client,
-      adblock::mojom::FilterMatchResult result);
+      adblock::FilterMatchResult result);
 
   base::WeakPtrFactory<AdblockContentBrowserClient> weak_factory_{this};
 

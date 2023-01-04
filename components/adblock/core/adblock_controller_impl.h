@@ -24,6 +24,8 @@
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "components/adblock/core/adblock_controller.h"
+#include "components/adblock/core/configuration/filtering_configuration.h"
+#include "components/adblock/core/subscription/subscription_config.h"
 #include "components/adblock/core/subscription/subscription_service.h"
 #include "components/prefs/pref_member.h"
 
@@ -33,15 +35,17 @@ class PrefService;
 namespace adblock {
 
 /**
- * @brief Implementation of the AdblockController interface. Uses preferences
- * as the backend for all the state set via the interface.
- * Only reads and writes the preferences.
+ * @brief Implementation of the AdblockController interface. Uses a
+ * FilteringConfiguration as the backend for all the state set via the
+ * interface.
  */
-class AdblockControllerImpl : public AdblockController {
+class AdblockControllerImpl : public AdblockController,
+                              public SubscriptionService::SubscriptionObserver {
  public:
-  AdblockControllerImpl(PrefService* pref_service,
+  AdblockControllerImpl(FilteringConfiguration* adblock_filtering_configuration,
                         SubscriptionService* subscription_service,
-                        const std::string& locale);
+                        const std::string& locale,
+                        std::vector<KnownSubscriptionInfo> known_subscriptions);
   ~AdblockControllerImpl() override;
 
   AdblockControllerImpl(const AdblockControllerImpl&) = delete;
@@ -56,6 +60,7 @@ class AdblockControllerImpl : public AdblockController {
   bool IsAdblockEnabled() const override;
   void SetAcceptableAdsEnabled(bool enabled) override;
   bool IsAcceptableAdsEnabled() const override;
+
   void SelectBuiltInSubscription(const GURL& url) override;
   void UnselectBuiltInSubscription(const GURL& url) override;
   std::vector<scoped_refptr<Subscription>> GetSelectedBuiltInSubscriptions()
@@ -66,12 +71,14 @@ class AdblockControllerImpl : public AdblockController {
   std::vector<scoped_refptr<Subscription>> GetCustomSubscriptions()
       const override;
 
+  void InstallSubscription(const GURL& url) override;
+  void UninstallSubscription(const GURL& url) override;
+  std::vector<scoped_refptr<Subscription>> GetInstalledSubscriptions()
+      const override;
+
   void AddAllowedDomain(const std::string& domain) override;
   void RemoveAllowedDomain(const std::string& domain) override;
   std::vector<std::string> GetAllowedDomains() const override;
-
-  void SetUpdateConsent(AllowedConnectionType consent) override;
-  AllowedConnectionType GetUpdateConsent() const override;
 
   void AddCustomFilter(const std::string& filter) override;
   void RemoveCustomFilter(const std::string& filter) override;
@@ -79,38 +86,23 @@ class AdblockControllerImpl : public AdblockController {
 
   std::vector<KnownSubscriptionInfo> GetKnownSubscriptions() const override;
 
-  // Synchronizes the state of SubscriptionService with the content of Prefs.
-  void SynchronizeWithPrefsWhenPossible();
+  // SubscriptionObserver:
+  void OnSubscriptionInstalled(const GURL& subscription_url) override;
+
+  void RunFirstRunLogic(PrefService* pref_service);
+  void MigrateLegacyPrefs(PrefService* pref_service);
 
  protected:
   SEQUENCE_CHECKER(sequence_checker_);
-  bool HasAcceptableAdsInstalled() const;
   void NotifySubscriptionChanged(const GURL& subscription_url);
-  void UninstallSubscription(const GURL& subscription_url);
-  void DownloadAndInstallSubscription(const GURL& subscription_url);
-  void OnSubscriptionDownloaded(const GURL& subscription_url, bool success);
-  void SynchronizeWithSubscriptionService();
-  void SynchronizeCustomFiltersAndAllowedDomains();
-  void SynchronizeSubscriptions();
-  void InstallMissingSubscriptions(
-      const std::vector<GURL>& subscriptions_in_prefs,
-      const std::vector<GURL>& subscriptions_in_service);
-  void RemoveUnexpectedSubscriptions(
-      const std::vector<GURL>& subscriptions_in_prefs,
-      const std::vector<GURL>& subscriptions_in_service);
-  GURL FindLanguageBasedRecommendedSubscription() const;
-  std::vector<scoped_refptr<Subscription>> GetSubscriptionsThatMatchPref(
-      const StringListPrefMember& url_list) const;
+  void InstallLanguageBasedRecommendedSubscriptions();
+  std::vector<scoped_refptr<Subscription>>
+  GetSubscriptionsThatMatchConfiguration() const;
 
-  PrefService* prefs_{nullptr};
-  BooleanPrefMember enable_adblock_;
-  BooleanPrefMember enable_aa_;
-  StringListPrefMember allowed_domains_;
-  StringListPrefMember custom_filters_;
-  StringListPrefMember subscriptions_;
-  StringListPrefMember custom_subscriptions_;
+  FilteringConfiguration* adblock_filtering_configuration_;
   SubscriptionService* subscription_service_;
   std::string language_;
+  std::vector<KnownSubscriptionInfo> known_subscriptions_;
   base::ObserverList<AdblockController::Observer> observers_;
   base::WeakPtrFactory<AdblockControllerImpl> weak_ptr_factory_{this};
 };

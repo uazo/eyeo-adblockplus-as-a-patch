@@ -199,6 +199,54 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, BuiltInSubscriptionsManagement) {
       << message_;
 }
 
+IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest,
+                       InstalledSubscriptionsDataSchema) {
+  EXPECT_TRUE(RunTest("installedSubscriptionsDataSchema")) << message_;
+}
+
+IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, InstallSubscriptionInvalidURL) {
+  EXPECT_TRUE(RunTest("installSubscriptionInvalidURL")) << message_;
+}
+
+IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, UninstallSubscriptionInvalidURL) {
+  EXPECT_TRUE(RunTest("uninstallSubscriptionInvalidURL")) << message_;
+}
+
+IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, SubscriptionsManagement) {
+  DCHECK(browser()->profile());
+  auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
+      browser()->profile());
+  auto selected = controller->GetInstalledSubscriptions();
+  const auto easylist = std::find_if(
+      selected.begin(), selected.end(),
+      [&](scoped_refptr<adblock::Subscription> subscription) {
+        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
+                              "easylist.txt");
+      });
+  const auto exceptions = std::find_if(
+      selected.begin(), selected.end(),
+      [&](scoped_refptr<adblock::Subscription> subscription) {
+        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
+                              "exceptionrules.txt");
+      });
+  const auto snippets = std::find_if(
+      selected.begin(), selected.end(),
+      [&](scoped_refptr<adblock::Subscription> subscription) {
+        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
+                              "abp-filters-anti-cv.txt");
+      });
+  if (easylist == selected.end() || exceptions == selected.end() ||
+      snippets == selected.end()) {
+    // Since default configuration has been changed let's skip this test
+    return;
+  }
+  const std::map<std::string, std::string> params = {
+      {"easylist", (*easylist)->GetSourceUrl().spec()},
+      {"exceptions", (*exceptions)->GetSourceUrl().spec()},
+      {"snippets", (*snippets)->GetSourceUrl().spec()}};
+  EXPECT_TRUE(RunTestWithParams("subscriptionsManagement", params)) << message_;
+}
+
 IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, CustomSubscriptionInvalidURL) {
   EXPECT_TRUE(RunTest("addCustomSubscriptionInvalidURL")) << message_;
 }

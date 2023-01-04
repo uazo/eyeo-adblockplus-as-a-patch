@@ -30,22 +30,57 @@
 #include "components/adblock/core/adblock_controller.h"
 #include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_prefs.h"
+#include "components/adblock/core/configuration/filtering_configuration.h"
+#include "components/adblock/core/subscription/subscription_config.h"
 #include "components/adblock/core/subscription/test/mock_subscription.h"
 #include "components/adblock/core/subscription/test/mock_subscription_service.h"
 #include "components/prefs/pref_member.h"
 #include "components/prefs/testing_pref_service.h"
+#include "gmock/gmock.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace adblock {
 
 using InstallationState = Subscription::InstallationState;
+using testing::_;
+using testing::Return;
 
 namespace {
 
 class MockObserver : public AdblockController::Observer {
  public:
   MOCK_METHOD(void, OnSubscriptionUpdated, (const GURL& url), (override));
+  MOCK_METHOD(void, OnEnabledStateChanged, (), (override));
+};
+
+class MockFilteringConfiguration : public FilteringConfiguration {
+ public:
+  MOCK_METHOD(void, AddObserver, (Observer * observer), (override));
+  MOCK_METHOD(void, RemoveObserver, (Observer * observer), (override));
+
+  MOCK_METHOD(const std::string&, GetName, (), (const, override));
+
+  MOCK_METHOD(void, SetEnabled, (bool enabled), (override));
+  MOCK_METHOD(bool, IsEnabled, (), (const, override));
+
+  MOCK_METHOD(void, AddFilterList, (GURL url), (override));
+  MOCK_METHOD(void, RemoveFilterList, (GURL url), (override));
+  MOCK_METHOD(std::vector<GURL>, GetFilterLists, (), (const, override));
+
+  MOCK_METHOD(void, AddAllowedDomain, (std::string domain), (override));
+  MOCK_METHOD(void, RemoveAllowedDomain, (std::string domain), (override));
+  MOCK_METHOD(std::vector<std::string>,
+              GetAllowedDomains,
+              (),
+              (const, override));
+
+  MOCK_METHOD(void, AddCustomFilter, (std::string filter), (override));
+  MOCK_METHOD(void, RemoveCustomFilter, (std::string filter), (override));
+  MOCK_METHOD(std::vector<std::string>,
+              GetCustomFilters,
+              (),
+              (const, override));
 };
 
 }  // namespace
@@ -61,30 +96,49 @@ class AdblockControllerImplTest : public testing::Test {
   AdblockControllerImplTest() {
     prefs::RegisterProfilePrefs(pref_service_.registry());
     RecreateController();
-    custom_subscriptions_pref_.Init(prefs::kAdblockCustomSubscriptions,
+    custom_subscriptions_pref_.Init(prefs::kAdblockCustomSubscriptionsLegacy,
                                     &pref_service_);
-    subscriptions_pref_.Init(prefs::kAdblockSubscriptions, &pref_service_);
+    subscriptions_pref_.Init(prefs::kAdblockSubscriptionsLegacy,
+                             &pref_service_);
   }
 
-  void RecreateController(std::string locale = "pl-PL") {
+  void RecreateController(
+      std::string locale = "pl-PL",
+      std::vector<KnownSubscriptionInfo> known_subscriptions =
+          config::GetKnownSubscriptions()) {
+    if (testee_) {
+      testee_->RemoveObserver(&observer_);
+      testee_.reset();
+    }
     testee_ = std::make_unique<AdblockControllerImpl>(
-        &pref_service_, &subscription_service_, locale);
+        &filtering_configuration_, &subscription_service_, locale,
+        std::move(known_subscriptions));
+    EXPECT_EQ(subscription_service_.observer_, testee_.get());
+    testee_->AddObserver(&observer_);
   }
 
   void ExpectInstallationTriggered(const GURL& subscription_url) {
-    EXPECT_CALL(subscription_service_,
-                DownloadAndInstallSubscription(subscription_url, testing::_))
-        .WillOnce(base::test::RunOnceCallback<1>(true));
+    EXPECT_CALL(filtering_configuration_, AddFilterList(subscription_url));
   }
 
   void ExpectNoInstallation(const GURL& subscription_url) {
-    EXPECT_CALL(subscription_service_,
-                DownloadAndInstallSubscription(subscription_url, testing::_))
+    EXPECT_CALL(filtering_configuration_, AddFilterList(subscription_url))
+        .Times(0);
+  }
+
+  void ExpectRemoval(const GURL& subscription_url) {
+    EXPECT_CALL(filtering_configuration_, RemoveFilterList(subscription_url));
+  }
+
+  void ExpectNoRemoval(const GURL& subscription_url) {
+    EXPECT_CALL(filtering_configuration_, RemoveFilterList(subscription_url))
         .Times(0);
   }
 
   base::test::TaskEnvironment task_environment_;
+  MockObserver observer_;
   TestingPrefServiceSimple pref_service_;
+  MockFilteringConfiguration filtering_configuration_;
   MockSubscriptionService subscription_service_;
   StringListPrefMember custom_subscriptions_pref_;
   StringListPrefMember subscriptions_pref_;
@@ -93,674 +147,217 @@ class AdblockControllerImplTest : public testing::Test {
       "https://easylist-downloads.adblockplus.org/easylistpolish+easylist.txt"};
 };
 
-namespace allowed_domain_test_data {
-std::string domain_google = "google.com";
-std::string domain_google_upper = "GooGlE.com";
-std::string domain_filter_google = "@@||google.com^$document,domain=google.com";
-std::vector<std::string> with_domain_google{domain_google};
-std::vector<std::string> with_domain_filter_google{domain_filter_google};
-
-std::string domain_facebook = "facebook.com";
-std::string domain_filter_facebook =
-    "@@||facebook.com^$document,domain=facebook.com";
-std::vector<std::string> with_domain_facebook{domain_facebook};
-std::vector<std::string> with_domain_filter_facebook{domain_filter_facebook};
-
-std::vector<std::string> with_domain_google_and_facebook{domain_google,
-                                                         domain_facebook};
-std::vector<std::string> with_domain_filter_google_and_facebook{
-    domain_filter_google, domain_filter_facebook};
-
-std::vector<std::string> empty;
-}  // namespace allowed_domain_test_data
-
 TEST_F(AdblockControllerImplTest, EnableAndDisableAdBlocking) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  // By default, ad-blocking is enabled.
+  EXPECT_CALL(filtering_configuration_, IsEnabled()).WillOnce(Return(true));
   EXPECT_TRUE(testee_->IsAdblockEnabled());
-  // Disabling it is registered.
-  testee_->SetAdblockEnabled(false);
+  EXPECT_CALL(filtering_configuration_, IsEnabled()).WillOnce(Return(false));
   EXPECT_FALSE(testee_->IsAdblockEnabled());
-  // The disabled state persists after restart.
-  RecreateController();
-  EXPECT_FALSE(testee_->IsAdblockEnabled());
-}
 
-TEST_F(AdblockControllerImplTest, SelectedBuiltInSubscriptionsReadFromPrefs) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  const GURL subscription1("https://subscription.com/1.txt");
-  const GURL subscription2("https://subscription.com/2.txt");
-  const GURL subscription_not_in_prefs("https://subscription.com/3.txt");
-
-  const std::vector<scoped_refptr<Subscription>> current_subscriptions = {
-      MakeMockSubscription(subscription1), MakeMockSubscription(subscription2),
-      MakeMockSubscription(subscription_not_in_prefs),
-      MakeMockSubscription(AcceptableAdsUrl())};
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillRepeatedly(testing::Return(current_subscriptions));
-
-  // so that anti-cv isn't tagged along.
-  BooleanPrefMember first_run;
-  first_run.Init(prefs::kInstallFirstStartSubscriptions, &pref_service_);
-  first_run.SetValue(false);
-
-  StringListPrefMember list;
-  list.Init(prefs::kAdblockSubscriptions, &pref_service_);
-  list.SetValue({subscription1.spec(), subscription2.spec()});
-
-  // subscription_not_in_prefs is not returned as it is not in
-  // kAdblockSubscriptions. Acceptable Ads subscription is returned despite
-  // not being in kAdblockSubscriptions prefs because AA is enabled (a separate
-  // pref).
-  EXPECT_THAT(testee_->GetSelectedBuiltInSubscriptions(),
-              testing::UnorderedElementsAre(current_subscriptions[0],
-                                            current_subscriptions[1],
-                                            current_subscriptions[3]));
-}
-
-TEST_F(AdblockControllerImplTest, CustomSubscriptionsReadFromPrefs) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  const GURL subscription1("https://subscription.com/1.txt");
-  const GURL subscription2("https://subscription.com/2.txt");
-  const GURL subscription_not_in_prefs("https://subscription.com/3.txt");
-
-  const std::vector<scoped_refptr<Subscription>> current_subscriptions = {
-      MakeMockSubscription(subscription1), MakeMockSubscription(subscription2),
-      MakeMockSubscription(subscription_not_in_prefs),
-      MakeMockSubscription(AcceptableAdsUrl())};
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillRepeatedly(testing::Return(current_subscriptions));
-
-  StringListPrefMember list;
-  list.Init(prefs::kAdblockCustomSubscriptions, &pref_service_);
-  list.SetValue({subscription1.spec(), subscription2.spec()});
-
-  // subscription_not_in_prefs is not returned as it is not in
-  // kAdblockCustomSubscriptions. Acceptable Ads subscription is not returned
-  // because it is not a custom subscription.
-  EXPECT_THAT(testee_->GetCustomSubscriptions(),
-              testing::UnorderedElementsAre(current_subscriptions[0],
-                                            current_subscriptions[1]));
+  // Switching state notifies observers and stores into FilteringConfiguration.
+  EXPECT_CALL(observer_, OnEnabledStateChanged());
+  EXPECT_CALL(filtering_configuration_, SetEnabled(true));
+  testee_->SetAdblockEnabled(true);
 }
 
 TEST_F(AdblockControllerImplTest, GetKnownSubscriptions) {
-  auto subscriptions = config::GetKnownSubscriptions();
-  subscriptions.emplace_back(AcceptableAdsUrl(), std::string("Acceptable Ads"),
-                             std::vector<std::string>{},
-                             SubscriptionUiVisibility::Invisible,
-                             SubscriptionFirstRunBehavior::Subscribe,
-                             SubscriptionPrivilegedFilterStatus::Forbidden);
-  EXPECT_EQ(testee_->GetKnownSubscriptions(), subscriptions);
+  EXPECT_EQ(config::GetKnownSubscriptions(), testee_->GetKnownSubscriptions());
 }
 
-TEST_F(AdblockControllerImplTest,
-       AddingCustomSubscriptionTriggersInstallation) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
+TEST_F(AdblockControllerImplTest, InstallingSubscription) {
   const GURL subscription_url("https://subscription.com/1.txt");
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(subscription_url));
   ExpectInstallationTriggered(subscription_url);
 
-  testee_->AddCustomSubscription(subscription_url);
-  testee_->RemoveObserver(&observer);
-  // URL was added to prefs.
-  EXPECT_EQ(*custom_subscriptions_pref_,
-            std::vector<std::string>{subscription_url.spec()});
+  testee_->InstallSubscription(subscription_url);
+
+  // SubscriptionService notifies observers about installation progress, this is
+  // relayed to AdblockController's observer.
+  EXPECT_CALL(observer_, OnSubscriptionUpdated(subscription_url));
+  subscription_service_.observer_->OnSubscriptionInstalled(subscription_url);
 }
 
-TEST_F(AdblockControllerImplTest,
-       SelectingBuiltInSubscriptionTriggersInstallation) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  ASSERT_GE(config::GetKnownSubscriptions().size(), 1u);
-  const GURL subscription_url = config::GetKnownSubscriptions()[0].url;
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(subscription_url));
-  ExpectInstallationTriggered(subscription_url);
+TEST_F(AdblockControllerImplTest, UninstallingSubscription) {
+  const GURL subscription_url("https://subscription.com/1.txt");
 
-  testee_->SelectBuiltInSubscription(subscription_url);
-  testee_->RemoveObserver(&observer);
-  // URL was added to prefs.
-  EXPECT_THAT(*subscriptions_pref_, testing::Contains(subscription_url));
+  // Uninstalling subscription just removes from FilteringConfiguration.
+  ExpectRemoval(subscription_url);
+  testee_->UninstallSubscription(subscription_url);
+}
+
+TEST_F(AdblockControllerImplTest, SubscriptionsPrefsMigrated) {
+  const GURL subscription_url1("https://subscription.com/1.txt");
+  const GURL subscription_url2("https://subscription.com/2.txt");
+  subscriptions_pref_.SetValue(
+      {subscription_url1.spec(), subscription_url2.spec()});
+
+  ExpectInstallationTriggered(subscription_url1);
+  ExpectInstallationTriggered(subscription_url2);
+
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+
+  // When recreating again, no installations triggered because migration is
+  // only done once.
+  ExpectNoInstallation(subscription_url1);
+  ExpectNoInstallation(subscription_url2);
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+}
+
+TEST_F(AdblockControllerImplTest, CustomSubscriptionsMigratedFromPrefs) {
+  const GURL subscription_url1("https://subscription.com/1.txt");
+  const GURL subscription_url2("https://subscription.com/2.txt");
+  custom_subscriptions_pref_.SetValue(
+      {subscription_url1.spec(), subscription_url2.spec()});
+  ExpectInstallationTriggered(subscription_url1);
+  ExpectInstallationTriggered(subscription_url2);
+
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+
+  // When recreating again, no installations triggered because migration is
+  // only done once.
+  ExpectNoInstallation(subscription_url1);
+  ExpectNoInstallation(subscription_url2);
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+}
+
+TEST_F(AdblockControllerImplTest, EnableAcceptableAdsfPrefMigrated) {
+  pref_service_.SetBoolean(prefs::kEnableAcceptableAdsLegacy, false);
+  // Acceptable Ads is not installed (and even removed, if it was installed
+  // before) as old profile had it disabled.
+  ExpectRemoval(AcceptableAdsUrl());
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+  // Migration only happens once.
+  ExpectNoRemoval(AcceptableAdsUrl());
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+
+  pref_service_.SetBoolean(prefs::kEnableAcceptableAdsLegacy, true);
+  // Acceptable Ads is installed but only once.
+  ExpectInstallationTriggered(AcceptableAdsUrl());
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+
+  ExpectNoInstallation(AcceptableAdsUrl());
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+}
+
+TEST_F(AdblockControllerImplTest, EnabledStatePrefMigrated) {
+  // Pref is migrated once.
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, false);
+  EXPECT_CALL(filtering_configuration_, SetEnabled(false));
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+  EXPECT_CALL(filtering_configuration_, SetEnabled(_)).Times(0);
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+
+  // Works for true value as well.
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
+  EXPECT_CALL(filtering_configuration_, SetEnabled(true));
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
+  EXPECT_CALL(filtering_configuration_, SetEnabled(_)).Times(0);
+  RecreateController();
+  testee_->MigrateLegacyPrefs(&pref_service_);
 }
 
 TEST_F(AdblockControllerImplTest, EnablingAcceptableAdsInstallsSubscription) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  pref_service_.SetBoolean(prefs::kEnableAcceptableAds, false);
-  const GURL subscription_url = AcceptableAdsUrl();
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillOnce(testing::Return(std::vector<scoped_refptr<Subscription>>{}));
-  EXPECT_CALL(observer, OnSubscriptionUpdated(subscription_url));
-  ExpectInstallationTriggered(subscription_url);
-
-  testee_->SetAcceptableAdsEnabled(true);
-  testee_->RemoveObserver(&observer);
-}
-
-TEST_F(AdblockControllerImplTest, SelectingAcceptableAdsInstallsSubscription) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  pref_service_.SetBoolean(prefs::kEnableAcceptableAds, false);
-  const GURL subscription_url = AcceptableAdsUrl();
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillOnce(testing::Return(std::vector<scoped_refptr<Subscription>>{}));
-  EXPECT_CALL(observer, OnSubscriptionUpdated(subscription_url));
-  ExpectInstallationTriggered(subscription_url);
-
-  testee_->SelectBuiltInSubscription(subscription_url);
-  EXPECT_TRUE(testee_->IsAcceptableAdsEnabled());
-  testee_->RemoveObserver(&observer);
-}
-
-TEST_F(AdblockControllerImplTest,
-       RemovingCustomSubscriptionTriggersUninstallation) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  const GURL subscription_url("https://subscription.com/1.txt");
-  // The URL is initially in Prefs.
-  custom_subscriptions_pref_.SetValue({subscription_url.spec()});
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(subscription_url));
-  EXPECT_CALL(subscription_service_, UninstallSubscription(subscription_url));
-
-  testee_->RemoveCustomSubscription(subscription_url);
-  testee_->RemoveObserver(&observer);
-  // The URL has been removed from Prefs.
-  EXPECT_TRUE(custom_subscriptions_pref_.GetValue().empty());
-}
-
-TEST_F(AdblockControllerImplTest,
-       UnselectingBuiltInSubscriptionTriggersUninstallation) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  // so that anti-cv ins't tagged along.
-  BooleanPrefMember first_run;
-  first_run.Init(prefs::kInstallFirstStartSubscriptions, &pref_service_);
-  first_run.SetValue(false);
-
-  ASSERT_GE(config::GetKnownSubscriptions().size(), 1u);
-  const GURL subscription_url = config::GetKnownSubscriptions()[0].url;
-  // The URL is initially in Prefs.
-  subscriptions_pref_.SetValue({subscription_url.spec()});
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(subscription_url));
-  EXPECT_CALL(subscription_service_, UninstallSubscription(subscription_url));
-
-  testee_->UnselectBuiltInSubscription(subscription_url);
-  testee_->RemoveObserver(&observer);
-  // The URL has been removed from Prefs.
-  EXPECT_TRUE(subscriptions_pref_.GetValue().empty());
-}
-
-TEST_F(AdblockControllerImplTest,
-       DisablingAcceptableAdsTriggersUninstallation) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  const GURL subscription_url = AcceptableAdsUrl();
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  // Acceptable Ads subscription currently installed, returned by
-  // SubscriptionService::GetCurrentSubscriptions().
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillOnce(testing::Return(
-          std::vector<scoped_refptr<Subscription>>{MakeMockSubscription(
-              AcceptableAdsUrl(), InstallationState::Installed)}));
-  EXPECT_CALL(observer, OnSubscriptionUpdated(subscription_url));
-  EXPECT_CALL(subscription_service_, UninstallSubscription(subscription_url));
-
-  testee_->SetAcceptableAdsEnabled(false);
-  testee_->RemoveObserver(&observer);
-}
-
-TEST_F(AdblockControllerImplTest,
-       UnselectingAcceptableAdsTriggersUninstallation) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  const GURL subscription_url = AcceptableAdsUrl();
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  // Acceptable Ads subscription currently installed, returned by
-  // SubscriptionService::GetCurrentSubscriptions().
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillOnce(testing::Return(
-          std::vector<scoped_refptr<Subscription>>{MakeMockSubscription(
-              AcceptableAdsUrl(), InstallationState::Installed)}));
-  EXPECT_CALL(observer, OnSubscriptionUpdated(subscription_url));
-  EXPECT_CALL(subscription_service_, UninstallSubscription(subscription_url));
-
-  testee_->UnselectBuiltInSubscription(subscription_url);
+  // Initially, AA is not installed.
+  EXPECT_CALL(filtering_configuration_, GetFilterLists())
+      .WillRepeatedly(Return(std::vector<GURL>{DefaultSubscriptionUrl()}));
   EXPECT_FALSE(testee_->IsAcceptableAdsEnabled());
-  testee_->RemoveObserver(&observer);
-}
 
-TEST_F(AdblockControllerImplTest,
-       SynchronizingSubscriptionsWhenServiceBecomesInitialized) {
-  // SubscriptionService reports its not initialized yet.
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(false));
-  // This is not a first run.
-  pref_service_.SetBoolean(prefs::kInstallFirstStartSubscriptions, false);
-
-  // SynchronizeWithPrefsWhenPossible() will schedule a delayed task.
-  base::OnceClosure delayed_task;
-  EXPECT_CALL(subscription_service_, RunWhenInitialized(testing::_))
-      .WillRepeatedly(
-          [&](base::OnceClosure task) { delayed_task = std::move(task); });
-  testee_->SynchronizeWithPrefsWhenPossible();
-
-  const GURL new_built_in_subscription = config::GetKnownSubscriptions()[0].url;
-  const GURL installed_built_in_subscription =
-      config::GetKnownSubscriptions()[1].url;
-  const GURL installed_custom_subscription("https://subscription.com/1.txt");
-  const GURL temporary_custom_subscription("https://subscription.com/2.txt");
-  const GURL unexpected_installed_subscription(
-      "https://subscription.com/4.txt");
-
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-
-  // For now, we expect no notifications and no calls to SubscriptionService, as
-  // it is not initialized.
-  EXPECT_CALL(subscription_service_,
-              DownloadAndInstallSubscription(testing::_, testing::_))
-      .Times(0);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(testing::_)).Times(0);
-
-  // Call methods that install and uninstall subscriptions, they will only
-  // modify Prefs.
-  testee_->AddCustomSubscription(installed_custom_subscription);
-  testee_->AddCustomSubscription(temporary_custom_subscription);
-  testee_->RemoveCustomSubscription(temporary_custom_subscription);
-  testee_->SelectBuiltInSubscription(new_built_in_subscription);
-  testee_->SelectBuiltInSubscription(installed_built_in_subscription);
-
-  // There are no current subscriptions yet as the SubscriptionService is not
-  // initialized. The SubscriptionService is not asked to provide subscriptions
-  // as it is not legal to query an uninitialized SubscriptionService.
-  // TODO(mpawlowski) those getters could instead return dummy Subscriptions
-  // populated based on prefs. Is it worth the complexity, considering how
-  // fast SubscriptionService normally starts up?
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions()).Times(0);
-  EXPECT_TRUE(testee_->GetSelectedBuiltInSubscriptions().empty());
-  EXPECT_TRUE(testee_->GetCustomSubscriptions().empty());
-
-  // Since |temporary_custom_subscription| was added and then removed while the
-  // service was initializing, there will be no installation attempt.
-  ExpectNoInstallation(temporary_custom_subscription);
-  // |installed_custom_subscription| and |installed_built_in_subscription| are
-  // already installed. They don't need to be installed.
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillRepeatedly(testing::Return(std::vector<scoped_refptr<Subscription>>{
-          MakeMockSubscription(installed_custom_subscription,
-                               InstallationState::Installed),
-          MakeMockSubscription(unexpected_installed_subscription,
-                               InstallationState::Installed),
-          MakeMockSubscription(installed_built_in_subscription,
-                               InstallationState::Installed)}));
-
-  ExpectNoInstallation(installed_custom_subscription);
-  ExpectNoInstallation(installed_built_in_subscription);
-
-  // |new_built_in_subscription| isn't available, so it will be installed.
-  ExpectInstallationTriggered(new_built_in_subscription);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(new_built_in_subscription));
-
-  // |unexpected_installed_subscription| is installed but not accounted for in
-  // Prefs, it will be uninstalled.
-  EXPECT_CALL(subscription_service_,
-              UninstallSubscription(unexpected_installed_subscription));
-  EXPECT_CALL(observer,
-              OnSubscriptionUpdated(unexpected_installed_subscription));
-
-  // Since Acceptable Ads are also enabled, but weren't reported as installed,
-  // the Acceptable Ads subscription is also downloaded.
+  // Enabling AA adds new filter list.
   ExpectInstallationTriggered(AcceptableAdsUrl());
-  EXPECT_CALL(observer, OnSubscriptionUpdated(AcceptableAdsUrl()));
+  testee_->SetAcceptableAdsEnabled(true);
 
-  // Now, SubscriptionService becomes initialized.
-  // Run the delayed task posted by SynchronizeWithPrefsWhenPossible();
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  std::move(delayed_task).Run();
-
-  testee_->RemoveObserver(&observer);
+  // FilteringConfiguration now reports AA is installed.
+  EXPECT_CALL(filtering_configuration_, GetFilterLists())
+      .WillRepeatedly(Return(
+          std::vector<GURL>{DefaultSubscriptionUrl(), AcceptableAdsUrl()}));
+  EXPECT_TRUE(testee_->IsAcceptableAdsEnabled());
 }
 
-TEST_F(AdblockControllerImplTest, SetCustomFilters) {
-  std::string custom_filter = "test.com/ad";
-  std::vector<std::string> with_filter{custom_filter};
-  std::vector<std::string> empty;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
+TEST_F(AdblockControllerImplTest, DisablingAcceptableAdsRemovesSubscription) {
+  // Initially, AA is installed.
+  EXPECT_CALL(filtering_configuration_, GetFilterLists())
+      .WillRepeatedly(Return(
+          std::vector<GURL>{DefaultSubscriptionUrl(), AcceptableAdsUrl()}));
+  EXPECT_TRUE(testee_->IsAcceptableAdsEnabled());
 
-  EXPECT_EQ(empty, testee_->GetCustomFilters());
-  EXPECT_CALL(subscription_service_, SetCustomFilters(with_filter));
-  testee_->AddCustomFilter(custom_filter);
-  EXPECT_EQ(with_filter, testee_->GetCustomFilters());
-  EXPECT_CALL(subscription_service_, SetCustomFilters(testing::_)).Times(0);
-  testee_->AddCustomFilter(custom_filter);
-  EXPECT_EQ(with_filter, testee_->GetCustomFilters());
-  EXPECT_CALL(subscription_service_, SetCustomFilters(empty));
-  testee_->RemoveCustomFilter(custom_filter);
-  EXPECT_EQ(empty, testee_->GetCustomFilters());
-  EXPECT_CALL(subscription_service_, SetCustomFilters(testing::_)).Times(0);
-  testee_->RemoveCustomFilter(custom_filter);
-  EXPECT_EQ(empty, testee_->GetCustomFilters());
+  // Disabling AA removes the filter list.
+  ExpectRemoval(AcceptableAdsUrl());
+  testee_->SetAcceptableAdsEnabled(false);
+
+  // FilteringConfiguration now reports AA is not installed.
+  EXPECT_CALL(filtering_configuration_, GetFilterLists())
+      .WillRepeatedly(Return(std::vector<GURL>{DefaultSubscriptionUrl()}));
+  EXPECT_FALSE(testee_->IsAcceptableAdsEnabled());
 }
 
-TEST_F(AdblockControllerImplTest, AllowedDomainAdd) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
+TEST_F(AdblockControllerImplTest, CustomFilters) {
+  const auto installed_filters = std::vector<std::string>{"abc", "def"};
+  EXPECT_CALL(filtering_configuration_, GetCustomFilters())
+      .WillOnce(Return(installed_filters));
+  EXPECT_EQ(testee_->GetCustomFilters(), installed_filters);
 
-  EXPECT_EQ(empty, testee_->GetAllowedDomains());
-  EXPECT_CALL(subscription_service_,
-              SetCustomFilters(with_domain_filter_google));
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
+  EXPECT_CALL(filtering_configuration_, AddCustomFilter("ggg"));
+  testee_->AddCustomFilter("ggg");
+
+  EXPECT_CALL(filtering_configuration_, RemoveCustomFilter("ggg"));
+  testee_->RemoveCustomFilter("ggg");
 }
 
-TEST_F(AdblockControllerImplTest, AllowedDomainAddEmpty) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
+TEST_F(AdblockControllerImplTest, AllowedDomains) {
+  const auto installed_allowed_domains =
+      std::vector<std::string>{"abc.com", "def.com"};
+  EXPECT_CALL(filtering_configuration_, GetAllowedDomains())
+      .WillOnce(Return(installed_allowed_domains));
+  EXPECT_EQ(testee_->GetAllowedDomains(), installed_allowed_domains);
 
-  EXPECT_CALL(subscription_service_, SetCustomFilters(testing::_)).Times(0);
-  testee_->AddAllowedDomain("");
-  EXPECT_EQ(empty, testee_->GetAllowedDomains());
-}
+  EXPECT_CALL(filtering_configuration_, AddAllowedDomain("ggg.com"));
+  testee_->AddAllowedDomain("ggg.com");
 
-TEST_F(AdblockControllerImplTest, AllowedDomainAddMultiple) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_CALL(subscription_service_,
-              SetCustomFilters(with_domain_filter_google_and_facebook));
-  testee_->AddAllowedDomain(domain_facebook);
-  EXPECT_EQ(with_domain_google_and_facebook, testee_->GetAllowedDomains());
-}
-
-TEST_F(AdblockControllerImplTest, AllowedDomainAddExisting) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_CALL(subscription_service_, SetCustomFilters(testing::_)).Times(0);
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
-}
-
-TEST_F(AdblockControllerImplTest, AllowedDomainAddUppercase) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  EXPECT_EQ(empty, testee_->GetAllowedDomains());
-  EXPECT_CALL(subscription_service_,
-              SetCustomFilters(with_domain_filter_google));
-  testee_->AddAllowedDomain(domain_google_upper);
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
-}
-
-TEST_F(AdblockControllerImplTest, AllowedDomainAddExistingUppercase) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_CALL(subscription_service_, SetCustomFilters(testing::_)).Times(0);
-  testee_->AddAllowedDomain(domain_google_upper);
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
-}
-
-TEST_F(AdblockControllerImplTest, AllowedDomainRemove) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
-  EXPECT_CALL(subscription_service_, SetCustomFilters(empty));
-  testee_->RemoveAllowedDomain(domain_google);
-  EXPECT_EQ(empty, testee_->GetAllowedDomains());
-}
-
-TEST_F(AdblockControllerImplTest, AllowedDomainRemoveMultiple) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  testee_->AddAllowedDomain(domain_google);
-  testee_->AddAllowedDomain(domain_facebook);
-  EXPECT_EQ(with_domain_google_and_facebook, testee_->GetAllowedDomains());
-  EXPECT_CALL(subscription_service_,
-              SetCustomFilters(with_domain_filter_facebook));
-  testee_->RemoveAllowedDomain(domain_google);
-  EXPECT_EQ(with_domain_facebook, testee_->GetAllowedDomains());
-}
-
-TEST_F(AdblockControllerImplTest, AllowedDomainRemoveEmpty) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
-  EXPECT_CALL(subscription_service_, SetCustomFilters(testing::_)).Times(0);
-  testee_->RemoveAllowedDomain("");
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
-}
-
-TEST_F(AdblockControllerImplTest, AllowedDomainRemoveNotExisting) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
-  EXPECT_CALL(subscription_service_, SetCustomFilters(testing::_)).Times(0);
-  testee_->RemoveAllowedDomain(domain_facebook);
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
-}
-
-TEST_F(AdblockControllerImplTest, AllowedDomainRemoveUppercase) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_EQ(with_domain_google, testee_->GetAllowedDomains());
-  EXPECT_CALL(subscription_service_, SetCustomFilters(empty));
-  testee_->RemoveAllowedDomain(domain_google_upper);
-  EXPECT_EQ(empty, testee_->GetAllowedDomains());
-}
-
-TEST_F(AdblockControllerImplTest, SynchronizeCustomFiltersAndAllowedDomains) {
-  using namespace allowed_domain_test_data;
-  std::string custom_filter = "test.com/ad";
-  std::vector<std::string> with_custom_and_allowed_domain_filter{
-      custom_filter, domain_filter_google};
-  std::vector<std::string> with_custom_filter{custom_filter};
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-
-  EXPECT_CALL(subscription_service_, SetCustomFilters(with_custom_filter));
-  testee_->AddCustomFilter(custom_filter);
-  EXPECT_CALL(subscription_service_,
-              SetCustomFilters(with_custom_and_allowed_domain_filter));
-  testee_->AddAllowedDomain(domain_google);
-  EXPECT_EQ(with_custom_filter, testee_->GetCustomFilters());
-}
-
-TEST_F(
-    AdblockControllerImplTest,
-    SynchronizeCustomFiltersAndAllowedDomains_NoCustomFiltersOrAllowedDomains) {
-  using namespace allowed_domain_test_data;
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  EXPECT_CALL(subscription_service_, SetCustomFilters(empty));
-  testee_->SynchronizeWithPrefsWhenPossible();
-}
-
-TEST_F(AdblockControllerImplTest,
-       SynchronizeCustomFiltersWhenServiceAvailable) {
-  std::string custom_filter = "test.com/aaa";
-  std::vector<base::OnceClosure> delayed_tasks;
-  EXPECT_CALL(subscription_service_, RunWhenInitialized(testing::_))
-      .WillRepeatedly([&](base::OnceClosure task) {
-        delayed_tasks.push_back(std::move(task));
-      });
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(false));
-  EXPECT_CALL(subscription_service_,
-              SetCustomFilters(std::vector<std::string>{custom_filter}))
-      .Times(0);
-  testee_->SynchronizeWithPrefsWhenPossible();
-  testee_->AddCustomFilter(custom_filter);
-
-  ASSERT_EQ(delayed_tasks.size(), 1u);
-  EXPECT_CALL(subscription_service_,
-              SetCustomFilters(std::vector<std::string>{custom_filter}));
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  // should call OnSubscriptionServiceReady
-  for (auto& task : delayed_tasks) {
-    std::move(task).Run();
-  }
+  EXPECT_CALL(filtering_configuration_, RemoveAllowedDomain("ggg.com"));
+  testee_->RemoveAllowedDomain("ggg.com");
 }
 
 TEST_F(AdblockControllerImplTest,
        InstallLanguageBasedRecommendationAndAntiCvOnFirstRun) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(false));
-
-  // SynchronizeWithPrefsWhenPossible() will schedule a delayed task.
-  base::OnceClosure delayed_task;
-  EXPECT_CALL(subscription_service_, RunWhenInitialized(testing::_))
-      .WillRepeatedly(
-          [&](base::OnceClosure task) { delayed_task = std::move(task); });
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  testee_->SynchronizeWithPrefsWhenPossible();
-
-  // There are no subscriptions on disk.
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillOnce(testing::Return(std::vector<scoped_refptr<Subscription>>{}));
-
-  // Default prefs state indicates a first run situation. Since there aren't any
-  // pre-existing subscriptions in prefs, we will install a language-based
-  // recommendation.
+  // Default prefs state indicates a first run situation.
+  pref_service_.SetBoolean(prefs::kInstallFirstStartSubscriptions, true);
+  // Since there aren't any pre-existing subscriptions migrated, we will install
+  // a language-based recommendation.
   ExpectInstallationTriggered(kRecommendedSubscription);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(kRecommendedSubscription));
   // By default, Acceptable Ads are enabled, so they will be installed as well.
   ExpectInstallationTriggered(AcceptableAdsUrl());
-  EXPECT_CALL(observer, OnSubscriptionUpdated(AcceptableAdsUrl()));
   // Anti-CV filter list is installed as well, to enable snippets.
   ExpectInstallationTriggered(AntiCVUrl());
-  EXPECT_CALL(observer, OnSubscriptionUpdated(AntiCVUrl()));
 
-  // Now, SubscriptionService becomes initialized.
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  std::move(delayed_task).Run();
-
-  // After synchronization is complete, the first-run flag is disabled.
-  EXPECT_FALSE(
-      pref_service_.GetBoolean(prefs::kInstallFirstStartSubscriptions));
-  // Controller has the recommended subscription installed.
-  const std::vector<scoped_refptr<Subscription>> installed_subscriptions = {
-      MakeMockSubscription(kRecommendedSubscription),
-      MakeMockSubscription(AntiCVUrl()),
-      MakeMockSubscription(AcceptableAdsUrl())};
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillRepeatedly(testing::Return(installed_subscriptions));
-  EXPECT_THAT(testee_->GetSelectedBuiltInSubscriptions(),
-              testing::UnorderedElementsAreArray(installed_subscriptions));
-
-  testee_->RemoveObserver(&observer);
+  RecreateController();
+  testee_->RunFirstRunLogic(&pref_service_);
 }
 
 TEST_F(AdblockControllerImplTest,
        InstallDefaultRecommendationForNonMatchingLanguage) {
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(false));
-
-  // SynchronizeWithPrefsWhenPossible() will schedule a delayed task.
-  base::OnceClosure delayed_task;
-  EXPECT_CALL(subscription_service_, RunWhenInitialized(testing::_))
-      .WillRepeatedly(
-          [&](base::OnceClosure task) { delayed_task = std::move(task); });
-  MockObserver observer;
-  pref_service_.ClearPref(prefs::kAdblockSubscriptions);
-  RecreateController("th-TH");
-  testee_->AddObserver(&observer);
-  testee_->SynchronizeWithPrefsWhenPossible();
-
-  // There are no subscriptions on disk.
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillOnce(testing::Return(std::vector<scoped_refptr<Subscription>>{}));
-
-  // Default prefs state indicates a first run situation. Since there aren't any
-  // pre-existing subscriptions in prefs, we will install a default
-  // subscription because we don't find a language-based recommendation.
+  pref_service_.SetBoolean(prefs::kInstallFirstStartSubscriptions, true);
+  // Since the language does not have a language-specific recommendation, we
+  // install a default list.
   ExpectInstallationTriggered(DefaultSubscriptionUrl());
-  EXPECT_CALL(observer, OnSubscriptionUpdated(DefaultSubscriptionUrl()));
-
   // By default, Acceptable Ads are enabled, so they will be installed as well.
   ExpectInstallationTriggered(AcceptableAdsUrl());
-  EXPECT_CALL(observer, OnSubscriptionUpdated(AcceptableAdsUrl()));
   // Anti-CV filter list is installed as well, to enable snippets.
   ExpectInstallationTriggered(AntiCVUrl());
-  EXPECT_CALL(observer, OnSubscriptionUpdated(AntiCVUrl()));
 
-  // Now, SubscriptionService becomes initialized.
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  std::move(delayed_task).Run();
-
-  testee_->RemoveObserver(&observer);
+  RecreateController("th-TH");
+  testee_->RunFirstRunLogic(&pref_service_);
 }
 
 TEST_F(AdblockControllerImplTest, InstallAntiCvOnFirstRunIfMigrating) {
-  RecreateController("pl-PL");
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(false));
-
-  // SynchronizeWithPrefsWhenPossible() will schedule a delayed task.
-  base::OnceClosure delayed_task;
-  EXPECT_CALL(subscription_service_, RunWhenInitialized(testing::_))
-      .WillRepeatedly(
-          [&](base::OnceClosure task) { delayed_task = std::move(task); });
-  MockObserver observer;
-  testee_->AddObserver(&observer);
-  testee_->SynchronizeWithPrefsWhenPossible();
-
-  // There are no subscriptions on disk.
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillOnce(testing::Return(std::vector<scoped_refptr<Subscription>>{}));
-
-  // Acceptable Ads were disabled in the old eyeo Chromium SDK version.
-  pref_service_.SetBoolean(prefs::kEnableAcceptableAds, false);
-
   // Previous version of eyeo Chromium SDK had a specific subscription
   // installed. Note that this is a different subscription from the recommended
   // one for the user's locale. It will be installed on first run in the current
@@ -770,36 +367,100 @@ TEST_F(AdblockControllerImplTest, InstallAntiCvOnFirstRunIfMigrating) {
       "easylistgermany+easylist.txt"};
   subscriptions_pref_.SetValue({kMigratedSubscription.spec()});
 
+  pref_service_.SetBoolean(prefs::kInstallFirstStartSubscriptions, true);
   ExpectInstallationTriggered(kMigratedSubscription);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(kMigratedSubscription));
-  // Additionally recommended subscription based on new locale will be installed
   ExpectInstallationTriggered(kRecommendedSubscription);
-  EXPECT_CALL(observer, OnSubscriptionUpdated(kRecommendedSubscription));
-  // Anti-CV filter list is installed as well, to enable snippets.
   ExpectInstallationTriggered(AntiCVUrl());
-  EXPECT_CALL(observer, OnSubscriptionUpdated(AntiCVUrl()));
-  // Acceptable Ads is not installed since it was disabled in old version.
+  ExpectInstallationTriggered(AcceptableAdsUrl());
+
+  RecreateController();
+  testee_->RunFirstRunLogic(&pref_service_);
+  testee_->MigrateLegacyPrefs(&pref_service_);
+}
+
+TEST_F(AdblockControllerImplTest, AADefaultOffFirstRun) {
+  pref_service_.SetBoolean(prefs::kInstallFirstStartSubscriptions, true);
+  const std::vector<KnownSubscriptionInfo> recommendations = {
+      {AcceptableAdsUrl(),
+       "AA",
+       {},
+       SubscriptionUiVisibility::Invisible,
+       SubscriptionFirstRunBehavior::Ignore,
+       SubscriptionPrivilegedFilterStatus::Forbidden}};
   ExpectNoInstallation(AcceptableAdsUrl());
+  RecreateController("pl-PL", recommendations);
+  testee_->RunFirstRunLogic(&pref_service_);
+}
 
-  // Now, SubscriptionService becomes initialized.
-  EXPECT_CALL(subscription_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
-  std::move(delayed_task).Run();
+TEST_F(AdblockControllerImplTest, AADefaultOnFirstRun) {
+  pref_service_.SetBoolean(prefs::kInstallFirstStartSubscriptions, true);
+  const std::vector<KnownSubscriptionInfo> recommendations = {
+      {AcceptableAdsUrl(),
+       "AA",
+       {},
+       SubscriptionUiVisibility::Invisible,
+       SubscriptionFirstRunBehavior::Subscribe,
+       SubscriptionPrivilegedFilterStatus::Forbidden}};
+  ExpectInstallationTriggered(AcceptableAdsUrl());
+  RecreateController("pl-PL", recommendations);
+  testee_->RunFirstRunLogic(&pref_service_);
+}
 
-  // After synchronization is complete, the first-run flag is disabled.
-  EXPECT_FALSE(
-      pref_service_.GetBoolean(prefs::kInstallFirstStartSubscriptions));
-  // Controller has the recommended subscription installed.
-  const std::vector<scoped_refptr<Subscription>> installed_subscriptions = {
-      MakeMockSubscription(kMigratedSubscription),
-      MakeMockSubscription(kRecommendedSubscription),
-      MakeMockSubscription(AntiCVUrl())};
-  EXPECT_CALL(subscription_service_, GetCurrentSubscriptions())
-      .WillRepeatedly(testing::Return(installed_subscriptions));
-  EXPECT_THAT(testee_->GetSelectedBuiltInSubscriptions(),
-              testing::UnorderedElementsAreArray(installed_subscriptions));
+TEST_F(AdblockControllerImplTest,
+       NoInstallationWhenDefaultSubscriptionIgnored) {
+  pref_service_.SetBoolean(prefs::kInstallFirstStartSubscriptions, true);
+  const std::vector<KnownSubscriptionInfo> recommendations = {
+      {DefaultSubscriptionUrl(),
+       "EasyList",
+       {},
+       SubscriptionUiVisibility::Invisible,
+       SubscriptionFirstRunBehavior::Ignore,
+       SubscriptionPrivilegedFilterStatus::Forbidden}};
+  ExpectNoInstallation(DefaultSubscriptionUrl());
+  RecreateController("pl-PL", recommendations);
+  testee_->RunFirstRunLogic(&pref_service_);
+}
 
-  testee_->RemoveObserver(&observer);
+TEST_F(AdblockControllerImplTest, SeveralLanguageSpecificSubscriptions) {
+  pref_service_.SetBoolean(prefs::kInstallFirstStartSubscriptions, true);
+  const auto kEnglishUrl1 = GURL("https://english.com/filter1.txt");
+  const auto kEnglishUrl2 = GURL("https://english.com/filter2.txt");
+  const auto kGermanUrl1 = GURL("https://german.com/filter1.txt");
+  const std::vector<KnownSubscriptionInfo> recommendations = {
+      {DefaultSubscriptionUrl(),
+       "EasyList",
+       {},
+       SubscriptionUiVisibility::Invisible,
+       SubscriptionFirstRunBehavior::Subscribe,
+       SubscriptionPrivilegedFilterStatus::Forbidden},
+      {kEnglishUrl1,
+       "English list 1",
+       {"en"},
+       SubscriptionUiVisibility::Invisible,
+       SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+       SubscriptionPrivilegedFilterStatus::Forbidden},
+      {kEnglishUrl2,
+       "English list 2",
+       {"en"},
+       SubscriptionUiVisibility::Invisible,
+       SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+       SubscriptionPrivilegedFilterStatus::Forbidden},
+      {kGermanUrl1,
+       "German list 1",
+       {"de"},
+       SubscriptionUiVisibility::Invisible,
+       SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+       SubscriptionPrivilegedFilterStatus::Forbidden}};
+  // Installed because SubscriptionFirstRunBehavior::Subscribe, not specific to
+  // any language.
+  ExpectInstallationTriggered(DefaultSubscriptionUrl());
+  // No installation because locale doesn't match.
+  ExpectNoInstallation(kGermanUrl1);
+  // All matching language-specific lists installed.
+  ExpectInstallationTriggered(kEnglishUrl1);
+  ExpectInstallationTriggered(kEnglishUrl2);
+  RecreateController("en-US", recommendations);
+  testee_->RunFirstRunLogic(&pref_service_);
 }
 
 }  // namespace adblock

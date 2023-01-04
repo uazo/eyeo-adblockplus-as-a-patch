@@ -20,7 +20,6 @@
 
 #include "base/observer_list.h"
 #include "components/adblock/core/adblock_controller.h"
-#include "components/adblock/core/common/allowed_connection_type.h"
 #include "components/adblock/core/subscription/installed_subscription.h"
 #include "testing/gmock/include/gmock/gmock.h"
 
@@ -51,6 +50,12 @@ class MockAdblockController : public NiceMock<AdblockController> {
               GetCustomSubscriptions,
               (),
               (const, override));
+  MOCK_METHOD(void, InstallSubscription, (const GURL& url), (override));
+  MOCK_METHOD(void, UninstallSubscription, (const GURL& url), (override));
+  MOCK_METHOD(std::vector<scoped_refptr<Subscription>>,
+              GetInstalledSubscriptions,
+              (),
+              (const, override));
   MOCK_METHOD(void, AddAllowedDomain, (const std::string& domain), (override));
   MOCK_METHOD(void,
               RemoveAllowedDomain,
@@ -64,11 +69,6 @@ class MockAdblockController : public NiceMock<AdblockController> {
               GetKnownSubscriptions,
               (),
               (const, override));
-  MOCK_METHOD(void,
-              SetUpdateConsent,
-              (AllowedConnectionType consent),
-              (override));
-  MOCK_METHOD(AllowedConnectionType, GetUpdateConsent, (), (const override));
   MOCK_METHOD(void, AddCustomFilter, (const std::string& filter), (override));
   MOCK_METHOD(void,
               RemoveCustomFilter,

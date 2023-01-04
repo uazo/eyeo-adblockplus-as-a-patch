@@ -406,10 +406,10 @@ void Converter::ParseLine(base::StringPiece line, ConverterData& data) const {
       const std::string domains(base::ToLowerASCII(line.substr(0, pos)));
       line.remove_prefix(pos + (type == ContentFilterType::ElemHide ? 2 : 3));
       ParseContentFilter(domains, line, type, data, line);
+      return;
     }
-  } else {
-    ParseUrlFilter(line, data);
   }
+  ParseUrlFilter(line, data);
 }
 
 std::unique_ptr<FlatbufferData> Converter::Pack(

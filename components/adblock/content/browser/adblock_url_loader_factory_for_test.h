@@ -15,10 +15,10 @@
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef COMPONENTS_ADBLOCK_CONTENT_COMMON_ADBLOCK_URL_LOADER_FACTORY_FOR_TEST_H_
-#define COMPONENTS_ADBLOCK_CONTENT_COMMON_ADBLOCK_URL_LOADER_FACTORY_FOR_TEST_H_
+#ifndef COMPONENTS_ADBLOCK_CONTENT_BROWSER_ADBLOCK_URL_LOADER_FACTORY_FOR_TEST_H_
+#define COMPONENTS_ADBLOCK_CONTENT_BROWSER_ADBLOCK_URL_LOADER_FACTORY_FOR_TEST_H_
 
-#include "components/adblock/content/common/adblock_url_loader_factory.h"
+#include "components/adblock/content/browser/adblock_url_loader_factory.h"
 #include "components/adblock/core/adblock_controller.h"
 
 namespace adblock {
@@ -40,7 +40,8 @@ namespace adblock {
 class AdblockURLLoaderFactoryForTest final : public AdblockURLLoaderFactory {
  public:
   AdblockURLLoaderFactoryForTest(
-      std::unique_ptr<mojom::AdblockInterface> adblock_interface,
+      AdblockURLLoaderFactoryConfig config,
+      int32_t render_process_id,
       int frame_tree_node_id,
       mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
       mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
@@ -70,4 +71,4 @@ class AdblockURLLoaderFactoryForTest final : public AdblockURLLoaderFactory {
 
 }  // namespace adblock
 
-#endif  // COMPONENTS_ADBLOCK_CONTENT_COMMON_ADBLOCK_URL_LOADER_FACTORY_FOR_TEST_H_
+#endif  // COMPONENTS_ADBLOCK_CONTENT_BROWSER_ADBLOCK_URL_LOADER_FACTORY_FOR_TEST_H_

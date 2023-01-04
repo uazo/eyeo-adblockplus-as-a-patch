@@ -42,10 +42,21 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment 
 
     @Override
     protected List<String> getItems() {
-        List<URL> customUrls = AdblockController.getInstance().getCustomSubscriptions();
-        List<String> customStrings = new ArrayList<String>();
-        for (URL customUrl : customUrls) {
-            customStrings.add(customUrl.toString());
+        final List<AdblockController.Subscription> installed =
+                AdblockController.getInstance().getInstalledSubscriptions();
+        final List<AdblockController.Subscription> recommended =
+                AdblockController.getInstance().getRecommendedSubscriptions(getActivity());
+        final List<String> customStrings = new ArrayList<String>();
+        for (final AdblockController.Subscription subscription : installed) {
+            if (recommended.contains(subscription)) {
+              continue;
+            }
+            // FIXME(kzlomek): Remove this after DPD-1613
+            if (subscription.url().toString().equals(
+                        "https://easylist-downloads.adblockplus.org/exceptionrules.txt")) {
+                continue;
+            }
+            customStrings.add(subscription.url().toString());
         }
 
         return customStrings;
@@ -79,7 +90,7 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment 
     @Override
     protected void addItemImpl(String url) {
         try {
-            AdblockController.getInstance().addCustomSubscription(new URL(URLUtil.guessUrl(url)));
+            AdblockController.getInstance().installSubscription(new URL(URLUtil.guessUrl(url)));
         } catch (MalformedURLException ex) {
             Log.e(TAG, "Error parsing url: " + url);
         }
@@ -88,8 +99,7 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment 
     @Override
     protected void removeItemImpl(String url) {
         try {
-            AdblockController.getInstance().removeCustomSubscription(
-                    new URL(URLUtil.guessUrl(url)));
+            AdblockController.getInstance().uninstallSubscription(new URL(URLUtil.guessUrl(url)));
         } catch (MalformedURLException ex) {
             Log.e(TAG, "Error parsing url: " + url);
         }

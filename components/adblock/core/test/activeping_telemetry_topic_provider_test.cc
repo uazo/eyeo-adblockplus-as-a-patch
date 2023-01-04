@@ -26,6 +26,7 @@
 #include "base/test/mock_callback.h"
 #include "base/test/task_environment.h"
 #include "components/adblock/core/common/adblock_prefs.h"
+#include "components/adblock/core/test/mock_adblock_controller.h"
 #include "components/prefs/pref_value_store.h"
 #include "components/prefs/testing_pref_service.h"
 #include "gmock/gmock.h"
@@ -43,8 +44,8 @@ class AdblockActivepingTelemetryTopicProviderTest
     app_info_.version = "1234";
     app_info_.client_os = "UNUSED";  // base/sys_info.h used instead.
     prefs::RegisterProfilePrefs(pref_service_.registry());
-    pref_service_.SetBoolean(prefs::kEnableAcceptableAds,
-                             AcceptableAdsEnabled());
+    EXPECT_CALL(controller_, IsAcceptableAdsEnabled())
+        .WillRepeatedly(testing::Return(AcceptableAdsEnabled()));
     RecreateProvider();
   }
 
@@ -54,7 +55,7 @@ class AdblockActivepingTelemetryTopicProviderTest
 
   void RecreateProvider() {
     provider_ = std::make_unique<ActivepingTelemetryTopicProvider>(
-        app_info_, &pref_service_, kBaseUrl, kAuthToken);
+        app_info_, &pref_service_, &controller_, kBaseUrl, kAuthToken);
   }
 
   void ExpectPayloadAndTimeConsistentAfterRestart() {
@@ -146,6 +147,7 @@ class AdblockActivepingTelemetryTopicProviderTest
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   utils::AppInfo app_info_;
   TestingPrefServiceSimple pref_service_;
+  MockAdblockController controller_;
   std::unique_ptr<ActivepingTelemetryTopicProvider> provider_;
 };
 

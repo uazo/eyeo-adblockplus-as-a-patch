@@ -14,12 +14,17 @@
  * You should have received a copy of the GNU General Public License
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef COMPONENTS_ADBLOCK_CORE_COMMON_ADBLOCK_FILTER_MATCH_H_
+#define COMPONENTS_ADBLOCK_CORE_COMMON_ADBLOCK_FILTER_MATCH_H_
 
-#include "components/adblock/content/common/test/mock_adblock_mojo_interface.h"
+#include "base/functional/callback_forward.h"
 
 namespace adblock {
 
-MockAdblockMojoInterface::MockAdblockMojoInterface() = default;
-MockAdblockMojoInterface::~MockAdblockMojoInterface() = default;
+enum class FilterMatchResult { kNoRule, kBlockRule, kAllowRule, kDisabled };
+
+using CheckFilterMatchCallback = base::OnceCallback<void(FilterMatchResult)>;
 
 }  // namespace adblock
+
+#endif  // COMPONENTS_ADBLOCK_CORE_COMMON_ADBLOCK_FILTER_MATCH_H_

@@ -15,10 +15,11 @@
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "components/adblock/content/browser/adblock_content_utils.h"
+
 #include <string>
 
 #include "base/containers/flat_map.h"
-#include "components/adblock/content/browser/adblock_content_utils.h"
 #include "third_party/blink/public/mojom/loader/resource_load_info.mojom-shared.h"
 
 namespace adblock::utils {

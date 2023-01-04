@@ -47,7 +47,7 @@ std::map<GURL, long> SessionStatsImpl::GetSessionBlockedAdsCount() const {
 }
 
 void SessionStatsImpl::OnAdMatched(const GURL& url,
-                                   mojom::FilterMatchResult match_result,
+                                   FilterMatchResult match_result,
                                    const std::vector<GURL>& parent_frame_urls,
                                    ContentType content_type,
                                    content::RenderFrameHost* render_frame_host,
@@ -59,26 +59,26 @@ void SessionStatsImpl::OnPageAllowed(
     const GURL& url,
     content::RenderFrameHost* render_frame_host,
     const GURL& subscription) {
-  OnMatchedInternal(mojom::FilterMatchResult::kAllowRule, subscription);
+  OnMatchedInternal(FilterMatchResult::kAllowRule, subscription);
 }
 
 void SessionStatsImpl::OnPopupMatched(
     const GURL& url,
-    mojom::FilterMatchResult match_result,
+    FilterMatchResult match_result,
     const GURL& opener_url,
     content::RenderFrameHost* render_frame_host,
     const GURL& subscription) {
   OnMatchedInternal(match_result, subscription);
 }
 
-void SessionStatsImpl::OnMatchedInternal(mojom::FilterMatchResult match_result,
+void SessionStatsImpl::OnMatchedInternal(FilterMatchResult match_result,
                                          const GURL& subscription) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(!subscription.is_empty());
-  if (match_result == adblock::mojom::FilterMatchResult::kBlockRule) {
+  if (match_result == adblock::FilterMatchResult::kBlockRule) {
     blocked_map_[subscription]++;
   } else {
-    DCHECK(match_result == adblock::mojom::FilterMatchResult::kAllowRule);
+    DCHECK(match_result == adblock::FilterMatchResult::kAllowRule);
     allowed_map_[subscription]++;
   }
 }

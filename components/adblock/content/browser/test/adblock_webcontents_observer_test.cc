@@ -19,8 +19,8 @@
 
 #include "components/adblock/content/browser/test/mock_element_hider.h"
 #include "components/adblock/content/browser/test/mock_frame_hierarchy_builder.h"
-#include "components/adblock/core/subscription/test/mock_subscription_updater.h"
-#include "components/adblock/core/test/mock_adblock_controller.h"
+#include "components/adblock/core/subscription/subscription_service.h"
+#include "components/adblock/core/subscription/test/mock_subscription_service.h"
 #include "components/adblock/core/test/mock_sitekey_storage.h"
 #include "content/public/test/mock_navigation_handle.h"
 #include "content/public/test/test_renderer_host.h"
@@ -35,12 +35,12 @@ class AdblockWebContentObserverTest
 
     auto* web_contents = this->web_contents();
     AdblockWebContentObserver::CreateForWebContents(
-        web_contents, &controller_, &hider_, &storage_,
+        web_contents, &service_, &hider_, &storage_,
         std::make_unique<MockFrameHierarchyBuilder>());
     observer_ = AdblockWebContentObserver::FromWebContents(web_contents);
   }
 
-  MockAdblockController controller_;
+  MockSubscriptionService service_;
   MockElementHider hider_;
   MockSitekeyStorage storage_;
   AdblockWebContentObserver* observer_;
@@ -67,7 +67,8 @@ TEST_F(AdblockWebContentObserverTest, DidFinishNavigationWithNiceUrl) {
   mock_navigation_handle.set_url(url);
   mock_navigation_handle.set_render_frame_host(frame_host);
 
-  EXPECT_CALL(controller_, IsAdblockEnabled()).WillOnce(testing::Return(true));
+  EXPECT_CALL(service_, GetStatus())
+      .WillOnce(testing::Return(FilteringStatus::Active));
   EXPECT_CALL(storage_, FindSiteKeyForAnyUrl(std::vector<GURL>{}))
       .WillOnce(testing::Return(absl::nullopt));
   EXPECT_CALL(hider_, HideBlockedElement(testing::_, testing::_)).Times(0);

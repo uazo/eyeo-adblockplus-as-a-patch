@@ -14,8 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/adblock/resource_classification_runner_factory.h"
-#include "chrome/browser/adblock/subscription_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_list.h"
@@ -23,8 +23,9 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/adblock/content/browser/resource_classification_runner.h"
-#include "components/adblock/core/subscription/subscription_service.h"
-#include "components/sessions/content/session_tab_helper.cc"
+#include "components/adblock/core/adblock_controller.h"
+#include "components/adblock/core/common/adblock_constants.h"
+#include "components/sessions/content/session_tab_helper.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/dns/mock_host_resolver.h"
@@ -54,9 +55,12 @@ class AdblockMultipleTabsBrowserTest
   }
 
   void SetFilters(std::vector<std::string> filters) {
-    auto* subscription_service =
-        SubscriptionServiceFactory::GetForBrowserContext(browser()->profile());
-    subscription_service->SetCustomFilters(std::move(filters));
+    auto* controller =
+        AdblockControllerFactory::GetForBrowserContext(browser()->profile());
+    controller->RemoveCustomFilter(kAllowlistEverythingFilter);
+    for (auto& filter : filters) {
+      controller->AddCustomFilter(filter);
+    }
   }
 
   void RestoreTabs(Browser* browser) {
@@ -72,19 +76,19 @@ class AdblockMultipleTabsBrowserTest
 
   // ResourceClassificationRunner::Observer:
   void OnAdMatched(const GURL& url,
-                   mojom::FilterMatchResult match_result,
+                   FilterMatchResult match_result,
                    const std::vector<GURL>& parent_frame_urls,
                    ContentType content_type,
                    content::RenderFrameHost* render_frame_host,
                    const GURL& subscription) override {
     const content::WebContents* wc =
         content::WebContents::FromRenderFrameHost(render_frame_host);
-    if (match_result == mojom::FilterMatchResult::kBlockRule
-       && url.path() == "/blocked.png") {
+    if (match_result == FilterMatchResult::kBlockRule &&
+        url.path() == "/blocked.png") {
       tabs_with_blocked_resource_.insert(
           sessions::SessionTabHelper::IdForTab(wc).id());
-    } else if (match_result == mojom::FilterMatchResult::kAllowRule
-       && url.path() == "/expected.png") {
+    } else if (match_result == FilterMatchResult::kAllowRule &&
+               url.path() == "/expected.png") {
       tabs_with_allowed_resource_.insert(
           sessions::SessionTabHelper::IdForTab(wc).id());
     }
@@ -95,7 +99,7 @@ class AdblockMultipleTabsBrowserTest
                      const GURL& subscription) override {}
 
   void OnPopupMatched(const GURL& url,
-                      mojom::FilterMatchResult match_result,
+                      FilterMatchResult match_result,
                       const GURL& opener_url,
                       content::RenderFrameHost* render_frame_host,
                       const GURL& subscription) override {}

@@ -32,6 +32,9 @@ class PreloadedSubscriptionProviderImpl final
     : public PreloadedSubscriptionProvider {
  public:
   ~PreloadedSubscriptionProviderImpl() final;
+  // TODO(mpawlowski): This still observes prefs::kEnableAdblockLegacy in
+  // |prefs|. This is no longer a valid way to become notified of needing to
+  // deallocate the preloaded subscriptions. Address in DPD-1568.
   explicit PreloadedSubscriptionProviderImpl(PrefService* prefs);
 
   void UpdateSubscriptions(std::vector<GURL> installed_subscriptions,

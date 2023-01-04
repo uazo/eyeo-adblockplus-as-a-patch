@@ -61,6 +61,7 @@ source_set("subscription") {
   public_deps = [
     "//base",
     "//components/adblock/core/common",
+    "//components/adblock/core/configuration",
     "//components/resources:components_resources_grit",
     "//url:url",
   ]
@@ -111,6 +112,7 @@ source_set("unit_tests") {
   deps = [
     ":test_support",
     "//components/adblock/core",
+    "//components/adblock/core/configuration:test_support",
     "//components/prefs:test_support",
     "//components/sync_preferences:test_support",
     "//net:test_support",

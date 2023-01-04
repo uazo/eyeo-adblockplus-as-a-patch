@@ -31,7 +31,7 @@ class PreloadedSubscriptionProviderImplTest : public testing::Test {
  public:
   void SetUp() final {
     prefs::RegisterProfilePrefs(pref_service_.registry());
-    pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+    pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
     provider_ =
         std::make_unique<PreloadedSubscriptionProviderImpl>(&pref_service_);
   }
@@ -171,13 +171,13 @@ TEST_F(PreloadedSubscriptionProviderImplTest,
   ASSERT_EQ(preloaded_subscriptions.size(), 3u);
 
   // Disable adblocking globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, false);
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, false);
 
   // No preloaded subscriptions are kept in memory.
   EXPECT_TRUE(provider_->GetCurrentPreloadedSubscriptions().empty());
 
   // Enable adblocking globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
 
   // Previously used preloaded subscriptions are restored.
   const auto restored_preloaded_subscriptions =
@@ -194,7 +194,7 @@ TEST_F(PreloadedSubscriptionProviderImplTest,
   provider_->UpdateSubscriptions({}, {});
 
   // Disable adblocking globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, false);
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, false);
 
   // Update subscriptions while adblocking is disabled.
   const GURL kAcceptableAdsSubscription{
@@ -212,7 +212,7 @@ TEST_F(PreloadedSubscriptionProviderImplTest,
   EXPECT_TRUE(provider_->GetCurrentPreloadedSubscriptions().empty());
 
   // Enable adblocking globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
 
   // The subscriptions set while adblocking was disabled are restored.
   auto restored_preloaded_subscriptions =

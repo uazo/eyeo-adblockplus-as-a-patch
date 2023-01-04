@@ -19,6 +19,7 @@
 
 #include "base/trace_event/trace_event.h"
 #include "components/adblock/core/common/sitekey.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "content/public/browser/navigation_handle.h"
 #include "net/base/url_util.h"
 #include "third_party/blink/public/common/frame/frame_owner_element_type.h"
@@ -32,18 +33,18 @@ void TraceHandleLoadComplete(
 
 AdblockWebContentObserver::AdblockWebContentObserver(
     content::WebContents* web_contents,
-    adblock::AdblockController* controller,
+    adblock::SubscriptionService* subscription_service,
     adblock::ElementHider* element_hider,
     adblock::SitekeyStorage* sitekey_storage,
     std::unique_ptr<adblock::FrameHierarchyBuilder> frame_hierarchy_builder)
     : content::WebContentsObserver(web_contents),
       content::WebContentsUserData<AdblockWebContentObserver>(*web_contents),
-      controller_(controller),
+      subscription_service_(subscription_service),
       element_hider_(element_hider),
       sitekey_storage_(sitekey_storage),
       frame_hierarchy_builder_(std::move(frame_hierarchy_builder)) {}
 
-AdblockWebContentObserver::~AdblockWebContentObserver() {}
+AdblockWebContentObserver::~AdblockWebContentObserver() = default;
 
 void AdblockWebContentObserver::DidFinishNavigation(
     content::NavigationHandle* navigation_handle) {
@@ -80,7 +81,8 @@ void AdblockWebContentObserver::DidFinishNavigation(
 
 void AdblockWebContentObserver::HandleOnLoad(
     content::RenderFrameHost* frame_host) {
-  if (!controller_ || !controller_->IsAdblockEnabled()) {
+  if (!subscription_service_ || subscription_service_->GetStatus() ==
+                                    adblock::FilteringStatus::Inactive) {
     LOG(WARNING) << "[eyeo] Adblocking is disabled, skip apply element hiding.";
     return;
   }

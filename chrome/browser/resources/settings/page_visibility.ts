@@ -13,7 +13,7 @@ import {loadTimeData} from 'chrome://resources/js/load_time_data.m.js';
  */
 export interface PageVisibility {
   a11y?: boolean;
-  adblock?: boolean,
+  adblock?: boolean;
   advancedSettings?: boolean;
   appearance?: boolean|AppearancePageVisibility;
   autofill?: boolean;
