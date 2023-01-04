@@ -40,7 +40,7 @@ class SessionStatsImpl final : public SessionStats,
 
   // ResourceClassificationRunner::Observer:
   void OnAdMatched(const GURL& url,
-                   mojom::FilterMatchResult match_result,
+                   FilterMatchResult match_result,
                    const std::vector<GURL>& parent_frame_urls,
                    ContentType content_type,
                    content::RenderFrameHost* render_frame_host,
@@ -49,13 +49,13 @@ class SessionStatsImpl final : public SessionStats,
                      content::RenderFrameHost* render_frame_host,
                      const GURL& subscription) final;
   void OnPopupMatched(const GURL& url,
-                      mojom::FilterMatchResult match_result,
+                      FilterMatchResult match_result,
                       const GURL& opener_url,
                       content::RenderFrameHost* render_frame_host,
                       const GURL& subscription) final;
 
  private:
-  void OnMatchedInternal(mojom::FilterMatchResult match_result,
+  void OnMatchedInternal(FilterMatchResult match_result,
                          const GURL& subscription);
 
   SEQUENCE_CHECKER(sequence_checker_);

@@ -45,7 +45,7 @@ class AdblockOngoingSubscriptionRequestImplTest
  public:
   void SetUp() final {
     prefs::RegisterProfilePrefs(pref_service_.registry());
-    pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+    pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
     ongoing_request_ = std::make_unique<OngoingSubscriptionRequestImpl>(
         &pref_service_, &kRetryBackoffPolicy, test_shared_url_loader_factory_);
   }
@@ -91,7 +91,7 @@ class AdblockOngoingSubscriptionRequestImplTest
 TEST_P(AdblockOngoingSubscriptionRequestImplTest,
        RequestDeferredUntilAdblockingEnabled) {
   // Initially, adblocking is disabled globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, false);
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, false);
   base::MockCallback<OngoingSubscriptionRequest::ResponseCallback>
       response_callback;
   ongoing_request_->Start(kUrl, GetParam(), response_callback.Get());
@@ -100,7 +100,7 @@ TEST_P(AdblockOngoingSubscriptionRequestImplTest,
   EXPECT_EQ(test_url_loader_factory_.NumPending(), 0);
 
   // Adblocking gets enabled globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
 
   // Download started.
   VerifyRequestSent();
@@ -303,7 +303,7 @@ TEST_P(AdblockOngoingSubscriptionRequestImplTest,
             kRetryBackoffPolicy.initial_delay_ms);
 
   // Adblocking is disabled globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, false);
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, false);
 
   // Fast-forward time until the retry task was scheduled to execute.
   task_environment_.FastForwardBy(
@@ -313,7 +313,7 @@ TEST_P(AdblockOngoingSubscriptionRequestImplTest,
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 0);
 
   // Adblocking is enabled globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
 
   // Request was started.
   VerifyRequestSent();

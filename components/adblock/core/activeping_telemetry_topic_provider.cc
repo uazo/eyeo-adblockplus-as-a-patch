@@ -70,10 +70,12 @@ void AppendStringIfPresent(PrefService* pref_service,
 ActivepingTelemetryTopicProvider::ActivepingTelemetryTopicProvider(
     utils::AppInfo app_info,
     PrefService* pref_service,
+    AdblockController* adblock_controller,
     const GURL& base_url,
     const std::string& auth_token)
     : app_info_(std::move(app_info)),
       pref_service_(pref_service),
+      adblock_controller_(adblock_controller),
       base_url_(base_url),
       auth_token_(auth_token) {}
 
@@ -121,7 +123,7 @@ void ActivepingTelemetryTopicProvider::GetPayload(PayloadCallback callback) {
   payload.SetStringKey("application", app_info_.name);
   payload.SetStringKey("application_version", app_info_.version);
   payload.SetBoolKey("aa_active",
-                     pref_service_->GetBoolean(prefs::kEnableAcceptableAds));
+                     adblock_controller_->IsAcceptableAdsEnabled());
   payload.SetStringKey("platform", base::SysInfo::OperatingSystemName());
   payload.SetStringKey("platform_version",
                        base::SysInfo::OperatingSystemVersion());

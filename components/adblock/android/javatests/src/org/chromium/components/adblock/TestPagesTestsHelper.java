@@ -268,7 +268,7 @@ public class TestPagesTestsHelper {
         }
         Assert.assertNotNull("Test subscription url", mTestSubscriptionUrl);
         TestThreadUtils.runOnUiThreadBlocking(() -> {
-            AdblockController.getInstance().addCustomSubscription(mTestSubscriptionUrl);
+            AdblockController.getInstance().installSubscription(mTestSubscriptionUrl);
         });
         try {
             mHelper.waitForCallback(0, 1, TEST_TIMEOUT_SEC, TimeUnit.SECONDS);

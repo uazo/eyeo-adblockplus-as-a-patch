@@ -176,10 +176,18 @@ public final class AdblockController {
     public static class Subscription {
         private URL mUrl;
         private String mTitle;
+        private String[] mLanguages = {};
 
-        public Subscription(URL url, String title) {
+        public Subscription(final URL url, final String title) {
             this.mUrl = url;
             this.mTitle = title;
+        }
+
+        @CalledByNative("Subscription")
+        public Subscription(final URL url, final String title, final String[] languages) {
+            this.mUrl = url;
+            this.mTitle = title;
+            this.mLanguages = languages;
         }
 
         public String title() {
@@ -190,35 +198,17 @@ public final class AdblockController {
             return mUrl;
         }
 
+        public String[] languages() {
+            return mLanguages;
+        }
+
         @Override
-        public boolean equals(Object object) {
+        public boolean equals(final Object object) {
             if (object == null) return false;
             if (getClass() != object.getClass()) return false;
 
             Subscription other = (Subscription) object;
             return url().equals(other.url());
-        }
-    }
-
-    // Deprecated, ConnectionType will be removed in 109
-    public enum ConnectionType {
-        // All WiFi networks
-        WIFI("wifi"),
-        // Any connection
-        ANY("any");
-
-        private String mValue;
-
-        private ConnectionType(String value) {
-            this.mValue = value;
-        }
-
-        static public ConnectionType fromString(String val) {
-            return ConnectionType.ANY;
-        }
-
-        public String getValue() {
-            return mValue;
         }
     }
 
@@ -255,57 +245,23 @@ public final class AdblockController {
     }
 
     @UiThread
-    @Deprecated
-    public ConnectionType getAllowedConnectionType() {
-        Log.w(TAG,
-                "[eyeo] AllowedConnectionType is not supported "
-                        + "anymore, downloads are allowed anytime. "
-                        + "getAllowedConnectionType will be removed "
-                        + "in version 109.");
-        return ConnectionType.ANY;
-    }
-
-    @UiThread
-    @Deprecated
-    public void setAllowedConnectionType(ConnectionType type) {
-        Log.w(TAG,
-                "[eyeo] AllowedConnectionType is not supported "
-                        + "anymore, downloads are allowed anytime. "
-                        + "setAllowedConnectionType will be removed "
-                        + "in version 109.");
-    }
-
-    @UiThread
     public List<Subscription> getRecommendedSubscriptions(Context context) {
-        if (mRecommendedSubscriptions.isEmpty()) {
-            final Map<String, String> localeToTitle = getLocaleToTitleMap(context);
-            String[] recommendedSubscriptions =
-                    AdblockControllerJni.get().getRecommendedSubscriptions();
-            for (String subscription : recommendedSubscriptions) {
-                String title = null;
-                String languages = AdblockControllerJni.get().getRecommendedSubscriptionLanguages(
-                        subscription);
-                if (languages != null && !languages.isEmpty()) {
-                    final String[] separatedLanguages = languages.split(",");
-                    for (String language : separatedLanguages) {
-                        title = localeToTitle.get(language);
-                        if (title != null && !title.isEmpty()) break;
-                    }
-                }
-                title = title != null
-                        ? title
-                        : AdblockControllerJni.get().getRecommendedSubscriptionTitle(subscription);
-                try {
-                    Subscription s =
-                            new Subscription(new URL(URLUtil.guessUrl(subscription)), title);
-                    mRecommendedSubscriptions.add(s);
-                } catch (MalformedURLException e) {
-                    Log.e(TAG, "Error parsing url: " + subscription);
+        final List<Subscription> recommendedSubscriptions =
+                (List<Subscription>) (List<?>) Arrays.asList(
+                        AdblockControllerJni.get().getRecommendedSubscriptions());
+        final Map<String, String> localeToTitle = getLocaleToTitleMap(context);
+        for (int i = 0; i < recommendedSubscriptions.size(); ++i) {
+            for (final String language : recommendedSubscriptions.get(i).languages()) {
+                final String title = localeToTitle.get(language);
+                if (title != null && !title.isEmpty()) {
+                    recommendedSubscriptions.set(i,
+                            new Subscription(recommendedSubscriptions.get(i).url(), title,
+                                    recommendedSubscriptions.get(i).languages()));
+                    break;
                 }
             }
         }
-
-        return mRecommendedSubscriptions;
+        return recommendedSubscriptions;
     }
 
     @UiThread
@@ -314,16 +270,34 @@ public final class AdblockController {
     }
 
     @UiThread
+    /**
+     * @deprecated
+     * This method will be removed in version 111.
+     * <p> Use {@link AdblockController#installSubscription(URL)} instead.
+     */
+    @Deprecated
     public void selectSubscription(final Subscription subscription) {
         AdblockControllerJni.get().selectSubscription(subscription.url().toString());
     }
 
     @UiThread
+    /**
+     * @deprecated
+     * This method will be removed in version 111.
+     * <p> Use {@link AdblockController#uninstallSubscription(URL)} instead.
+     */
+    @Deprecated
     public void unselectSubscription(final Subscription subscription) {
         AdblockControllerJni.get().unselectSubscription(subscription.url().toString());
     }
 
     @UiThread
+    /**
+     * @deprecated
+     * This method will be removed in version 111.
+     * <p> Use {@link AdblockController#getInstalledSubscriptions()} instead.
+     */
+    @Deprecated
     public List<Subscription> getSelectedSubscriptions() {
         String[] selectedSubscriptions = AdblockControllerJni.get().getSelectedSubscriptions();
 
@@ -352,16 +326,50 @@ public final class AdblockController {
     }
 
     @UiThread
+    public void installSubscription(final URL url) {
+        AdblockControllerJni.get().installSubscription(url.toString());
+    }
+
+    @UiThread
+    public void uninstallSubscription(final URL url) {
+        AdblockControllerJni.get().uninstallSubscription(url.toString());
+    }
+
+    @UiThread
+    public List<Subscription> getInstalledSubscriptions() {
+        return (List<Subscription>) (List<?>) Arrays.asList(
+                AdblockControllerJni.get().getInstalledSubscriptions());
+    }
+
+    @UiThread
+    /**
+     * @deprecated
+     * This method will be removed in version 111.
+     * <p> Use {@link AdblockController#installSubscription(URL)} instead.
+     */
+    @Deprecated
     public void addCustomSubscription(final URL url) {
         AdblockControllerJni.get().addCustomSubscription(url.toString());
     }
 
     @UiThread
+    /**
+     * @deprecated
+     * This method will be removed in version 111.
+     * <p> Use {@link AdblockController#uninstallSubscription(URL)} instead.
+     */
+    @Deprecated
     public void removeCustomSubscription(final URL url) {
         AdblockControllerJni.get().removeCustomSubscription(url.toString());
     }
 
     @UiThread
+    /**
+     * @deprecated
+     * This method will be removed in version 111.
+     * <p> Use {@link AdblockController#getInstalledSubscriptions()} instead.
+     */
+    @Deprecated
     public List<URL> getCustomSubscriptions() {
         String[] subscriptions = AdblockControllerJni.get().getCustomSubscriptions();
         return transform(subscriptions);
@@ -452,16 +460,6 @@ public final class AdblockController {
             }
         }
 
-        return result;
-    }
-
-    private String[] transform(List<URL> urls) {
-        if (urls == null) return null;
-
-        String[] result = new String[urls.size()];
-        for (int i = 0; i < urls.size(); ++i) {
-            result[i] = urls.get(i).toString();
-        }
         return result;
     }
 
@@ -559,6 +557,9 @@ public final class AdblockController {
         void setAdblockEnabled(boolean aa_enabled);
         boolean isAcceptableAdsEnabled();
         void setAcceptableAdsEnabled(boolean aa_enabled);
+        void installSubscription(String url);
+        Object[] getInstalledSubscriptions();
+        void uninstallSubscription(String url);
         void selectSubscription(String url);
         String[] getSelectedSubscriptions();
         void unselectSubscription(String url);
@@ -568,9 +569,7 @@ public final class AdblockController {
         void addAllowedDomain(String domain);
         void removeAllowedDomain(String domain);
         String[] getAllowedDomains();
-        String[] getRecommendedSubscriptions();
-        String getRecommendedSubscriptionTitle(String subscription);
-        String getRecommendedSubscriptionLanguages(String subscription);
+        Object[] getRecommendedSubscriptions();
         String getSelectedSubscriptionVersion(String subscription);
         void composeFilterSuggestions(
                 AdblockElement element, AdblockComposeFilterSuggestionsCallback callback);

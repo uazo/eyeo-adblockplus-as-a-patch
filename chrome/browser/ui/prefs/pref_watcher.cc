@@ -70,12 +70,12 @@ const char* const kWebPrefsToObserve[] = {
     prefs::kAccessibilityFocusHighlightEnabled,
 #endif
 
-    adblock::prefs::kAdblockAllowedDomains,
-    adblock::prefs::kAdblockCustomFilters,
-    adblock::prefs::kAdblockCustomSubscriptions,
-    adblock::prefs::kAdblockSubscriptions,
-    adblock::prefs::kEnableAcceptableAds,
-    adblock::prefs::kEnableAdblock,
+    adblock::prefs::kAdblockAllowedDomainsLegacy,
+    adblock::prefs::kAdblockCustomFiltersLegacy,
+    adblock::prefs::kAdblockCustomSubscriptionsLegacy,
+    adblock::prefs::kAdblockSubscriptionsLegacy,
+    adblock::prefs::kEnableAcceptableAdsLegacy,
+    adblock::prefs::kEnableAdblockLegacy,
 
 };
 

@@ -27,24 +27,28 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/string_piece_forward.h"
+#include "base/test/gmock_callback_support.h"
+#include "base/test/gmock_move_support.h"
 #include "base/test/mock_callback.h"
 #include "base/test/task_environment.h"
 #include "components/adblock/core/common/adblock_constants.h"
-#include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/common/flatbuffer_data.h"
 #include "components/adblock/core/common/header_filter_data.h"
 #include "components/adblock/core/common/sitekey.h"
+#include "components/adblock/core/configuration/fake_filtering_configuration.h"
 #include "components/adblock/core/converter/converter.h"
 #include "components/adblock/core/subscription/installed_subscription.h"
 #include "components/adblock/core/subscription/subscription_config.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "components/adblock/core/subscription/test/mock_subscription.h"
 #include "components/adblock/core/subscription/test/mock_subscription_downloader.h"
 #include "components/adblock/core/subscription/test/mock_subscription_persistent_metadata.h"
-#include "components/prefs/testing_pref_service.h"
+#include "components/adblock/core/subscription/test/mock_subscription_updater.h"
 #include "gmock/gmock.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 
 namespace adblock {
@@ -178,14 +182,19 @@ class MockPreloadedSubscriptionProvider
               (override, const));
 };
 
+class MockObserver : public SubscriptionService::SubscriptionObserver {
+ public:
+  MOCK_METHOD(void,
+              OnSubscriptionInstalled,
+              (const GURL& subscription_url),
+              (override));
+};
+
 }  // namespace
 
 class AdblockSubscriptionServiceImplTest : public testing::Test {
  public:
   AdblockSubscriptionServiceImplTest() {
-    prefs::RegisterProfilePrefs(pref_service_.registry());
-    // Set adblock disabled as default
-    pref_service_.SetBoolean(prefs::kEnableAdblock, false);
     auto storage = std::make_unique<FakePersistentStorage>();
     storage_ = storage.get();
     auto downloader = std::make_unique<MockSubscriptionDownloader>();
@@ -193,14 +202,21 @@ class AdblockSubscriptionServiceImplTest : public testing::Test {
     auto preloaded_subscription_provider =
         std::make_unique<MockPreloadedSubscriptionProvider>();
     preloaded_subscription_provider_ = preloaded_subscription_provider.get();
+    auto updater = std::make_unique<MockSubscriptionUpdater>();
+    updater_ = updater.get();
 
     service_ = std::make_unique<SubscriptionServiceImpl>(
-        &pref_service_, std::move(storage), std::move(downloader),
-        std::move(preloaded_subscription_provider),
+        std::move(storage), std::move(downloader),
+        std::move(preloaded_subscription_provider), std::move(updater),
         base::BindRepeating(
             &AdblockSubscriptionServiceImplTest::CreateCustomSubscription,
             base::Unretained(this)),
         &persistent_metadata_);
+    service_->AddObserver(&observer_);
+  }
+
+  ~AdblockSubscriptionServiceImplTest() override {
+    service_->RemoveObserver(&observer_);
   }
 
   scoped_refptr<InstalledSubscription> CreateCustomSubscription(
@@ -208,13 +224,28 @@ class AdblockSubscriptionServiceImplTest : public testing::Test {
     return base::MakeRefCounted<FakeSubscription>(CustomFiltersUrl().spec());
   }
 
+  FakeFilteringConfiguration* InstallFilteringConfiguration(
+      std::vector<scoped_refptr<InstalledSubscription>>
+          demanded_subscriptions) {
+    auto filtering_configuration =
+        std::make_unique<FakeFilteringConfiguration>();
+    filtering_configuration_ = filtering_configuration.get();
+    for (auto& sub : demanded_subscriptions)
+      filtering_configuration_->AddFilterList(sub->GetSourceUrl());
+    service_->InstallFilteringConfiguration(std::move(filtering_configuration));
+    return filtering_configuration_;
+  }
+
   void AddSubscription(
       scoped_refptr<InstalledSubscription> subscription,
       SubscriptionDownloader::RetryPolicy expected_retry_policy =
           SubscriptionDownloader::RetryPolicy::RetryUntilSucceeded) {
+    DCHECK(filtering_configuration_)
+        << "Call InstallFilteringConfiguration() first";
+    const auto url = subscription->GetSourceUrl();
     // The downloader will be called to fetch the raw_data for subscription.
-    EXPECT_CALL(*downloader_, StartDownload(subscription->GetSourceUrl(),
-                                            expected_retry_policy, testing::_))
+    EXPECT_CALL(*downloader_,
+                StartDownload(url, expected_retry_policy, testing::_))
         .WillOnce([](const GURL&, SubscriptionDownloader::RetryPolicy,
                      base::OnceCallback<void(std::unique_ptr<FlatbufferData>)>
                          callback) {
@@ -222,34 +253,33 @@ class AdblockSubscriptionServiceImplTest : public testing::Test {
           // buffer, simulating a successful download.
           std::move(callback).Run(std::make_unique<FakeBuffer>());
         });
-    // DownloadAndInstallSubscription gets called.
-    base::MockCallback<SubscriptionService::InstallationCallback> on_finished;
-    service_->DownloadAndInstallSubscription(subscription->GetSourceUrl(),
-                                             on_finished.Get());
+    filtering_configuration_->AddFilterList(url);
+
     // Storage was asked to store the buffer provided by downloader.
     ASSERT_EQ(storage_->store_subscription_calls_.size(), 1u);
     EXPECT_TRUE(storage_->store_subscription_calls_[0].first);
     // Storage runs the callback provided by SubscriptionService to indicate
-    // store succeeded. This triggers the final InstallationCallback to run with
-    // a successful result.
-    EXPECT_CALL(on_finished, Run(true));
+    // store succeeded. This triggers the SubscriptionObserver.
+    EXPECT_CALL(observer_, OnSubscriptionInstalled(url));
     std::move(storage_->store_subscription_calls_[0].second).Run(subscription);
     storage_->store_subscription_calls_.clear();
   }
 
   void RemoveSubscription(scoped_refptr<FakeSubscription> subscription) {
+    DCHECK(filtering_configuration_)
+        << "Call InstallFilteringConfiguration() first";
     // Simulates a single call to UninstallSubscription that forwards the
     // subscription to storage_ for removal.
     EXPECT_CALL(persistent_metadata_,
                 RemoveMetadata(subscription->GetSourceUrl()));
-    service_->UninstallSubscription(subscription->GetSourceUrl());
+    filtering_configuration_->RemoveFilterList(subscription->GetSourceUrl());
     ASSERT_EQ(storage_->remove_subscription_calls_.size(), 1u);
     EXPECT_EQ(storage_->remove_subscription_calls_[0], subscription);
     storage_->remove_subscription_calls_.clear();
   }
 
   void InitializeServiceWithNoSubscriptions() {
-    pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+    InstallFilteringConfiguration({});
     std::move(storage_->on_initialized_).Run({});
   }
 
@@ -257,22 +287,30 @@ class AdblockSubscriptionServiceImplTest : public testing::Test {
   const GURL kParentUrl{"https://domain.com"};
   const SiteKey kSitekey{"abc"};
 
+  FakeFilteringConfiguration* filtering_configuration_;
   FakePersistentStorage* storage_;
   MockPreloadedSubscriptionProvider* preloaded_subscription_provider_;
+  MockSubscriptionUpdater* updater_;
   MockSubscriptionDownloader* downloader_;
   MockSubscriptionPersistentMetadata persistent_metadata_;
   base::test::TaskEnvironment task_environment_;
-  TestingPrefServiceSimple pref_service_;
+  MockObserver observer_;
   std::unique_ptr<SubscriptionServiceImpl> service_;
 };
 
-TEST_F(AdblockSubscriptionServiceImplTest, InitializationScheduledImmediately) {
-  // Adblocking is enabled by default
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+TEST_F(AdblockSubscriptionServiceImplTest,
+       InitializationAfterInstallingFilteringConfiguration) {
+  std::vector<scoped_refptr<InstalledSubscription>> initial_subscriptions = {
+      base::MakeRefCounted<FakeSubscription>("fake_subscription1"),
+      base::MakeRefCounted<FakeSubscription>("fake_subscription2")};
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Inactive);
+  // Install a FilteringConfiguration which triggers initialization.
+  InstallFilteringConfiguration(initial_subscriptions);
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Initializing);
   // Service has called Initialize() on persistent storage.
   ASSERT_TRUE(storage_->on_initialized_);
   // Service is not initialized until storage finishes initialization.
-  EXPECT_FALSE(service_->IsInitialized());
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Initializing);
   // Tasks can be scheduled to execute after initialization.
   testing::InSequence seq;
   base::MockOnceClosure task1;
@@ -283,43 +321,55 @@ TEST_F(AdblockSubscriptionServiceImplTest, InitializationScheduledImmediately) {
   service_->RunWhenInitialized(task2.Get());
 
   // Storage completes initialization, loads two subscriptions.
-  auto fake_subscription1 =
-      base::MakeRefCounted<FakeSubscription>("fake_subscription1");
-  auto fake_subscription2 =
-      base::MakeRefCounted<FakeSubscription>("fake_subscription2");
-  std::move(storage_->on_initialized_)
-      .Run({fake_subscription1, fake_subscription2});
+  std::move(storage_->on_initialized_).Run(initial_subscriptions);
 
   // Service is now initialized:
-  EXPECT_TRUE(service_->IsInitialized());
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Active);
   // The subscriptions provided by storage are visible.
-  EXPECT_THAT(
-      service_->GetCurrentSubscriptions(),
-      testing::UnorderedElementsAre(fake_subscription1, fake_subscription2));
+  EXPECT_THAT(service_->GetCurrentSubscriptions(filtering_configuration_),
+              testing::UnorderedElementsAre(initial_subscriptions[0],
+                                            initial_subscriptions[1]));
 }
 
-TEST_F(
-    AdblockSubscriptionServiceImplTest,
-    SubscriptionServiceGetsInitializedWhenEnablingAdblockingForTheFirstTime) {
+TEST_F(AdblockSubscriptionServiceImplTest,
+       NoInitializationUntilConfigurationEnabled) {
   // Service is not initialized:
-  EXPECT_FALSE(service_->IsInitialized());
-  // Subscriptions get loaded when the service gets initialized
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Inactive);
+
+  // Initially the configuration is disabled. We expect no initialization.
+  EXPECT_CALL(*storage_, MockLoadSubscriptions()).Times(0);
+
+  auto filtering_configuration = std::make_unique<FakeFilteringConfiguration>();
+  filtering_configuration->is_enabled = false;
+  filtering_configuration_ = filtering_configuration.get();
+
+  service_->InstallFilteringConfiguration(std::move(filtering_configuration));
+  // Service is still not initialized:
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Inactive);
+
+  // Configuration becomes enabled, this triggers initialization.
   EXPECT_CALL(*storage_, MockLoadSubscriptions()).Times(1);
-  // Enabled adblocking.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  filtering_configuration_->SetEnabled(true);
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Initializing);
+
   std::move(storage_->on_initialized_).Run({});
   // Service is now initialized:
-  EXPECT_TRUE(service_->IsInitialized());
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Active);
 }
 
 TEST_F(AdblockSubscriptionServiceImplTest, SubscriptionsGetLoadedOnlyOnce) {
+  // TODO(mpawlowski) this test precludes optimizing memory usage by forcing
+  // keeping loaded subscriptions allocated while configuration is disabled.
+
   // Storage has no initial subscriptions:
   InitializeServiceWithNoSubscriptions();
-  // Subscriptions should not be reloaded when re-enabling adblock.
+  // Subscriptions should not be reloaded when re-enabling configuration.
   EXPECT_CALL(*storage_, MockLoadSubscriptions()).Times(0);
-  // Toggle adblock enabled:
-  pref_service_.SetBoolean(prefs::kEnableAdblock, false);
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  // Toggle enabled state:
+  filtering_configuration_->SetEnabled(false);
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Inactive);
+  filtering_configuration_->SetEnabled(true);
+  EXPECT_EQ(service_->GetStatus(), FilteringStatus::Active);
 }
 
 TEST_F(AdblockSubscriptionServiceImplTest, AddSubscription) {
@@ -333,15 +383,15 @@ TEST_F(AdblockSubscriptionServiceImplTest, AddSubscription) {
   AddSubscription(fake_subscription1);
 
   // Added subscription is reflected in |GetCurrentSubscriptions|.
-  EXPECT_THAT(service_->GetCurrentSubscriptions(),
+  EXPECT_THAT(service_->GetCurrentSubscriptions(filtering_configuration_),
               testing::ElementsAre(fake_subscription1));
 
-  // The snapshot is a SubscriptionCollection that queries the added
+  // The snapshot has a SubscriptionCollection that queries the added
   // subscription. We can check whether FakeSubscription's title appears in
   // Elemhide selectors.
-  auto subscription_collection = service_->GetCurrentSnapshot();
-  auto selectors =
-      subscription_collection->GetElementHideSelectors(GURL(), {}, SiteKey());
+  auto snapshot = service_->GetCurrentSnapshot();
+  ASSERT_EQ(snapshot.size(), 1u);
+  auto selectors = snapshot[0]->GetElementHideSelectors(GURL(), {}, SiteKey());
   EXPECT_THAT(selectors, testing::ElementsAre(fake_subscription1->GetTitle()));
 }
 
@@ -365,15 +415,15 @@ TEST_F(AdblockSubscriptionServiceImplTest,
 
   // Two remaining subscription are reflected in |GetInstalledSubscriptions|.
   EXPECT_THAT(
-      service_->GetCurrentSubscriptions(),
+      service_->GetCurrentSubscriptions(filtering_configuration_),
       testing::UnorderedElementsAre(fake_subscription1, fake_subscription3));
 
-  // The snapshot is a SubscriptionCollection that queries the remaining
+  // The snapshot has a SubscriptionCollection that queries the remaining
   // subscriptions. We can check whether FakeSubscription's title appears in
   // Elemhide selectors.
-  auto subscription_collection = service_->GetCurrentSnapshot();
-  auto selectors =
-      subscription_collection->GetElementHideSelectors(GURL(), {}, SiteKey());
+  auto snapshot = service_->GetCurrentSnapshot();
+  ASSERT_EQ(snapshot.size(), 1u);
+  auto selectors = snapshot[0]->GetElementHideSelectors(GURL(), {}, SiteKey());
   EXPECT_THAT(selectors,
               testing::UnorderedElementsAre(fake_subscription1->GetTitle(),
                                             fake_subscription3->GetTitle()));
@@ -388,7 +438,7 @@ TEST_F(AdblockSubscriptionServiceImplTest,
   AddSubscription(fake_subscription1);
 
   // Take snapshot now.
-  auto subscription_collection = service_->GetCurrentSnapshot();
+  auto snapshot = service_->GetCurrentSnapshot();
 
   // Add new subscription after snapshot.
   auto fake_subscription2 =
@@ -396,8 +446,8 @@ TEST_F(AdblockSubscriptionServiceImplTest,
   AddSubscription(fake_subscription2);
 
   // Snapshot only contains the first subscription.
-  auto selectors =
-      subscription_collection->GetElementHideSelectors(GURL(), {}, SiteKey());
+  ASSERT_EQ(snapshot.size(), 1u);
+  auto selectors = snapshot[0]->GetElementHideSelectors(GURL(), {}, SiteKey());
   EXPECT_THAT(selectors,
               testing::UnorderedElementsAre(fake_subscription1->GetTitle()));
 }
@@ -412,55 +462,112 @@ TEST_F(AdblockSubscriptionServiceImplTest, SnapshotNotAffectedByFutureRemoval) {
   AddSubscription(fake_subscription2);
 
   // Take snapshot now.
-  auto subscription_collection = service_->GetCurrentSnapshot();
+  auto snapshot = service_->GetCurrentSnapshot();
 
   // Remove second subscription.
   RemoveSubscription(fake_subscription2);
 
   // Snapshot still contains both subscriptions.
-  auto selectors =
-      subscription_collection->GetElementHideSelectors(GURL(), {}, SiteKey());
+  ASSERT_EQ(snapshot.size(), 1u);
+  auto selectors = snapshot[0]->GetElementHideSelectors(GURL(), {}, SiteKey());
   EXPECT_THAT(selectors,
               testing::UnorderedElementsAre(fake_subscription1->GetTitle(),
                                             fake_subscription2->GetTitle()));
 }
 
 TEST_F(AdblockSubscriptionServiceImplTest, UpgradeExistingSubscription) {
+  // Capture the callback that SubscriptionService reports as its
+  // run_update_check callback.
+  base::RepeatingClosure run_update_check;
+  EXPECT_CALL(*updater_, StartSchedule(_))
+      .WillOnce(testing::SaveArg<0>(&run_update_check));
+
   InitializeServiceWithNoSubscriptions();
-  auto existing_subscription =
-      base::MakeRefCounted<FakeSubscription>("subscription");
-  AddSubscription(existing_subscription);
+  auto expired_subscription =
+      base::MakeRefCounted<FakeSubscription>("expired_subscription");
+  auto young_subscription =
+      base::MakeRefCounted<FakeSubscription>("young_subscription");
+  AddSubscription(expired_subscription);
+  AddSubscription(young_subscription);
 
-  auto upgraded_subscription =
-      base::MakeRefCounted<FakeSubscription>("subscription");
-  // Upgraded subscription has the same URL as |existing_subscription|.
-  ASSERT_EQ(existing_subscription->GetSourceUrl(),
-            upgraded_subscription->GetSourceUrl());
-  // The request to download the new subscription will have a current version of
-  // the existing subscription.
-  AddSubscription(upgraded_subscription,
-                  SubscriptionDownloader::RetryPolicy::DoNotRetry);
+  // Pretend one of the subscriptions expired.
+  EXPECT_CALL(persistent_metadata_,
+              IsExpired(expired_subscription->GetSourceUrl()))
+      .WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(persistent_metadata_,
+              IsExpired(young_subscription->GetSourceUrl()))
+      .WillRepeatedly(testing::Return(false));
+  // Even though Acceptable Ads is not installed, its expiration will be checked
+  // to make a HEAD request if needed.
+  EXPECT_CALL(persistent_metadata_, IsExpired(AcceptableAdsUrl()))
+      .WillRepeatedly(testing::Return(false));
 
-  // Service noticed we're updating an existing subscription, it uninstalls
-  // the old version.
-  ASSERT_EQ(storage_->remove_subscription_calls_.size(), 1u);
-  EXPECT_EQ(storage_->remove_subscription_calls_[0], existing_subscription);
+  // Expect that the expired subscription will be re-downloaded.
+  EXPECT_CALL(*downloader_,
+              StartDownload(expired_subscription->GetSourceUrl(),
+                            SubscriptionDownloader::RetryPolicy::DoNotRetry,
+                            testing::_))
+      .WillOnce(base::test::RunOnceCallback<2>(std::make_unique<FakeBuffer>()));
 
-  // Current subscriptions contains only one URL.
-  EXPECT_THAT(service_->GetCurrentSubscriptions(),
-              testing::UnorderedElementsAre(upgraded_subscription));
+  // The young subscription will not be re-downloaded.
+  EXPECT_CALL(*downloader_, StartDownload(young_subscription->GetSourceUrl(),
+                                          testing::_, testing::_))
+      .Times(0);
 
-  // Selectors returned by snapshot contain entry from only one subscription
-  // (it would be duplicated if both subscriptions were present).
-  const auto subscription_collection = service_->GetCurrentSnapshot();
-  const auto selectors =
-      subscription_collection->GetElementHideSelectors(GURL(), {}, SiteKey());
-  EXPECT_EQ(selectors, std::vector<base::StringPiece>{"subscription"});
+  run_update_check.Run();
+
+  // In a second run, even though |expired_subscription| might be marked as
+  // expired by persistent_metadata_, there will be no new download since one is
+  // already under way.
+  EXPECT_CALL(*downloader_, StartDownload(expired_subscription->GetSourceUrl(),
+                                          testing::_, testing::_))
+      .Times(0);
+  run_update_check.Run();
+}
+
+TEST_F(AdblockSubscriptionServiceImplTest, UpdatePingStoresAAversion) {
+  // Capture the callback that SubscriptionService reports as its
+  // run_update_check callback.
+  base::RepeatingClosure run_update_check;
+  EXPECT_CALL(*updater_, StartSchedule(_))
+      .WillOnce(testing::SaveArg<0>(&run_update_check));
+  const std::string version("202107210821");
+
+  InitializeServiceWithNoSubscriptions();
+
+  // Once the update check runs, even though Acceptable Ads is not installed,
+  // pretend its expired. This will trigger a HEAD request.
+  EXPECT_CALL(persistent_metadata_, IsExpired(AcceptableAdsUrl()))
+      .WillRepeatedly(testing::Return(true));
+
+  SubscriptionDownloader::HeadRequestCallback download_completed_callback;
+  EXPECT_CALL(*downloader_, DoHeadRequest(AcceptableAdsUrl(), testing::_))
+      .WillOnce(MoveArg<1>(&download_completed_callback));
+
+  run_update_check.Run();
+
+  // When the HEAD request finishes, the service will store the parsed version
+  // and the expiration interval.
+  EXPECT_CALL(persistent_metadata_, SetVersion(AcceptableAdsUrl(), version));
+  // The next ping should happen in a day.
+  EXPECT_CALL(persistent_metadata_,
+              SetExpirationInterval(AcceptableAdsUrl(), base::Days(1)));
+  std::move(download_completed_callback).Run(version);
+}
+
+TEST_F(AdblockSubscriptionServiceImplTest,
+       UpdateScheduleStoppedWhenFilteringDisabled) {
+  EXPECT_CALL(*updater_, StartSchedule(_));
+  InitializeServiceWithNoSubscriptions();
+
+  EXPECT_CALL(*updater_, StopSchedule());
+  filtering_configuration_->SetEnabled(false);
+
+  EXPECT_CALL(*updater_, StartSchedule(_));
+  filtering_configuration_->SetEnabled(true);
 }
 
 TEST_F(AdblockSubscriptionServiceImplTest, RemoveDuplicatesDuringInitialLoad) {
-  // Adblocking is enabled by default
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
   // Storage returns 3 subscriptions in initial load, however there is a
   // duplicate, due to a race condition or corruption.
   auto fake_subscription1 =
@@ -471,6 +578,8 @@ TEST_F(AdblockSubscriptionServiceImplTest, RemoveDuplicatesDuringInitialLoad) {
       base::MakeRefCounted<FakeSubscription>("subscription");
   ASSERT_EQ(fake_subscription1->GetSourceUrl(),
             fake_subscription3->GetSourceUrl());
+
+  InstallFilteringConfiguration({fake_subscription1, fake_subscription2});
 
   std::move(storage_->on_initialized_)
       .Run({fake_subscription1, fake_subscription2, fake_subscription3});
@@ -483,18 +592,20 @@ TEST_F(AdblockSubscriptionServiceImplTest, RemoveDuplicatesDuringInitialLoad) {
 
   // Installed subscriptions do not contain duplicates.
   std::vector<GURL> current_subscriptions_urls;
-  base::ranges::transform(service_->GetCurrentSubscriptions(),
-                          std::back_inserter(current_subscriptions_urls),
-                          [](const auto& sub) { return sub->GetSourceUrl(); });
+  base::ranges::transform(
+      service_->GetCurrentSubscriptions(filtering_configuration_),
+      std::back_inserter(current_subscriptions_urls),
+      [](const auto& sub) { return sub->GetSourceUrl(); });
   EXPECT_THAT(
       current_subscriptions_urls,
       testing::UnorderedElementsAre(fake_subscription1->GetSourceUrl(),
                                     fake_subscription2->GetSourceUrl()));
 
   // Selectors returned by snapshot do not contain duplicates.
-  const auto subscription_collection = service_->GetCurrentSnapshot();
+  const auto snapshot = service_->GetCurrentSnapshot();
+  ASSERT_EQ(snapshot.size(), 1u);
   const auto selectors =
-      subscription_collection->GetElementHideSelectors(GURL(), {}, SiteKey());
+      snapshot[0]->GetElementHideSelectors(GURL(), {}, SiteKey());
   EXPECT_EQ(selectors.size(), 2u);
   EXPECT_THAT(selectors,
               testing::UnorderedElementsAre(fake_subscription1->GetTitle(),
@@ -530,33 +641,34 @@ TEST_F(AdblockSubscriptionServiceImplTest,
               preloaded_subscription}));
 
   // Start installation.
-  base::MockCallback<SubscriptionService::InstallationCallback> on_finished;
-  service_->DownloadAndInstallSubscription(url, on_finished.Get());
+  filtering_configuration_->AddFilterList(url);
 
   // We should see the preloaded fallback in GetCurrentSubscriptions().
-  EXPECT_THAT(service_->GetCurrentSubscriptions(),
+  EXPECT_THAT(service_->GetCurrentSubscriptions(filtering_configuration_),
               testing::UnorderedElementsAre(preloaded_subscription));
 
   // We now uninstall the subscription, this should cancel the download.
-  // The installation callback is notified with a failure indication.
-  EXPECT_CALL(on_finished, Run(false));
+  // The observer is never notified about success.
+  EXPECT_CALL(observer_, OnSubscriptionInstalled(testing::_)).Times(0);
   // The downloader is told to cancel the download.
   EXPECT_CALL(*downloader_, CancelDownload(url));
-  service_->UninstallSubscription(url);
+  filtering_configuration_->RemoveFilterList(url);
 
   // The subscription is no longer listed.
   EXPECT_CALL(*preloaded_subscription_provider_,
               GetCurrentPreloadedSubscriptions())
       .WillRepeatedly(
           testing::Return(std::vector<scoped_refptr<InstalledSubscription>>{}));
-  EXPECT_TRUE(service_->GetCurrentSubscriptions().empty());
+  EXPECT_TRUE(
+      service_->GetCurrentSubscriptions(filtering_configuration_).empty());
 
   // Even when the download callback delivers the FakeBuffer, it will not
   // be sent to storage.
   std::move(download_completed_callback).Run(std::make_unique<FakeBuffer>());
   // There are no attempts to store the buffer received from Downloader.
   EXPECT_TRUE(storage_->store_subscription_calls_.empty());
-  EXPECT_TRUE(service_->GetCurrentSubscriptions().empty());
+  EXPECT_TRUE(
+      service_->GetCurrentSubscriptions(filtering_configuration_).empty());
 }
 
 TEST_F(AdblockSubscriptionServiceImplTest,
@@ -583,27 +695,28 @@ TEST_F(AdblockSubscriptionServiceImplTest,
           });
 
   // Start installation.
-  base::MockCallback<SubscriptionService::InstallationCallback> on_finished;
-  service_->DownloadAndInstallSubscription(url, on_finished.Get());
+  filtering_configuration_->AddFilterList(url);
 
   // The downloader immediately returned a FakeBuffer, it should have been sent
   // to storage.
   ASSERT_EQ(storage_->store_subscription_calls_.size(), 1u);
 
   // We should see the ongoing installation in GetCurrentSubscriptions().
-  const auto current_subscriptions = service_->GetCurrentSubscriptions();
+  const auto current_subscriptions =
+      service_->GetCurrentSubscriptions(filtering_configuration_);
   ASSERT_EQ(current_subscriptions.size(), 1u);
   EXPECT_EQ(current_subscriptions[0]->GetSourceUrl(), url);
   EXPECT_EQ(current_subscriptions[0]->GetInstallationState(),
             Subscription::InstallationState::Installing);
 
   // We now uninstall the subscription, this should cancel the installation.
-  // The installation callback is notified with a failure indication.
-  EXPECT_CALL(on_finished, Run(false));
-  service_->UninstallSubscription(url);
+  // The observer is never notified about success.
+  EXPECT_CALL(observer_, OnSubscriptionInstalled(testing::_)).Times(0);
+  filtering_configuration_->RemoveFilterList(url);
 
   // The subscription is no longer listed.
-  EXPECT_TRUE(service_->GetCurrentSubscriptions().empty());
+  EXPECT_TRUE(
+      service_->GetCurrentSubscriptions(filtering_configuration_).empty());
 
   // Even when the storage callback delivers the Subscription, it will not
   // be installed in SubscriptionService.
@@ -614,7 +727,8 @@ TEST_F(AdblockSubscriptionServiceImplTest,
   ASSERT_EQ(storage_->remove_subscription_calls_.size(), 1u);
   EXPECT_EQ(storage_->remove_subscription_calls_[0], fake_subscription1);
 
-  EXPECT_TRUE(service_->GetCurrentSubscriptions().empty());
+  EXPECT_TRUE(
+      service_->GetCurrentSubscriptions(filtering_configuration_).empty());
 }
 
 TEST_F(AdblockSubscriptionServiceImplTest, CustomFilterIsAdded) {
@@ -622,43 +736,20 @@ TEST_F(AdblockSubscriptionServiceImplTest, CustomFilterIsAdded) {
       base::MakeRefCounted<FakeSubscription>("subscription");
   InitializeServiceWithNoSubscriptions();
   AddSubscription(fake_subscription1);
-  std::vector<std::string> filters{"test"};
-  service_->SetCustomFilters(filters);
+  filtering_configuration_->AddCustomFilter("test");
 
   // The in-memory subscription containing the custom filter is not reported
   // among current subscriptions, only the subscription added by client is.
-  EXPECT_THAT(service_->GetCurrentSubscriptions(),
+  EXPECT_THAT(service_->GetCurrentSubscriptions(filtering_configuration_),
               testing::UnorderedElementsAre(fake_subscription1));
 
   // However, the SubscriptionCollection *does* get the custom filter
   // subscription.
-  auto subscription_collection = service_->GetCurrentSnapshot();
-  auto selectors =
-      subscription_collection->GetElementHideSelectors(GURL(), {}, SiteKey());
+  auto snapshot = service_->GetCurrentSnapshot();
+  ASSERT_EQ(snapshot.size(), 1u);
+  auto selectors = snapshot[0]->GetElementHideSelectors(GURL(), {}, SiteKey());
   EXPECT_THAT(selectors, testing::UnorderedElementsAre(
                              CustomFiltersUrl().spec(), "subscription"));
-}
-
-TEST_F(AdblockSubscriptionServiceImplTest, PingStoresAAversion) {
-  const std::string version("202107210821");
-
-  InitializeServiceWithNoSubscriptions();
-  SubscriptionDownloader::HeadRequestCallback download_completed_callback;
-  EXPECT_CALL(*downloader_, DoHeadRequest(AcceptableAdsUrl(), testing::_))
-      .WillOnce([&](const GURL&,
-                    SubscriptionDownloader::HeadRequestCallback callback) {
-        download_completed_callback = std::move(callback);
-      });
-
-  base::MockCallback<SubscriptionService::InstallationCallback> on_finished;
-  service_->PingAcceptableAds(on_finished.Get());
-  // Version delivered by HEAD response is stored persistently in metadata.
-  // It will be read by SubscriptionDownloader in next DoHeadRequest().
-  EXPECT_CALL(persistent_metadata_, SetVersion(AcceptableAdsUrl(), version));
-  // The next ping should happen in a day.
-  EXPECT_CALL(persistent_metadata_,
-              SetExpirationInterval(AcceptableAdsUrl(), base::Days(1)));
-  std::move(download_completed_callback).Run(version);
 }
 
 TEST_F(AdblockSubscriptionServiceImplTest,
@@ -684,8 +775,7 @@ TEST_F(AdblockSubscriptionServiceImplTest,
               SubscriptionDownloader::DownloadCompletedCallback callback) {
             download_completed_callback = std::move(callback);
           });
-  service_->DownloadAndInstallSubscription(first_subscription->GetSourceUrl(),
-                                           base::DoNothing());
+  filtering_configuration_->AddFilterList(first_subscription->GetSourceUrl());
   // When download completes, update the provider about new installed
   // subscription, and no pending subscriptions.
   EXPECT_CALL(
@@ -715,8 +805,8 @@ TEST_F(AdblockSubscriptionServiceImplTest,
               SubscriptionDownloader::DownloadCompletedCallback callback) {
             download_completed_callback = std::move(callback);
           });
-  service_->DownloadAndInstallSubscription(second_subscription->GetSourceUrl(),
-                                           base::DoNothing());
+
+  filtering_configuration_->AddFilterList(second_subscription->GetSourceUrl());
 
   // When second download completes, provider has two installed and zero pending
   // subscriptions.
@@ -735,7 +825,8 @@ TEST_F(AdblockSubscriptionServiceImplTest,
               UpdateSubscriptions(
                   std::vector<GURL>{second_subscription->GetSourceUrl()},
                   std::vector<GURL>{}));
-  service_->UninstallSubscription(first_subscription->GetSourceUrl());
+  filtering_configuration_->RemoveFilterList(
+      first_subscription->GetSourceUrl());
 }
 
 TEST_F(AdblockSubscriptionServiceImplTest,
@@ -761,8 +852,7 @@ TEST_F(AdblockSubscriptionServiceImplTest,
               SubscriptionDownloader::DownloadCompletedCallback callback) {
             download_completed_callback = std::move(callback);
           });
-  service_->DownloadAndInstallSubscription(first_subscription->GetSourceUrl(),
-                                           base::DoNothing());
+  filtering_configuration_->AddFilterList(first_subscription->GetSourceUrl());
   // When download fails, inform the provider about returning to previous state.
   EXPECT_CALL(*preloaded_subscription_provider_,
               UpdateSubscriptions(std::vector<GURL>{}, std::vector<GURL>{}));
@@ -794,14 +884,14 @@ TEST_F(AdblockSubscriptionServiceImplTest,
               SubscriptionDownloader::DownloadCompletedCallback callback) {
             download_completed_callback = std::move(callback);
           });
-  service_->DownloadAndInstallSubscription(first_subscription->GetSourceUrl(),
-                                           base::DoNothing());
+  filtering_configuration_->AddFilterList(first_subscription->GetSourceUrl());
   // When installation is cancelled, inform the provider about returning to
   // previous state.
   EXPECT_CALL(*preloaded_subscription_provider_,
               UpdateSubscriptions(std::vector<GURL>{}, std::vector<GURL>{}))
       .Times(testing::AtLeast(1));
-  service_->UninstallSubscription(first_subscription->GetSourceUrl());
+  filtering_configuration_->RemoveFilterList(
+      first_subscription->GetSourceUrl());
 
   // Download completes, but the installation was cancelled in the mean time.
   std::move(download_completed_callback).Run(std::make_unique<FakeBuffer>());
@@ -824,9 +914,10 @@ TEST_F(AdblockSubscriptionServiceImplTest,
 
   // Snapshot provides both the subscription in service and the preloaded
   // subscription returned by provider.
-  const auto subscription_collection = service_->GetCurrentSnapshot();
+  const auto snapshot = service_->GetCurrentSnapshot();
+  EXPECT_EQ(snapshot.size(), 1u);
   const auto selectors =
-      subscription_collection->GetElementHideSelectors(GURL(), {}, SiteKey());
+      snapshot[0]->GetElementHideSelectors(GURL(), {}, SiteKey());
   EXPECT_EQ(selectors.size(), 2u);
   EXPECT_THAT(selectors, testing::UnorderedElementsAre(
                              subscription_in_service->GetTitle(),
@@ -845,7 +936,8 @@ TEST_F(AdblockSubscriptionServiceImplTest, AcceptableAdsMetadataRetained) {
   // Removing EasyList clears the subscription's metadata.
   EXPECT_CALL(persistent_metadata_,
               RemoveMetadata(easylist_subscription->GetSourceUrl()));
-  service_->UninstallSubscription(easylist_subscription->GetSourceUrl());
+  filtering_configuration_->RemoveFilterList(
+      easylist_subscription->GetSourceUrl());
 
   // Removing the Acceptable Ads subscription retains metadata, in order to
   // allow sending continued HEAD-only update-like requests with consistent
@@ -853,7 +945,7 @@ TEST_F(AdblockSubscriptionServiceImplTest, AcceptableAdsMetadataRetained) {
   EXPECT_CALL(persistent_metadata_,
               RemoveMetadata(aa_subscription->GetSourceUrl()))
       .Times(0);
-  service_->UninstallSubscription(aa_subscription->GetSourceUrl());
+  filtering_configuration_->RemoveFilterList(aa_subscription->GetSourceUrl());
 }
 
 }  // namespace adblock

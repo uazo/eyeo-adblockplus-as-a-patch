@@ -254,7 +254,7 @@ void ElementHiderImpl::ApplyElementHidingEmulationOnPage(
     content::RenderFrameHost* render_frame_host,
     SiteKey sitekey,
     base::OnceCallback<void(const ElemhideInjectionData&)> on_finished) {
-  if (!subscription_service_->IsInitialized()) {
+  if (subscription_service_->GetStatus() == FilteringStatus::Initializing) {
     subscription_service_->RunWhenInitialized(base::BindOnce(
         &ElementHiderImpl::ApplyElementHidingEmulationInternal,
         weak_ptr_factory_.GetWeakPtr(), std::move(url),
@@ -316,10 +316,11 @@ void ElementHiderImpl::ApplyElementHidingEmulationInternal(
     SiteKey sitekey,
     base::OnceCallback<void(const ElementHider::ElemhideInjectionData&)>
         on_finished) {
+  // TODO(mpawlowski): Use entire Snapshot for classification, DPD-1568.
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {},
       base::BindOnce(&PrepareElemhideEmulationData,
-                     subscription_service_->GetCurrentSnapshot(),
+                     std::move(subscription_service_->GetCurrentSnapshot()[0]),
                      std::move(url), std::move(frame_hierarchy),
                      std::move(sitekey)),
       base::BindOnce(&InsertUserCSSAndApplyElemHidingEmuJS, frame_host_id,

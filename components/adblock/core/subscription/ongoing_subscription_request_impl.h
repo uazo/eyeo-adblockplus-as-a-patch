@@ -29,16 +29,16 @@
 #include "components/adblock/core/subscription/subscription_downloader.h"
 #include "components/prefs/pref_member.h"
 #include "net/base/backoff_entry.h"
-#include "net/base/network_change_notifier.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
 
 namespace adblock {
 
-class OngoingSubscriptionRequestImpl final
-    : public OngoingSubscriptionRequest,
-      public net::NetworkChangeNotifier::NetworkChangeObserver {
+class OngoingSubscriptionRequestImpl final : public OngoingSubscriptionRequest {
  public:
+  // TODO(mpawlowski): This still observes prefs::kEnableAdblockLegacy in
+  // |prefs|. This is no longer a valid way to become notified of needing to
+  // stop the download. Address in DPD-1568.
   OngoingSubscriptionRequestImpl(
       PrefService* prefs,
       const net::BackoffEntry::Policy* backoff_policy,
@@ -49,9 +49,6 @@ class OngoingSubscriptionRequestImpl final
   void Redirect(GURL redirect_url) final;
 
   size_t GetNumberOfRedirects() const final;
-
-  // NetworkChangeObserver:
-  void OnNetworkChanged(net::NetworkChangeNotifier::ConnectionType) final;
 
  private:
   bool IsStarted() const;

@@ -28,6 +28,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "components/adblock/core/adblock_controller.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/prefs/pref_service.h"
 #include "net/base/load_flags.h"
@@ -178,20 +179,20 @@ class AdblockTelemetryService::Conversation {
 };
 
 AdblockTelemetryService::AdblockTelemetryService(
-    PrefService* prefs,
+    AdblockController* controller,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
     base::TimeDelta initial_delay,
     base::TimeDelta check_interval)
-    : url_loader_factory_(url_loader_factory),
+    : controller_(controller),
+      url_loader_factory_(url_loader_factory),
       initial_delay_(initial_delay),
       check_interval_(check_interval) {
-  enable_adblock_.Init(
-      prefs::kEnableAdblock, prefs,
-      base::BindRepeating(&AdblockTelemetryService::OnEnableAdblockChanged,
-                          base::Unretained(this)));
+  controller_->AddObserver(this);
 }
 
-AdblockTelemetryService::~AdblockTelemetryService() = default;
+AdblockTelemetryService::~AdblockTelemetryService() {
+  controller_->RemoveObserver(this);
+}
 
 void AdblockTelemetryService::AddTopicProvider(
     std::unique_ptr<TopicProvider> topic_provider) {
@@ -201,17 +202,17 @@ void AdblockTelemetryService::AddTopicProvider(
 
 void AdblockTelemetryService::Start() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  OnEnableAdblockChanged();
+  OnEnabledStateChanged();
 }
 
-void AdblockTelemetryService::OnEnableAdblockChanged() {
+void AdblockTelemetryService::OnEnabledStateChanged() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (enable_adblock_.GetValue()) {
+  if (controller_->IsAdblockEnabled() && !timer_.IsRunning()) {
     VLOG(1) << "[eyeo] Starting periodic Telemetry requests";
     timer_.Start(FROM_HERE, initial_delay_,
                  base::BindRepeating(&AdblockTelemetryService::RunPeriodicCheck,
                                      base::Unretained(this)));
-  } else if (!enable_adblock_.GetValue()) {
+  } else if (!controller_->IsAdblockEnabled() && timer_.IsRunning()) {
     VLOG(1) << "[eyeo] Stopping periodic Telemetry requests";
     Shutdown();
   }

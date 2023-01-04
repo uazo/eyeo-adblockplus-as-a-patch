@@ -61,7 +61,7 @@ void ContentSecurityPolicyInjectorImpl::
         const scoped_refptr<net::HttpResponseHeaders>& headers,
         InsertContentSecurityPolicyHeadersCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!subscription_service_->IsInitialized()) {
+  if (subscription_service_->GetStatus() == FilteringStatus::Initializing) {
     subscription_service_->RunWhenInitialized(
         base::BindOnce(&ContentSecurityPolicyInjectorImpl::
                            InsertContentSecurityPolicyHeadersIfApplicable,
@@ -71,15 +71,16 @@ void ContentSecurityPolicyInjectorImpl::
   }
 
   content::RenderFrameHost* host =
-      frame_hierarchy_builder_->FindRenderFrameHost(
-          render_frame_host_id.child_id, render_frame_host_id.frame_routing_id);
+      frame_hierarchy_builder_->FindRenderFrameHost(render_frame_host_id);
   if (host) {
     // GetCspInjection might take a while, let it run in the background.
+    // TODO(mpawlowski): Use entire Snapshot for classification, DPD-1568.
     base::ThreadPool::PostTaskAndReplyWithResult(
         FROM_HERE, {},
-        base::BindOnce(&GetCspInjection,
-                       subscription_service_->GetCurrentSnapshot(), request_url,
-                       frame_hierarchy_builder_->BuildFrameHierarchy(host)),
+        base::BindOnce(
+            &GetCspInjection,
+            std::move(subscription_service_->GetCurrentSnapshot()[0]),
+            request_url, frame_hierarchy_builder_->BuildFrameHierarchy(host)),
         base::BindOnce(
             &ContentSecurityPolicyInjectorImpl::OnCspInjectionSearchFinished,
             weak_ptr_factory.GetWeakPtr(), request_url, headers,

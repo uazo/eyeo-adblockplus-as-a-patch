@@ -30,11 +30,12 @@
 #include "base/ranges/algorithm.h"
 #include "base/trace_event/common/trace_event_common.h"
 #include "base/trace_event/trace_event.h"
-#include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/common/adblock_utils.h"
 #include "components/adblock/core/subscription/subscription.h"
+#include "components/adblock/core/subscription/subscription_collection.h"
 #include "components/adblock/core/subscription/subscription_collection_impl.h"
 #include "components/adblock/core/subscription/subscription_config.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 
 namespace adblock {
 namespace {
@@ -62,33 +63,37 @@ class SubscriptionServiceImpl::OngoingInstallation final : public Subscription {
 };
 
 SubscriptionServiceImpl::SubscriptionServiceImpl(
-    PrefService* prefs,
     std::unique_ptr<SubscriptionPersistentStorage> storage,
     std::unique_ptr<SubscriptionDownloader> downloader,
     std::unique_ptr<PreloadedSubscriptionProvider>
         preloaded_subscription_provider,
+    std::unique_ptr<SubscriptionUpdater> updater,
     const SubscriptionCreator& custom_subscription_creator,
     SubscriptionPersistentMetadata* persistent_metadata)
     : storage_(std::move(storage)),
       downloader_(std::move(downloader)),
       preloaded_subscription_provider_(
           std::move(preloaded_subscription_provider)),
+      updater_(std::move(updater)),
       custom_subscription_creator_(custom_subscription_creator),
-      persistent_metadata_(persistent_metadata) {
-  enable_adblock_.Init(
-      prefs::kEnableAdblock, prefs,
-      base::BindRepeating(&SubscriptionServiceImpl::SynchronizeWithPrefState,
-                          weak_ptr_factory_.GetWeakPtr()));
-  SynchronizeWithPrefState();
-}
+      persistent_metadata_(persistent_metadata) {}
 
 SubscriptionServiceImpl::~SubscriptionServiceImpl() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (configuration_)
+    configuration_->RemoveObserver(this);
 }
 
-bool SubscriptionServiceImpl::IsInitialized() const {
+FilteringStatus SubscriptionServiceImpl::GetStatus() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  return status_ == Status::Initialized;
+  if (configuration_) {
+    if (!configuration_->IsEnabled())
+      return FilteringStatus::Inactive;
+    return status_ == StorageStatus::Initialized
+               ? FilteringStatus::Active
+               : FilteringStatus::Initializing;
+  }
+  return FilteringStatus::Inactive;
 }
 
 void SubscriptionServiceImpl::RunWhenInitialized(base::OnceClosure task) {
@@ -97,9 +102,12 @@ void SubscriptionServiceImpl::RunWhenInitialized(base::OnceClosure task) {
 }
 
 std::vector<scoped_refptr<Subscription>>
-SubscriptionServiceImpl::GetCurrentSubscriptions() const {
+SubscriptionServiceImpl::GetCurrentSubscriptions(
+    FilteringConfiguration* configuration) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(IsInitialized());
+  DCHECK_EQ(configuration, configuration_.get())
+      << "Multiple configurations not supported yet";
   // Result will contain the currently installed subscriptions:
   std::vector<scoped_refptr<Subscription>> result;
   base::ranges::copy(current_state_, std::back_inserter(result));
@@ -116,6 +124,16 @@ SubscriptionServiceImpl::GetCurrentSubscriptions() const {
                                   &Subscription::GetSourceUrl) == result.end();
       });
   return result;
+}
+
+void SubscriptionServiceImpl::InstallFilteringConfiguration(
+    std::unique_ptr<FilteringConfiguration> configuration) {
+  DCHECK(!configuration_) << "No support for multiple configurations yet";
+  VLOG(1) << "[eyeo] FilteringConfiguration installed, will initialize "
+             "SubscriptionService";
+  configuration_ = std::move(configuration);
+  configuration_->AddObserver(this);
+  OnEnabledStateChanged(configuration_.get());
 }
 
 std::vector<GURL> SubscriptionServiceImpl::GetReadySubscriptions() const {
@@ -138,23 +156,159 @@ std::vector<GURL> SubscriptionServiceImpl::GetPendingSubscriptions() const {
   return result;
 }
 
-std::unique_ptr<SubscriptionCollection>
-SubscriptionServiceImpl::GetCurrentSnapshot() const {
+void SubscriptionServiceImpl::InstallMissingSubscriptions() {
+  DCHECK(configuration_);
+  // Subscriptions that are either installed or being installed:
+  auto installed_subscriptions = GetReadySubscriptions();
+  base::ranges::copy(GetPendingSubscriptions(),
+                     std::back_inserter(installed_subscriptions));
+  // Subscriptions that are demanded by the FilteringConfiguration:
+  auto demanded_subscriptions = configuration_->GetFilterLists();
+  base::ranges::sort(installed_subscriptions);
+  base::ranges::sort(demanded_subscriptions);
+  // Missing subscriptions is the difference between the two:
+  std::vector<GURL> missing_subscriptions;
+  base::ranges::set_difference(demanded_subscriptions, installed_subscriptions,
+                               std::back_inserter(missing_subscriptions));
+  for (const auto& url : missing_subscriptions)
+    DownloadAndInstallSubscription(url);
+}
+
+void SubscriptionServiceImpl::RemoveUnneededSubscriptions() {
+  DCHECK(configuration_);
+  // Subscriptions that are either installed or being installed:
+  auto installed_subscriptions = GetReadySubscriptions();
+  base::ranges::copy(GetPendingSubscriptions(),
+                     std::back_inserter(installed_subscriptions));
+  // Subscriptions that are demanded by the FilteringConfiguration:
+  auto demanded_subscriptions = configuration_->GetFilterLists();
+  base::ranges::sort(installed_subscriptions);
+  base::ranges::sort(demanded_subscriptions);
+  // Unneeded subscriptions is the difference between the two:
+  std::vector<GURL> unneeded_subscriptions;
+  base::ranges::set_difference(installed_subscriptions, demanded_subscriptions,
+                               std::back_inserter(unneeded_subscriptions));
+  for (const auto& url : unneeded_subscriptions)
+    UninstallSubscription(url);
+}
+
+SubscriptionService::Snapshot SubscriptionServiceImpl::GetCurrentSnapshot()
+    const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(IsInitialized());
-  auto state = current_state_;
-  if (custom_filters_)
-    state.push_back(custom_filters_);
-  auto preloaded_subscriptions =
-      preloaded_subscription_provider_->GetCurrentPreloadedSubscriptions();
-  std::move(preloaded_subscriptions.begin(), preloaded_subscriptions.end(),
-            std::back_inserter(state));
-  return std::make_unique<SubscriptionCollectionImpl>(state);
+  std::vector<scoped_refptr<InstalledSubscription>> state;
+  if (configuration_->IsEnabled()) {
+    state = current_state_;
+    if (custom_filters_)
+      state.push_back(custom_filters_);
+    base::ranges::move(
+        preloaded_subscription_provider_->GetCurrentPreloadedSubscriptions(),
+        std::back_inserter(state));
+  }
+
+  Snapshot snapshot;
+  snapshot.push_back(std::make_unique<SubscriptionCollectionImpl>(state));
+  return snapshot;
+}
+
+void SubscriptionServiceImpl::AddObserver(SubscriptionObserver* o) {
+  observers_.AddObserver(o);
+}
+
+void SubscriptionServiceImpl::RemoveObserver(SubscriptionObserver* o) {
+  observers_.RemoveObserver(o);
+}
+
+void SubscriptionServiceImpl::OnEnabledStateChanged(
+    FilteringConfiguration* config) {
+  if (config->IsEnabled()) {
+    if (status_ == StorageStatus::Uninitialized) {
+      InitializeStorage();
+    } else if (status_ == StorageStatus::Initialized) {
+      updater_->StartSchedule(
+          base::BindRepeating(&SubscriptionServiceImpl::RunUpdateCheck,
+                              weak_ptr_factory_.GetWeakPtr()));
+      OnFilterListsChanged(config);
+      OnCustomFiltersChanged(config);
+    } else {
+      DCHECK_EQ(status_, StorageStatus::LoadingSubscriptions);
+      // Just wait. When the storage becomes initialized, we will enter
+      // this method again.
+    }
+  } else {
+    // TODO(mpawlowski) DPD-1568:
+    // - cancel downloads
+    // - clear installed subscriptions loaded from disk
+    // - clear custom filters
+    // - clear preloaded subscriptions
+    updater_->StopSchedule();
+  }
+}
+
+void SubscriptionServiceImpl::OnFilterListsChanged(
+    FilteringConfiguration* config) {
+  if (IsInitialized()) {
+    InstallMissingSubscriptions();
+    RemoveUnneededSubscriptions();
+  }
+}
+
+void SubscriptionServiceImpl::OnAllowedDomainsChanged(
+    FilteringConfiguration* config) {
+  OnCustomFiltersChanged(config);
+}
+
+void SubscriptionServiceImpl::OnCustomFiltersChanged(
+    FilteringConfiguration* config) {
+  if (IsInitialized()) {
+    SetCustomFilters();
+  }
+}
+
+bool SubscriptionServiceImpl::IsInitialized() const {
+  // Since the state can change between Active and Inactive while a website is
+  // loading, we may be asked to e.g. provide a Snapshot when FilteringState is
+  // Inactive. We should not be queried when we're Initializing tho, callers
+  // should defer calls via RunWhenInitialized().
+  // TODO(mpawlowski) this is still fragile, harden this during DPD-1568.
+  return GetStatus() != FilteringStatus::Initializing;
+}
+
+void SubscriptionServiceImpl::RunUpdateCheck() {
+  VLOG(1) << "[eyeo] Running update check";
+  for (auto& subscription : current_state_) {
+    // Update subscriptions that are expired and aren't already in the process
+    // of installing an update.
+    const auto& url = subscription->GetSourceUrl();
+    if (persistent_metadata_->IsExpired(url) &&
+        base::ranges::find(ongoing_installations_, url,
+                           &Subscription::GetSourceUrl) ==
+            ongoing_installations_.end()) {
+      VLOG(1) << "[eyeo] Updating expired subscription " << url;
+      DownloadAndInstallSubscription(url);
+    } else {
+      VLOG(1) << "[eyeo] Skipping update of " << url << ": "
+              << (!persistent_metadata_->IsExpired(url)
+                      ? "not expired yet"
+                      : "already downloading");
+    }
+  }
+  // TODO(mpawlowski): remove after DPD-1154. If Acceptable Ads is not
+  // installed, but it would have been expired, send HEAD request for Acceptable
+  // Ads filter list just to count the user, without the intention of
+  // downloading it.
+  if (base::ranges::none_of(GetCurrentSubscriptions(configuration_.get()),
+                            [](const auto& subscription) {
+                              return subscription->GetSourceUrl() ==
+                                     AcceptableAdsUrl();
+                            }) &&
+      persistent_metadata_->IsExpired(AcceptableAdsUrl())) {
+    PingAcceptableAds();
+  }
 }
 
 void SubscriptionServiceImpl::DownloadAndInstallSubscription(
-    const GURL& subscription_url,
-    InstallationCallback on_finished) {
+    const GURL& subscription_url) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(IsInitialized());
   const bool is_an_update =
@@ -175,23 +329,17 @@ void SubscriptionServiceImpl::DownloadAndInstallSubscription(
 
   downloader_->StartDownload(
       subscription_url, retry_policy,
-      base::BindOnce(
-          &SubscriptionServiceImpl::OnSubscriptionDataAvailable,
-          weak_ptr_factory_.GetWeakPtr(),
-          base::BindOnce(&SubscriptionServiceImpl::
-                             UpdatePreloadedSubscriptionProviderAndRun,
-                         weak_ptr_factory_.GetWeakPtr(),
-                         std::move(on_finished)),
-          ongoing_installation));
+      base::BindOnce(&SubscriptionServiceImpl::OnSubscriptionDataAvailable,
+                     weak_ptr_factory_.GetWeakPtr(), ongoing_installation));
 }
 
-void SubscriptionServiceImpl::PingAcceptableAds(PingCallback on_finished) {
+void SubscriptionServiceImpl::PingAcceptableAds() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(IsInitialized());
   downloader_->DoHeadRequest(
       AcceptableAdsUrl(),
       base::BindOnce(&SubscriptionServiceImpl::OnHeadRequestDone,
-                     weak_ptr_factory_.GetWeakPtr(), std::move(on_finished)));
+                     weak_ptr_factory_.GetWeakPtr()));
 }
 
 void SubscriptionServiceImpl::UninstallSubscription(
@@ -212,11 +360,14 @@ void SubscriptionServiceImpl::UninstallSubscription(
   VLOG(1) << "[eyeo] Removed subscription " << subscription_url;
 }
 
-void SubscriptionServiceImpl::SetCustomFilters(
-    const std::vector<std::string>& filters) {
+void SubscriptionServiceImpl::SetCustomFilters() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(IsInitialized());
 
+  std::vector<std::string> filters = configuration_->GetCustomFilters();
+  base::ranges::transform(configuration_->GetAllowedDomains(),
+                          std::back_inserter(filters),
+                          &utils::CreateDomainAllowlistingFilter);
   if (filters.empty()) {
     custom_filters_.reset();
     return;
@@ -225,41 +376,35 @@ void SubscriptionServiceImpl::SetCustomFilters(
   custom_filters_ = custom_subscription_creator_.Run(filters);
 }
 
-void SubscriptionServiceImpl::OnHeadRequestDone(
-    InstallationCallback on_finished,
-    const std::string version) {
+void SubscriptionServiceImpl::OnHeadRequestDone(const std::string version) {
   if (version.empty()) {
-    std::move(on_finished).Run(false);
     return;
   }
   persistent_metadata_->SetVersion(AcceptableAdsUrl(), version);
   persistent_metadata_->SetExpirationInterval(
       AcceptableAdsUrl(), kDefaultHeadRequestExpirationInterval);
-  std::move(on_finished).Run(true);
 }
 
 void SubscriptionServiceImpl::OnSubscriptionDataAvailable(
-    InstallationCallback on_finished,
     scoped_refptr<OngoingInstallation> ongoing_installation,
     std::unique_ptr<FlatbufferData> raw_data) {
   if (ongoing_installations_.find(ongoing_installation) ==
       ongoing_installations_.end()) {
     // Installation was canceled.
-    std::move(on_finished).Run(false);
+    UpdatePreloadedSubscriptionProvider();
     return;
   }
   if (!raw_data) {
     // Download failed.
     ongoing_installations_.erase(ongoing_installation);
-    std::move(on_finished).Run(false);
+    UpdatePreloadedSubscriptionProvider();
     return;
   }
 
   storage_->StoreSubscription(
       std::move(raw_data),
       base::BindOnce(&SubscriptionServiceImpl::SubscriptionAddedToStorage,
-                     weak_ptr_factory_.GetWeakPtr(), std::move(on_finished),
-                     ongoing_installation));
+                     weak_ptr_factory_.GetWeakPtr(), ongoing_installation));
 }
 
 void SubscriptionServiceImpl::StorageInitialized(
@@ -279,29 +424,29 @@ void SubscriptionServiceImpl::StorageInitialized(
   // make installing subscription updates atomic, so solve potential race
   // condition here:
   RemoveDuplicateSubscriptions();
-  status_ = Status::Initialized;
+  status_ = StorageStatus::Initialized;
+  // Synchronize current state with the demands of the FilteringConfiguration:
+  OnEnabledStateChanged(configuration_.get());
   UpdatePreloadedSubscriptionProvider();
   TRACE_EVENT_ASYNC_END0("eyeo", "SubscriptionService::Initialize",
                          TRACE_ID_LOCAL(this));
-  DLOG(INFO) << "[eyeo] Subscription service initialized, will now run "
-             << queued_tasks_.size() << " pending tasks.";
+  VLOG(1) << "[eyeo] Subscription service initialized, will now run "
+          << queued_tasks_.size() << " pending tasks.";
   while (!queued_tasks_.empty()) {
     std::move(queued_tasks_.front()).Run();
     queued_tasks_.erase(queued_tasks_.begin());
   }
 }
 
-void SubscriptionServiceImpl::SynchronizeWithPrefState() {
+void SubscriptionServiceImpl::InitializeStorage() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (enable_adblock_.GetValue() && status_ == Status::Uninitialized) {
-    DLOG(INFO) << "[eyeo] Subscription service initialization starting.";
-    TRACE_EVENT_ASYNC_BEGIN0("eyeo", "SubscriptionService::Initialize",
-                             TRACE_ID_LOCAL(this));
-    status_ = Status::LoadingSubscriptions;
-    storage_->LoadSubscriptions(
-        base::BindOnce(&SubscriptionServiceImpl::StorageInitialized,
-                       weak_ptr_factory_.GetWeakPtr()));
-  }
+  VLOG(1) << "[eyeo] Subscription service initialization starting.";
+  TRACE_EVENT_ASYNC_BEGIN0("eyeo", "SubscriptionService::Initialize",
+                           TRACE_ID_LOCAL(this));
+  status_ = StorageStatus::LoadingSubscriptions;
+  storage_->LoadSubscriptions(
+      base::BindOnce(&SubscriptionServiceImpl::StorageInitialized,
+                     weak_ptr_factory_.GetWeakPtr()));
 }
 
 void SubscriptionServiceImpl::RemoveDuplicateSubscriptions() {
@@ -326,7 +471,6 @@ void SubscriptionServiceImpl::RemoveDuplicateSubscriptions() {
 }
 
 void SubscriptionServiceImpl::SubscriptionAddedToStorage(
-    InstallationCallback on_finished,
     scoped_refptr<OngoingInstallation> ongoing_installation,
     scoped_refptr<InstalledSubscription> subscription) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -335,7 +479,7 @@ void SubscriptionServiceImpl::SubscriptionAddedToStorage(
     // Installation was canceled. We must now remove the subscription from
     // storage. Do not add it to |current_state|.
     storage_->RemoveSubscription(subscription);
-    std::move(on_finished).Run(false);
+    UpdatePreloadedSubscriptionProvider();
     return;
   }
   ongoing_installations_.erase(ongoing_installation);
@@ -344,7 +488,7 @@ void SubscriptionServiceImpl::SubscriptionAddedToStorage(
     // There was an error adding subscription to storage.
     LOG(WARNING) << "[eyeo] Failed to add subscription, current number "
                  << "of subscriptions: " << current_state_.size();
-    std::move(on_finished).Run(false);
+    UpdatePreloadedSubscriptionProvider();
     return;
   }
   // Remove any subscription that already exists with the same URL
@@ -359,8 +503,9 @@ void SubscriptionServiceImpl::SubscriptionAddedToStorage(
     VLOG(1) << "[eyeo] Added subscription " << subscription->GetSourceUrl()
             << ", current number of subscriptions: " << current_state_.size();
   }
-
-  std::move(on_finished).Run(true);
+  UpdatePreloadedSubscriptionProvider();
+  for (auto& observer : observers_)
+    observer.OnSubscriptionInstalled(subscription->GetSourceUrl());
 }
 
 bool SubscriptionServiceImpl::UninstallSubscriptionInternal(
@@ -393,13 +538,6 @@ bool SubscriptionServiceImpl::UninstallSubscriptionInternal(
 void SubscriptionServiceImpl::UpdatePreloadedSubscriptionProvider() {
   preloaded_subscription_provider_->UpdateSubscriptions(
       GetReadySubscriptions(), GetPendingSubscriptions());
-}
-
-void SubscriptionServiceImpl::UpdatePreloadedSubscriptionProviderAndRun(
-    InstallationCallback on_finished,
-    bool success) {
-  UpdatePreloadedSubscriptionProvider();
-  std::move(on_finished).Run(success);
 }
 
 }  // namespace adblock

@@ -14,7 +14,7 @@ import {Route} from './router.js';
 export interface SettingsRoutes {
   ABOUT: Route;
   ACCESSIBILITY: Route;
-  ADBLOCK: Route,
+  ADBLOCK: Route;
   ADVANCED: Route;
   ADDRESSES: Route;
   APPEARANCE: Route;

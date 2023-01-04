@@ -17,11 +17,10 @@
 
 #include "components/adblock/core/adblock_switches.h"
 
-namespace adblock {
-namespace switches {
+namespace adblock::switches {
 
 const char kDisableAcceptableAds[] = "disable-aa";
 const char kDisableAdblock[] = "disable-adblock";
+const char kDisableWebUiCompatibility[] = "disable-webui-compatibility";
 
-}  // namespace switches
-}  // namespace adblock
+}  // namespace adblock::switches

@@ -15,22 +15,43 @@
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "components/adblock/content/common/adblock_url_loader_factory.h"
+#include "components/adblock/content/browser/adblock_url_loader_factory.h"
 
 #include "base/barrier_closure.h"
 #include "base/strings/stringprintf.h"
 #include "base/supports_user_data.h"
+#include "components/adblock/content/browser/adblock_content_utils.h"
+#include "components/adblock/content/browser/content_security_policy_injector.h"
+#include "components/adblock/content/browser/element_hider.h"
+#include "components/adblock/content/browser/resource_classification_runner.h"
 #include "components/adblock/core/features.h"
+#include "components/adblock/core/sitekey_storage.h"
+#include "components/adblock/core/subscription/subscription_service.h"
+#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/render_process_host.h"
 #include "net/base/url_util.h"
 #include "net/http/http_status_code.h"
 #include "net/http/http_util.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/mojom/early_hints.mojom.h"
+#include "services/network/public/mojom/parsed_headers.mojom-forward.h"
 #include "services/network/public/mojom/url_loader.mojom.h"
 #include "services/network/public/mojom/url_loader_factory.mojom.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
+#include "url/gurl.h"
 
 namespace adblock {
+
+namespace {
+
+// Without USER_BLOCKING priority - in session restore case - posted
+// callbacks can take over a minute to trigger. This is why such high
+// priority is applied everywhere.
+const base::TaskPriority kTaskResponsePriority =
+    base::TaskPriority::USER_BLOCKING;
+
+}  // namespace
 
 class AdblockURLLoaderFactory::InProgressRequest
     : public network::mojom::URLLoader,
@@ -71,6 +92,12 @@ class AdblockURLLoaderFactory::InProgressRequest
   void OnComplete(const ::network::URLLoaderCompletionStatus& status) override;
 
  private:
+  using ProcessResponseHeadersCallback =
+      base::OnceCallback<void(FilterMatchResult,
+                              network::mojom::ParsedHeadersPtr)>;
+  using CheckRewriteFilterMatchCallback =
+      base::OnceCallback<void(const absl::optional<GURL>&)>;
+
   void OnBindingsClosed();
   void OnClientDisconnected();
   void Start(int32_t request_id,
@@ -87,17 +114,51 @@ class AdblockURLLoaderFactory::InProgressRequest
       const network::ResourceRequest& request,
       ::mojo::PendingRemote<network::mojom::URLLoaderClient> client,
       const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
-      adblock::mojom::FilterMatchResult result);
+      FilterMatchResult result);
   void OnRedirectFilterMatchResult(const net::RedirectInfo& redirect_info,
                                    network::mojom::URLResponseHeadPtr head,
-                                   adblock::mojom::FilterMatchResult result);
+                                   FilterMatchResult result);
   void OnProcessHeadersResult(
       ::network::mojom::URLResponseHeadPtr head,
       ::mojo::ScopedDataPipeConsumerHandle body,
       absl::optional<mojo_base::BigBuffer> cached_metadata,
-      adblock::mojom::FilterMatchResult result,
+      FilterMatchResult result,
       network::mojom::ParsedHeadersPtr parsed_headers);
   void OnRequestError(int error_code);
+  void CheckFilterMatch(const GURL& request_url,
+                        int32_t resource_type,
+                        int32_t render_frame_id,
+                        CheckFilterMatchCallback callback);
+  void ProcessResponseHeaders(
+      const GURL& request_url,
+      int32_t render_frame_id,
+      const scoped_refptr<net::HttpResponseHeaders>& headers,
+      const std::string& user_agent,
+      ProcessResponseHeadersCallback callback);
+  void CheckRewriteFilterMatch(const ::GURL& request_url,
+                               int32_t render_frame_id,
+                               CheckRewriteFilterMatchCallback callback);
+  void OnRequestUrlClassified(const GURL& request_url,
+                              int32_t render_frame_id,
+                              int32_t resource_type,
+                              CheckFilterMatchCallback callback,
+                              FilterMatchResult result);
+  void OnResponseHeadersClassified(
+      const GURL& response_url,
+      int32_t render_frame_id,
+      const scoped_refptr<net::HttpResponseHeaders>& headers,
+      const std::string& user_agent,
+      ProcessResponseHeadersCallback callback,
+      FilterMatchResult result);
+  void PostFilterMatchCallbackToUI(CheckFilterMatchCallback callback,
+                                   FilterMatchResult result);
+  void PostResponseHeadersCallbackToUI(
+      ProcessResponseHeadersCallback callback,
+      FilterMatchResult result,
+      network::mojom::ParsedHeadersPtr parsed_headers);
+  void PostRewriteCallbackToUI(
+      base::OnceCallback<void(const absl::optional<GURL>&)> callback,
+      const absl::optional<GURL>& url);
 
   GURL request_url_;
   int resource_type_;
@@ -132,7 +193,7 @@ AdblockURLLoaderFactory::InProgressRequest::InProgressRequest(
       factory_(factory),
       target_client_(std::move(client)),
       loader_receiver_(this, std::move(loader_receiver)) {
-  factory_->adblock_interface_->CheckRewriteFilterMatch(
+  CheckRewriteFilterMatch(
       request.url, factory_->frame_tree_node_id_,
       base::BindOnce(&InProgressRequest::Start, weak_factory_.GetWeakPtr(),
                      request_id, options, request, traffic_annotation,
@@ -202,7 +263,7 @@ void AdblockURLLoaderFactory::InProgressRequest::OnReceiveResponse(
   VLOG(1) << "[eyeo] Sending headers for processing: " << request_url_;
   client_receiver_.Pause();
   const scoped_refptr<net::HttpResponseHeaders>& headers = head->headers;
-  factory_->adblock_interface_->ProcessResponseHeaders(
+  ProcessResponseHeaders(
       request_url_, factory_->frame_tree_node_id_, headers, user_agent_string_,
       base::BindOnce(&InProgressRequest::OnProcessHeadersResult,
                      weak_factory_.GetWeakPtr(), std::move(head),
@@ -213,9 +274,9 @@ void AdblockURLLoaderFactory::InProgressRequest::OnProcessHeadersResult(
     ::network::mojom::URLResponseHeadPtr head,
     ::mojo::ScopedDataPipeConsumerHandle body,
     absl::optional<mojo_base::BigBuffer> cached_metadata,
-    adblock::mojom::FilterMatchResult result,
+    FilterMatchResult result,
     network::mojom::ParsedHeadersPtr parsed_headers) {
-  if (result == adblock::mojom::FilterMatchResult::kBlockRule) {
+  if (result == FilterMatchResult::kBlockRule) {
     OnRequestError(net::ERR_BLOCKED_BY_ADMINISTRATOR);
     return;
   }
@@ -238,11 +299,192 @@ void AdblockURLLoaderFactory::InProgressRequest::OnRequestError(
   factory_->RemoveRequest(this);
 }
 
+void AdblockURLLoaderFactory::InProgressRequest::CheckFilterMatch(
+    const GURL& request_url,
+    int32_t resource_type,
+    int32_t render_frame_id,
+    CheckFilterMatchCallback callback) {
+  if (!factory_->CheckRenderProcessValid()) {
+    PostFilterMatchCallbackToUI(std::move(callback),
+                                FilterMatchResult::kNoRule);
+    return;
+  }
+
+  auto* subscription_service = factory_->config_.subscription_service;
+  if (subscription_service->GetStatus() == FilteringStatus::Initializing) {
+    subscription_service->RunWhenInitialized(base::BindOnce(
+        &AdblockURLLoaderFactory::InProgressRequest::CheckFilterMatch,
+        weak_factory_.GetWeakPtr(), request_url, resource_type, render_frame_id,
+        std::move(callback)));
+    return;
+  }
+
+  // TODO(mpawlowski): Use entire Snapshot for classification, DPD-1568.
+  factory_->config_.resource_classifier->CheckRequestFilterMatch(
+      std::move(subscription_service->GetCurrentSnapshot()[0]), request_url,
+      resource_type,
+      content::GlobalRenderFrameHostId(factory_->render_process_id_,
+                                       render_frame_id),
+      base::BindOnce(
+          &AdblockURLLoaderFactory::InProgressRequest::OnRequestUrlClassified,
+          weak_factory_.GetWeakPtr(), request_url, render_frame_id,
+          resource_type,
+          base::BindOnce(&AdblockURLLoaderFactory::InProgressRequest::
+                             PostFilterMatchCallbackToUI,
+                         weak_factory_.GetWeakPtr(), std::move(callback))));
+}
+
+void AdblockURLLoaderFactory::InProgressRequest::ProcessResponseHeaders(
+    const GURL& request_url,
+    int32_t render_frame_id,
+    const scoped_refptr<net::HttpResponseHeaders>& headers,
+    const std::string& user_agent,
+    ProcessResponseHeadersCallback callback) {
+  if (!factory_->CheckRenderProcessValid()) {
+    PostResponseHeadersCallbackToUI(std::move(callback),
+                                    FilterMatchResult::kNoRule, nullptr);
+    return;
+  }
+
+  auto* subscription_service = factory_->config_.subscription_service;
+  if (subscription_service->GetStatus() == FilteringStatus::Initializing) {
+    subscription_service->RunWhenInitialized(base::BindOnce(
+        &AdblockURLLoaderFactory::InProgressRequest::ProcessResponseHeaders,
+        weak_factory_.GetWeakPtr(), request_url, render_frame_id, headers,
+        user_agent, std::move(callback)));
+    return;
+  }
+
+  // TODO(mpawlowski): Use entire Snapshot for classification, DPD-1568.
+  factory_->config_.resource_classifier->CheckResponseFilterMatch(
+      std::move(subscription_service->GetCurrentSnapshot()[0]), request_url,
+      content::GlobalRenderFrameHostId(factory_->render_process_id_,
+                                       render_frame_id),
+      headers,
+      base::BindOnce(
+          &AdblockURLLoaderFactory::InProgressRequest::
+              OnResponseHeadersClassified,
+          weak_factory_.GetWeakPtr(), request_url, render_frame_id, headers,
+          user_agent,
+          base::BindOnce(&AdblockURLLoaderFactory::InProgressRequest::
+                             PostResponseHeadersCallbackToUI,
+                         weak_factory_.GetWeakPtr(), std::move(callback))));
+}
+
+void AdblockURLLoaderFactory::InProgressRequest::CheckRewriteFilterMatch(
+    const GURL& request_url,
+    int32_t render_frame_id,
+    CheckRewriteFilterMatchCallback callback) {
+  if (!factory_->CheckRenderProcessValid()) {
+    PostRewriteCallbackToUI(std::move(callback), absl::optional<GURL>{});
+    return;
+  }
+
+  auto* subscription_service = factory_->config_.subscription_service;
+  if (subscription_service->GetStatus() == FilteringStatus::Initializing) {
+    subscription_service->RunWhenInitialized(base::BindOnce(
+        &AdblockURLLoaderFactory::InProgressRequest::CheckRewriteFilterMatch,
+        weak_factory_.GetWeakPtr(), request_url, render_frame_id,
+        std::move(callback)));
+    return;
+  }
+
+  // TODO(mpawlowski): Use entire Snapshot for classification, DPD-1568.
+  factory_->config_.resource_classifier->CheckRewriteFilterMatch(
+      std::move(subscription_service->GetCurrentSnapshot()[0]), request_url,
+      content::GlobalRenderFrameHostId(factory_->render_process_id_,
+                                       render_frame_id),
+      base::BindOnce(
+          &AdblockURLLoaderFactory::InProgressRequest::PostRewriteCallbackToUI,
+          weak_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+void AdblockURLLoaderFactory::InProgressRequest::OnRequestUrlClassified(
+    const GURL& request_url,
+    int32_t render_frame_id,
+    int32_t resource_type,
+    CheckFilterMatchCallback callback,
+    FilterMatchResult result) {
+  if (result == FilterMatchResult::kBlockRule) {
+    if (factory_->CheckRenderProcessAndFrameValid(render_frame_id)) {
+      ElementHider* element_hider = factory_->config_.element_hider;
+      const auto adblock_resource_type =
+          utils::ConvertToAdblockResourceType(request_url, resource_type);
+      if (element_hider->IsElementTypeHideable(adblock_resource_type)) {
+        element_hider->HideBlockedElement(
+            request_url, content::RenderFrameHost::FromID(
+                             factory_->render_process_id_, render_frame_id));
+      }
+    }
+  }
+  PostFilterMatchCallbackToUI(std::move(callback), result);
+}
+
+void AdblockURLLoaderFactory::InProgressRequest::OnResponseHeadersClassified(
+    const GURL& response_url,
+    int32_t render_frame_id,
+    const scoped_refptr<net::HttpResponseHeaders>& headers,
+    const std::string& user_agent,
+    ProcessResponseHeadersCallback callback,
+    FilterMatchResult result) {
+  if (!factory_->CheckRenderProcessAndFrameValid(render_frame_id) ||
+      result == FilterMatchResult::kDisabled) {
+    PostResponseHeadersCallbackToUI(std::move(callback), result, nullptr);
+    return;
+  }
+
+  if (result == FilterMatchResult::kBlockRule) {
+    ElementHider* element_hider = factory_->config_.element_hider;
+    auto adblock_resource_type = utils::DetectResourceType(response_url);
+    if (element_hider->IsElementTypeHideable(adblock_resource_type)) {
+      element_hider->HideBlockedElement(
+          response_url, content::RenderFrameHost::FromID(
+                            factory_->render_process_id_, render_frame_id));
+    }
+    PostResponseHeadersCallbackToUI(std::move(callback), result, nullptr);
+    return;
+  }
+
+  factory_->config_.sitekey_storage->ProcessResponseHeaders(
+      response_url, headers, user_agent);
+
+  factory_->config_.csp_injector
+      ->InsertContentSecurityPolicyHeadersIfApplicable(
+          response_url,
+          content::GlobalRenderFrameHostId(factory_->render_process_id_,
+                                           render_frame_id),
+          headers, base::BindOnce(std::move(callback), result));
+}
+
+void AdblockURLLoaderFactory::InProgressRequest::PostFilterMatchCallbackToUI(
+    CheckFilterMatchCallback callback,
+    FilterMatchResult result) {
+  content::GetUIThreadTaskRunner({kTaskResponsePriority})
+      ->PostTask(FROM_HERE, base::BindOnce(std::move(callback), result));
+}
+
+void AdblockURLLoaderFactory::InProgressRequest::
+    PostResponseHeadersCallbackToUI(
+        ProcessResponseHeadersCallback callback,
+        FilterMatchResult result,
+        network::mojom::ParsedHeadersPtr parsed_headers) {
+  content::GetUIThreadTaskRunner({kTaskResponsePriority})
+      ->PostTask(FROM_HERE, base::BindOnce(std::move(callback), result,
+                                           std::move(parsed_headers)));
+}
+
+void AdblockURLLoaderFactory::InProgressRequest::PostRewriteCallbackToUI(
+    base::OnceCallback<void(const absl::optional<GURL>&)> callback,
+    const absl::optional<GURL>& url) {
+  content::GetUIThreadTaskRunner({kTaskResponsePriority})
+      ->PostTask(FROM_HERE, base::BindOnce(std::move(callback), url));
+}
+
 void AdblockURLLoaderFactory::InProgressRequest::OnReceiveRedirect(
     const net::RedirectInfo& redirect_info,
     network::mojom::URLResponseHeadPtr head) {
   request_url_ = redirect_info.new_url;
-  factory_->adblock_interface_->CheckFilterMatch(
+  CheckFilterMatch(
       request_url_, resource_type_, factory_->frame_tree_node_id_,
       base::BindOnce(&InProgressRequest::OnRedirectFilterMatchResult,
                      weak_factory_.GetWeakPtr(), redirect_info,
@@ -252,14 +494,14 @@ void AdblockURLLoaderFactory::InProgressRequest::OnReceiveRedirect(
 void AdblockURLLoaderFactory::InProgressRequest::OnRedirectFilterMatchResult(
     const net::RedirectInfo& redirect_info,
     network::mojom::URLResponseHeadPtr head,
-    adblock::mojom::FilterMatchResult result) {
+    FilterMatchResult result) {
   if (!factory_->target_factory_.is_bound()) {
     DLOG(WARNING) << "[eyeo] "
                      "AdblockURLLoaderFactory::InProgressRequest::"
                      "OnRedirectFilterMatchResult: target_factory_ not bound";
     return;
   }
-  if (result == adblock::mojom::FilterMatchResult::kBlockRule) {
+  if (result == FilterMatchResult::kBlockRule) {
     OnRequestError(net::ERR_BLOCKED_BY_ADMINISTRATOR);
     return;
   }
@@ -353,7 +595,7 @@ void AdblockURLLoaderFactory::InProgressRequest::Start(
   VLOG(1) << "[eyeo] Checking filter match for: " << request.url << " ("
           << request.resource_type << ")";
 
-  factory_->adblock_interface_->CheckFilterMatch(
+  CheckFilterMatch(
       request.url, request.resource_type, factory_->frame_tree_node_id_,
       base::BindOnce(&InProgressRequest::OnRequestFilterMatchResult,
                      weak_factory_.GetWeakPtr(), std::move(target_loader),
@@ -368,14 +610,14 @@ void AdblockURLLoaderFactory::InProgressRequest::OnRequestFilterMatchResult(
     const network::ResourceRequest& request,
     ::mojo::PendingRemote<network::mojom::URLLoaderClient> proxy_client,
     const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
-    adblock::mojom::FilterMatchResult result) {
+    FilterMatchResult result) {
   if (!factory_->target_factory_.is_bound()) {
     DLOG(WARNING) << "[eyeo] "
                      "AdblockURLLoaderFactory::InProgressRequest::"
                      "OnRequestFilterMatchResult: target_factory_ not bound";
     return;
   }
-  if (result == adblock::mojom::FilterMatchResult::kBlockRule) {
+  if (result == FilterMatchResult::kBlockRule) {
     OnRequestError(net::ERR_BLOCKED_BY_ADMINISTRATOR);
     return;
   }
@@ -385,16 +627,23 @@ void AdblockURLLoaderFactory::InProgressRequest::OnRequestFilterMatchResult(
 }
 
 AdblockURLLoaderFactory::AdblockURLLoaderFactory(
-    std::unique_ptr<mojom::AdblockInterface> adblock_interface,
+    AdblockURLLoaderFactoryConfig config,
+    int32_t render_process_id,
     int frame_tree_node_id,
     mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
     mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
     std::string user_agent_string,
     DisconnectCallback on_disconnect)
-    : adblock_interface_(std::move(adblock_interface)),
+    : config_(std::move(config)),
       frame_tree_node_id_(frame_tree_node_id),
+      render_process_id_(render_process_id),
       user_agent_string_(std::move(user_agent_string)),
       on_disconnect_(std::move(on_disconnect)) {
+  DCHECK(config_.subscription_service);
+  DCHECK(config_.resource_classifier);
+  DCHECK(config_.element_hider);
+  DCHECK(config_.sitekey_storage);
+  DCHECK(config_.csp_injector);
   target_factory_.Bind(std::move(target_factory));
   target_factory_.set_disconnect_handler(base::BindOnce(
       &AdblockURLLoaderFactory::OnTargetFactoryError, base::Unretained(this)));
@@ -420,6 +669,19 @@ void AdblockURLLoaderFactory::CreateLoaderAndStart(
 void AdblockURLLoaderFactory::Clone(
     ::mojo::PendingReceiver<URLLoaderFactory> factory) {
   proxy_receivers_.Add(this, std::move(factory));
+}
+
+bool AdblockURLLoaderFactory::CheckRenderProcessValid() const {
+  auto* process_host = content::RenderProcessHost::FromID(render_process_id_);
+  return process_host;
+}
+
+bool AdblockURLLoaderFactory::CheckRenderProcessAndFrameValid(
+    int32_t render_frame_id) const {
+  auto* process_host = content::RenderProcessHost::FromID(render_process_id_);
+  auto* frame_host =
+      content::RenderFrameHost::FromID(render_process_id_, render_frame_id);
+  return process_host && frame_host;
 }
 
 void AdblockURLLoaderFactory::OnTargetFactoryError() {

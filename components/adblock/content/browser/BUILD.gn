@@ -14,6 +14,17 @@
 # You should have received a copy of the GNU General Public License
 # along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
 
+import("//components/adblock/features.gni")
+
+config("adblock_content_common_config") {
+  defines = []
+
+  if (eyeo_intercept_debug_url) {
+    print("WARNING! Enabled intercepting eyeo debug url \"adblock.test.data\"")
+    defines += [ "EYEO_INTERCEPT_DEBUG_URL=1" ]
+  }
+}
+
 source_set("browser_impl") {
   visibility = [
     ":*",
@@ -22,6 +33,9 @@ source_set("browser_impl") {
   sources = [
     "adblock_content_utils.cc",
     "adblock_content_utils.h",
+    "adblock_filter_match.h",
+    "adblock_url_loader_factory.cc",
+    "adblock_url_loader_factory.h",
     "adblock_webcontents_observer.cc",
     "adblock_webcontents_observer.h",
     "content_security_policy_injector.h",
@@ -39,16 +53,25 @@ source_set("browser_impl") {
     "session_stats_impl.h",
   ]
 
+  if (eyeo_intercept_debug_url) {
+    sources += [
+      "adblock_url_loader_factory_for_test.cc",
+      "adblock_url_loader_factory_for_test.h",
+    ]
+  }
+
   deps = [
     "//base",
     "//url:url",
   ]
 
   public_deps = [
-    "//components/adblock/content/common/mojom:adblock_interfaces",
     "//components/adblock/core",
     "//content/public/browser",
+    "//third_party/blink/public/common:headers",
   ]
+
+  all_dependent_configs = [ ":adblock_content_common_config" ]
 }
 
 source_set("test_support") {
@@ -75,6 +98,7 @@ source_set("unit_tests") {
   testonly = true
   sources = [
     "test/adblock_content_utils_test.cc",
+    "test/adblock_url_loader_factory_test.cc",
     "test/adblock_webcontents_observer_test.cc",
     "test/content_security_policy_injector_impl_test.cc",
     "test/element_hider_impl_test.cc",
@@ -86,6 +110,7 @@ source_set("unit_tests") {
   deps = [
     ":test_support",
     "//base/test:test_support",
+    "//components/adblock/core:test_support",
     "//components/adblock/core:test_support",
     "//components/adblock/core/classifier:test_support",
     "//components/adblock/core/subscription:test_support",

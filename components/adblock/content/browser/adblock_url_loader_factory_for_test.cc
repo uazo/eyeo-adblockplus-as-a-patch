@@ -15,7 +15,7 @@
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "components/adblock/content/common/adblock_url_loader_factory_for_test.h"
+#include "components/adblock/content/browser/adblock_url_loader_factory_for_test.h"
 
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
@@ -87,14 +87,16 @@ const std::string AdblockURLLoaderFactoryForTest::kAdblockDebugDataHostName =
     "adblock.test.data";
 
 AdblockURLLoaderFactoryForTest::AdblockURLLoaderFactoryForTest(
-    std::unique_ptr<mojom::AdblockInterface> adblock_interface,
+    AdblockURLLoaderFactoryConfig config,
+    int32_t render_process_id,
     int frame_tree_node_id,
     mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
     mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
     std::string user_agent_string,
     DisconnectCallback on_disconnect,
     AdblockController* adblock_controller)
-    : AdblockURLLoaderFactory(std::move(adblock_interface),
+    : AdblockURLLoaderFactory(std::move(config),
+                              render_process_id,
                               frame_tree_node_id,
                               std::move(receiver),
                               std::move(target_factory),

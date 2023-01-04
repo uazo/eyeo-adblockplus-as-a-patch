@@ -19,14 +19,16 @@
 
 #include "base/containers/unique_ptr_adapters.h"
 #include "chrome/browser/adblock/adblock_controller_factory.h"
-#include "chrome/browser/adblock/adblock_mojo_interface_impl.h"
+#include "chrome/browser/adblock/content_security_policy_injector_factory.h"
+#include "chrome/browser/adblock/element_hider_factory.h"
 #include "chrome/browser/adblock/resource_classification_runner_factory.h"
+#include "chrome/browser/adblock/sitekey_storage_factory.h"
 #include "chrome/browser/adblock/subscription_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
+#include "components/adblock/content/browser/adblock_url_loader_factory.h"
 #include "components/adblock/content/browser/resource_classification_runner.h"
-#include "components/adblock/content/common/adblock_url_loader_factory.h"
-#include "components/adblock/content/common/mojom/adblock.mojom.h"
+#include "components/adblock/core/adblock_controller.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/subscription/subscription_service.h"
 #include "components/embedder_support/user_agent_utils.h"
@@ -43,7 +45,7 @@
 #include "third_party/blink/public/common/loader/url_loader_throttle.h"
 
 #ifdef EYEO_INTERCEPT_DEBUG_URL
-#include "components/adblock/content/common/adblock_url_loader_factory_for_test.h"
+#include "components/adblock/content/browser/adblock_url_loader_factory_for_test.h"
 #endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
@@ -52,12 +54,13 @@
 
 namespace {
 
-bool IsAdblockEnabled(content::RenderFrameHost* frame) {
+bool IsFilteringNeeded(content::RenderFrameHost* frame) {
   if (frame) {
     auto* profile =
         Profile::FromBrowserContext(frame->GetProcess()->GetBrowserContext());
     if (profile) {
-      return profile->GetPrefs()->GetBoolean(adblock::prefs::kEnableAdblock);
+      return adblock::SubscriptionServiceFactory::GetForBrowserContext(profile)
+                 ->GetStatus() != adblock::FilteringStatus::Inactive;
     }
   }
   return false;
@@ -84,6 +87,17 @@ class AdblockContextData : public base::SupportsUserData::Data {
       self = new AdblockContextData();
       profile->SetUserData(kAdblockContextUserDataKey, base::WrapUnique(self));
     }
+    auto* browser_context =
+        content::WebContents::FromRenderFrameHost(frame)->GetBrowserContext();
+    adblock::AdblockURLLoaderFactoryConfig config{
+        adblock::SubscriptionServiceFactory::GetForBrowserContext(
+            browser_context),
+        adblock::ResourceClassificationRunnerFactory::GetForBrowserContext(
+            browser_context),
+        adblock::ElementHiderFactory::GetForBrowserContext(browser_context),
+        adblock::SitekeyStorageFactory::GetForBrowserContext(browser_context),
+        adblock::ContentSecurityPolicyInjectorFactory::GetForBrowserContext(
+            browser_context)};
 #ifdef EYEO_INTERCEPT_DEBUG_URL
     content::WebContents* wc = content::WebContents::FromRenderFrameHost(frame);
     bool is_adblock_test_url =
@@ -94,9 +108,8 @@ class AdblockContextData : public base::SupportsUserData::Data {
             adblock::AdblockURLLoaderFactoryForTest::kAdblockDebugDataHostName;
     if (is_adblock_test_url) {
       auto proxy = std::make_unique<adblock::AdblockURLLoaderFactoryForTest>(
-          std::make_unique<adblock::AdblockMojoInterfaceImpl>(
-              render_process_id),
-          frame->GetRoutingID(), std::move(receiver), std::move(target_factory),
+          std::move(config), render_process_id, frame->GetRoutingID(),
+          std::move(receiver), std::move(target_factory),
           embedder_support::GetUserAgent(),
           base::BindOnce(&AdblockContextData::RemoveProxy,
                          self->weak_factory_.GetWeakPtr()),
@@ -108,8 +121,8 @@ class AdblockContextData : public base::SupportsUserData::Data {
     }
 #endif
     auto proxy = std::make_unique<adblock::AdblockURLLoaderFactory>(
-        std::make_unique<adblock::AdblockMojoInterfaceImpl>(render_process_id),
-        frame->GetRoutingID(), std::move(receiver), std::move(target_factory),
+        std::move(config), render_process_id, frame->GetRoutingID(),
+        std::move(receiver), std::move(target_factory),
         embedder_support::GetUserAgent(),
         base::BindOnce(&AdblockContextData::RemoveProxy,
                        self->weak_factory_.GetWeakPtr()));
@@ -165,36 +178,33 @@ bool AdblockContentBrowserClient::CanCreateWindow(
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   DCHECK(opener);
 
-  if (IsAdblockEnabled(opener)) {
+  if (IsFilteringNeeded(opener)) {
     content::WebContents* web_contents =
         content::WebContents::FromRenderFrameHost(opener);
     auto* subscription_service =
         adblock::SubscriptionServiceFactory::GetForBrowserContext(
             web_contents->GetBrowserContext());
-    if (subscription_service->IsInitialized()) {
+    if (subscription_service->GetStatus() == adblock::FilteringStatus::Active) {
       GURL popup_url(target_url);
       web_contents->GetPrimaryMainFrame()->GetProcess()->FilterURL(false,
                                                                    &popup_url);
       auto* classification_runner =
           adblock::ResourceClassificationRunnerFactory::GetForBrowserContext(
               web_contents->GetBrowserContext());
+      // TODO(mpawlowski): Use entire Snapshot for classification, DPD-1568.
       const auto popup_blocking_decision =
           classification_runner->ShouldBlockPopup(
-              subscription_service->GetCurrentSnapshot(),
+              std::move(subscription_service->GetCurrentSnapshot()[0]),
               opener_top_level_frame_url, popup_url, opener);
-      if (popup_blocking_decision ==
-          adblock::mojom::FilterMatchResult::kAllowRule)
+      if (popup_blocking_decision == adblock::FilterMatchResult::kAllowRule)
         return true;
-      if (popup_blocking_decision ==
-          adblock::mojom::FilterMatchResult::kBlockRule)
+      if (popup_blocking_decision == adblock::FilterMatchResult::kBlockRule)
         return false;
       // Otherwise, if eyeo adblocking is disabled or there is no rule that
       // explicitly allows or blocks a popup, fall back on Chromium's built-in
       // popup blocker.
-      DCHECK(popup_blocking_decision ==
-                 adblock::mojom::FilterMatchResult::kDisabled ||
-             popup_blocking_decision ==
-                 adblock::mojom::FilterMatchResult::kNoRule);
+      DCHECK(popup_blocking_decision == adblock::FilterMatchResult::kDisabled ||
+             popup_blocking_decision == adblock::FilterMatchResult::kNoRule);
     }
   }
 
@@ -206,7 +216,7 @@ bool AdblockContentBrowserClient::CanCreateWindow(
 
 bool AdblockContentBrowserClient::WillInterceptWebSocket(
     content::RenderFrameHost* frame) {
-  if (IsAdblockEnabled(frame)) {
+  if (IsFilteringNeeded(frame)) {
     return true;
   }
 
@@ -221,7 +231,7 @@ void AdblockContentBrowserClient::CreateWebSocket(
     const absl::optional<std::string>& user_agent,
     mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
         handshake_client) {
-  if (IsAdblockEnabled(frame)) {
+  if (IsFilteringNeeded(frame)) {
     CreateWebSocketInternal(frame->GetGlobalId(), std::move(factory), url,
                             site_for_cookies, user_agent,
                             std::move(handshake_client));
@@ -248,7 +258,8 @@ void AdblockContentBrowserClient::CreateWebSocketInternal(
   auto* subscription_service =
       adblock::SubscriptionServiceFactory::GetForBrowserContext(
           browser_context);
-  if (!subscription_service->IsInitialized()) {
+  if (subscription_service->GetStatus() ==
+      adblock::FilteringStatus::Initializing) {
     subscription_service->RunWhenInitialized(base::BindOnce(
         &AdblockContentBrowserClient::CreateWebSocketInternal,
         weak_factory_.GetWeakPtr(), render_frame_host_id, std::move(factory),
@@ -258,8 +269,10 @@ void AdblockContentBrowserClient::CreateWebSocketInternal(
   auto* classification_runner =
       adblock::ResourceClassificationRunnerFactory::GetForBrowserContext(
           browser_context);
+  // TODO(mpawlowski): Use entire Snapshot for classification, DPD-1568.
   classification_runner->CheckRequestFilterMatchForWebSocket(
-      subscription_service->GetCurrentSnapshot(), url, render_frame_host_id,
+      std::move(subscription_service->GetCurrentSnapshot()[0]), url,
+      render_frame_host_id,
       base::BindOnce(
           &AdblockContentBrowserClient::OnWebSocketFilterCheckCompleted,
           weak_factory_.GetWeakPtr(), render_frame_host_id, std::move(factory),
@@ -274,12 +287,12 @@ void AdblockContentBrowserClient::OnWebSocketFilterCheckCompleted(
     const absl::optional<std::string>& user_agent,
     mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
         handshake_client,
-    adblock::mojom::FilterMatchResult result) {
+    adblock::FilterMatchResult result) {
   auto* frame = content::RenderFrameHost::FromID(render_frame_host_id);
   if (!frame)
     return;
   const bool has_blocking_filter =
-      result == adblock::mojom::FilterMatchResult::kBlockRule;
+      result == adblock::FilterMatchResult::kBlockRule;
   if (!has_blocking_filter) {
     VLOG(1) << "[eyeo] Web socket allowed for " << url;
     if (ChromeContentBrowserClient::WillInterceptWebSocket(frame)) {
@@ -339,8 +352,7 @@ bool AdblockContentBrowserClient::WillCreateURLLoaderFactory(
   bool use_adblock_proxy =
       (type == URLLoaderFactoryType::kDocumentSubResource ||
        type == URLLoaderFactoryType::kNavigation) &&
-      profile &&
-      profile->GetPrefs()->GetBoolean(adblock::prefs::kEnableAdblock);
+      IsFilteringNeeded(frame);
   if (use_adblock_proxy) {
     auto proxied_receiver = std::move(*factory_receiver);
     mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory_remote;

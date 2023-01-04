@@ -44,7 +44,7 @@ class AdblockJNI : public ResourceClassificationRunner::Observer,
 
   // ResourceClassificationRunner::Observer:
   void OnAdMatched(const GURL& url,
-                   mojom::FilterMatchResult result,
+                   FilterMatchResult result,
                    const std::vector<GURL>& parent_frame_urls,
                    ContentType content_type,
                    content::RenderFrameHost* render_frame_host,
@@ -53,7 +53,7 @@ class AdblockJNI : public ResourceClassificationRunner::Observer,
                      content::RenderFrameHost* render_frame_host,
                      const GURL& subscription) final;
   void OnPopupMatched(const GURL& url,
-                      mojom::FilterMatchResult match_result,
+                      FilterMatchResult match_result,
                       const GURL& opener_url,
                       content::RenderFrameHost* render_frame_host,
                       const GURL& subscription) override;

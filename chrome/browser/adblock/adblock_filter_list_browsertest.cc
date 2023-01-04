@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include "chrome/browser/adblock/subscription_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "components/adblock/core/adblock_switches.h"
@@ -45,22 +46,31 @@ class AdblockFilterListDownloadTestBase : public InProcessBrowserTest {
     SetFilterListServerPortForTesting(https_server_.port());
   }
 
+  void CheckRequestParams(const net::test_server::HttpRequest& request,
+                          std::string expected_disabled_value) {
+    std::string os;
+    base::ReplaceChars(version_info::GetOSType(), base::kWhitespaceASCII, "",
+                       &os);
+    EXPECT_TRUE(request.relative_url.find("addonName=eyeo-chromium-sdk") !=
+                std::string::npos);
+    EXPECT_TRUE(request.relative_url.find("addonVersion=1.0") !=
+                std::string::npos);
+    EXPECT_TRUE(request.relative_url.find("platformVersion=1.0") !=
+                std::string::npos);
+    EXPECT_TRUE(request.relative_url.find("platform=" + os) !=
+                std::string::npos);
+    EXPECT_TRUE(
+        request.relative_url.find("disabled=" + expected_disabled_value) !=
+        std::string::npos);
+  }
+
   virtual std::unique_ptr<net::test_server::HttpResponse> RequestHandler(
       const net::test_server::HttpRequest& request) {
-    if (base::StartsWith(request.relative_url, "/abp-filters-anti-cv.txt") ||
-        base::StartsWith(request.relative_url, "/easylist.txt") ||
-        base::StartsWith(request.relative_url, "/exceptionrules.txt")) {
-      std::string os;
-      base::ReplaceChars(version_info::GetOSType(), base::kWhitespaceASCII, "",
-                         &os);
-      EXPECT_TRUE(request.relative_url.find("addonName=eyeo-chromium-sdk") !=
-                  std::string::npos);
-      EXPECT_TRUE(request.relative_url.find("addonVersion=1.0") !=
-                  std::string::npos);
-      EXPECT_TRUE(request.relative_url.find("platformVersion=1.0") !=
-                  std::string::npos);
-      EXPECT_TRUE(request.relative_url.find("platform=" + os) !=
-                  std::string::npos);
+    if (request.method == net::test_server::HttpMethod::METHOD_GET &&
+        (base::StartsWith(request.relative_url, "/abp-filters-anti-cv.txt") ||
+         base::StartsWith(request.relative_url, "/easylist.txt") ||
+         base::StartsWith(request.relative_url, "/exceptionrules.txt"))) {
+      CheckRequestParams(request, "false");
       default_lists_.insert(request.relative_url.substr(
           1, request.relative_url.find_first_of("?") - 1));
     }
@@ -105,6 +115,39 @@ IN_PROC_BROWSER_TEST_F(AdblockEnabledFilterListDownloadTest,
   RunUntilBrowserProcessQuits();
 }
 
+class AdblockEnabledAcceptableAdsDisabledFilterListDownloadTest
+    : public AdblockFilterListDownloadTestBase {
+ public:
+  AdblockEnabledAcceptableAdsDisabledFilterListDownloadTest() {
+    const auto testing_interval = base::Seconds(1);
+    SubscriptionServiceFactory::SetUpdateCheckAndDelayIntervalsForTesting(
+        testing_interval, testing_interval);
+  }
+
+  std::unique_ptr<net::test_server::HttpResponse> RequestHandler(
+      const net::test_server::HttpRequest& request) override {
+    // If we get expected HEAD request we simply finish the test by closing
+    // the browser, otherwise test will fail with a timeout.
+    if (request.method == net::test_server::HttpMethod::METHOD_HEAD &&
+        base::StartsWith(request.relative_url, "/exceptionrules.txt")) {
+      CheckRequestParams(request, "true");
+      CloseBrowserFromAnyThread();
+    }
+
+    return nullptr;
+  }
+
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    command_line->AppendSwitch(adblock::switches::kDisableAcceptableAds);
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(
+    AdblockEnabledAcceptableAdsDisabledFilterListDownloadTest,
+    TestInitialDownloads) {
+  RunUntilBrowserProcessQuits();
+}
+
 class AdblockDisabledFilterListDownloadTest
     : public AdblockFilterListDownloadTestBase {
  public:
@@ -136,16 +179,18 @@ class AdblockPtLocaleFilterListDownloadTest
  public:
   AdblockPtLocaleFilterListDownloadTest()
       : AdblockFilterListDownloadTestBase() {
-    setenv("LC_ALL", "pt_PT.UTF-8", 1);
+    setenv("LANGUAGE", "pt_PT", 1);
   }
 
   std::unique_ptr<net::test_server::HttpResponse> RequestHandler(
       const net::test_server::HttpRequest& request) override {
     EXPECT_FALSE(base::StartsWith(request.relative_url, "/easylist.txt"));
-    if (base::StartsWith(request.relative_url, "/abp-filters-anti-cv.txt") ||
-        base::StartsWith(request.relative_url,
-                         "/easylistportuguese+easylist.txt") ||
-        base::StartsWith(request.relative_url, "/exceptionrules.txt")) {
+    if (request.method == net::test_server::HttpMethod::METHOD_GET &&
+        (base::StartsWith(request.relative_url, "/abp-filters-anti-cv.txt") ||
+         base::StartsWith(request.relative_url,
+                          "/easylistportuguese+easylist.txt") ||
+         base::StartsWith(request.relative_url, "/exceptionrules.txt"))) {
+      CheckRequestParams(request, "false");
       default_lists_.insert(request.relative_url.substr(
           1, request.relative_url.find_first_of("?") - 1));
     }

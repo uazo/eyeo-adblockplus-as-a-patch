@@ -17,12 +17,15 @@
 
 #include "chrome/browser/adblock/adblock_content_browser_client.h"
 
+#include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/adblock/subscription_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/adblock/core/adblock_controller.h"
+#include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/subscription/subscription_service.h"
 #include "components/adblock/core/subscription/test/mock_subscription_service.h"
@@ -74,7 +77,8 @@ IN_PROC_BROWSER_TEST_F(AdblockContentBrowserClientBrowserTest,
   ASSERT_TRUE(ws_server_.Start());
 
   // Disable ad-filtering.
-  browser()->profile()->GetPrefs()->SetBoolean(prefs::kEnableAdblock, false);
+  AdblockControllerFactory::GetForBrowserContext(browser()->profile())
+      ->SetAdblockEnabled(false);
 
   NavigateToHTTP("split_packet_check.html");
 
@@ -88,7 +92,8 @@ IN_PROC_BROWSER_TEST_F(AdblockContentBrowserClientBrowserTest,
   ASSERT_TRUE(ws_server_.Start());
 
   // Enable ad-filtering.
-  browser()->profile()->GetPrefs()->SetBoolean(prefs::kEnableAdblock, true);
+  AdblockControllerFactory::GetForBrowserContext(browser()->profile())
+      ->SetAdblockEnabled(true);
 
   NavigateToHTTP("split_packet_check.html");
 
@@ -102,10 +107,11 @@ IN_PROC_BROWSER_TEST_F(AdblockContentBrowserClientBrowserTest,
   ASSERT_TRUE(ws_server_.Start());
 
   // Intercept WebSocket and block connection via a filter.
-  auto* profile = browser()->profile();
-  profile->GetPrefs()->SetBoolean(prefs::kEnableAdblock, true);
-  SubscriptionServiceFactory::GetForBrowserContext(profile)->SetCustomFilters(
-      {"$websocket"});
+  auto* controller =
+      AdblockControllerFactory::GetForBrowserContext(browser()->profile());
+  controller->SetAdblockEnabled(true);
+  controller->RemoveCustomFilter(kAllowlistEverythingFilter);
+  controller->AddCustomFilter({"$websocket"});
 
   NavigateToHTTP("split_packet_check.html");
 

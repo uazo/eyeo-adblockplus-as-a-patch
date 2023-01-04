@@ -21,8 +21,7 @@
 
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
-#include "components/adblock/core/common/adblock_prefs.h"
-#include "components/prefs/testing_pref_service.h"
+#include "components/adblock/core/test/mock_adblock_controller.h"
 #include "net/base/load_flags.h"
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/resource_request.h"
@@ -58,10 +57,10 @@ const auto kCheckInterval = base::Minutes(5);
 class AdblockTelemetryServiceTest : public testing::Test {
  public:
   void SetUp() override {
-    prefs::RegisterProfilePrefs(pref_service_.registry());
     telemetry_service_ = std::make_unique<AdblockTelemetryService>(
-        &pref_service_, test_shared_url_loader_factory_, kInitialDelay,
+        &controller_, test_shared_url_loader_factory_, kInitialDelay,
         kCheckInterval);
+    EXPECT_TRUE(controller_.observers_.HasObserver(telemetry_service_.get()));
   }
 
   MockTopicProvider* RegisterFooMock() {
@@ -151,7 +150,7 @@ class AdblockTelemetryServiceTest : public testing::Test {
 
   base::test::TaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
-  TestingPrefServiceSimple pref_service_;
+  MockAdblockController controller_;
   network::TestURLLoaderFactory test_url_loader_factory_;
   scoped_refptr<network::SharedURLLoaderFactory>
       test_shared_url_loader_factory_{
@@ -166,7 +165,7 @@ class AdblockTelemetryServiceTest : public testing::Test {
 };
 
 TEST_F(AdblockTelemetryServiceTest, RequestNotMadeBeforeInitialDelay) {
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(true));
 
   auto* mock = RegisterFooMock();
   EXPECT_CALL(*mock, GetTimeOfNextRequest())
@@ -187,7 +186,7 @@ TEST_F(AdblockTelemetryServiceTest, RequestNotMadeBeforeInitialDelay) {
 
 TEST_F(AdblockTelemetryServiceTest,
        ScheduleStartsImmediatelyWhenAdblockEnabled) {
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(true));
 
   RegisterFooMock();
 
@@ -207,7 +206,7 @@ TEST_F(AdblockTelemetryServiceTest,
 }
 
 TEST_F(AdblockTelemetryServiceTest, ScheduleStartupDelayedWhenAdblockDisabled) {
-  pref_service_.SetBoolean(prefs::kEnableAdblock, false);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(false));
 
   RegisterFooMock();
 
@@ -218,11 +217,13 @@ TEST_F(AdblockTelemetryServiceTest, ScheduleStartupDelayedWhenAdblockDisabled) {
 
   // A lot of time passes.
   task_environment_.FastForwardBy(kCheckInterval * 5);
-  // There was no network request made, because prefs::kEnableAdblock is false.
+  // There was no network request made, because IsAdblockEnabled() is false.
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 0);
 
-  // kEnableAdblock becomes true:
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  // IsAdblockEnabled() becomes true:
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(true));
+  for (auto& o : controller_.observers_)
+    o.OnEnabledStateChanged();
 
   // Schedule is started, first request made after kInitialDelay.
   task_environment_.FastForwardBy(kInitialDelay);
@@ -233,12 +234,14 @@ TEST_F(AdblockTelemetryServiceTest, ScheduleStartupDelayedWhenAdblockDisabled) {
 
 TEST_F(AdblockTelemetryServiceTest, ScheduleAbortedWhenAdblockDisabled) {
   // Schedule starts normally, without delay:
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(true));
   RegisterFooMock();
   telemetry_service_->Start();
 
   // User disables Adblocking.
-  pref_service_.SetBoolean(prefs::kEnableAdblock, false);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(false));
+  for (auto& o : controller_.observers_)
+    o.OnEnabledStateChanged();
 
   // A lot of time passes with no requests, schedule is stopped.
   task_environment_.FastForwardBy(kCheckInterval * 5);
@@ -246,7 +249,7 @@ TEST_F(AdblockTelemetryServiceTest, ScheduleAbortedWhenAdblockDisabled) {
 }
 
 TEST_F(AdblockTelemetryServiceTest, MultipleProvidersMakeRequests) {
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(true));
 
   RegisterFooMock();
   RegisterBarMock();
@@ -269,7 +272,7 @@ TEST_F(AdblockTelemetryServiceTest, MultipleProvidersMakeRequests) {
 }
 
 TEST_F(AdblockTelemetryServiceTest, SuccessfulResponseReceived) {
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(true));
 
   auto* mock = RegisterFooMock();
 
@@ -289,7 +292,7 @@ TEST_F(AdblockTelemetryServiceTest, SuccessfulResponseReceived) {
 }
 
 TEST_F(AdblockTelemetryServiceTest, Non200ResponseStillParsed) {
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(true));
 
   auto* mock = RegisterFooMock();
 
@@ -312,7 +315,7 @@ TEST_F(AdblockTelemetryServiceTest, Non200ResponseStillParsed) {
 
 TEST_F(AdblockTelemetryServiceTest, RequestAbortedWhenAdblockDisabled) {
   // Start schedule normally:
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(true));
   auto* mock = RegisterFooMock();
   telemetry_service_->Start();
   task_environment_.FastForwardBy(kInitialDelay);
@@ -322,7 +325,9 @@ TEST_F(AdblockTelemetryServiceTest, RequestAbortedWhenAdblockDisabled) {
   ExpectFooMadeRequest(0);
 
   // Adblocking is disabled before response arrives:
-  pref_service_.SetBoolean(prefs::kEnableAdblock, false);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(false));
+  for (auto& o : controller_.observers_)
+    o.OnEnabledStateChanged();
 
   // Now, TopicProvider is not triggered even when response arrives.
   EXPECT_CALL(*mock, ParseResponse(testing::_)).Times(0);
@@ -332,7 +337,7 @@ TEST_F(AdblockTelemetryServiceTest, RequestAbortedWhenAdblockDisabled) {
 }
 
 TEST_F(AdblockTelemetryServiceTest, NegativeTimeToNextRequest) {
-  pref_service_.SetBoolean(prefs::kEnableAdblock, true);
+  EXPECT_CALL(controller_, IsAdblockEnabled()).WillRepeatedly(Return(true));
 
   auto* mock = RegisterFooMock();
   // TopicProvider returns a negative time to next request, as if the request

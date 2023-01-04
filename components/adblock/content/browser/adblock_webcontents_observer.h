@@ -22,6 +22,7 @@
 #include "components/adblock/content/browser/frame_hierarchy_builder.h"
 #include "components/adblock/core/adblock_controller.h"
 #include "components/adblock/core/sitekey_storage.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
@@ -44,7 +45,7 @@ class AdblockWebContentObserver
  public:
   AdblockWebContentObserver(
       content::WebContents* web_contents,
-      adblock::AdblockController* controller,
+      adblock::SubscriptionService* subscription_service,
       adblock::ElementHider* element_hider,
       adblock::SitekeyStorage* sitekey_storage,
       std::unique_ptr<adblock::FrameHierarchyBuilder> frame_hierarchy_builder);
@@ -64,7 +65,7 @@ class AdblockWebContentObserver
   friend class content::WebContentsUserData<AdblockWebContentObserver>;
   WEB_CONTENTS_USER_DATA_KEY_DECL();
 
-  adblock::AdblockController* controller_;
+  adblock::SubscriptionService* subscription_service_;
   adblock::ElementHider* element_hider_;
   adblock::SitekeyStorage* sitekey_storage_;
 

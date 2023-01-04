@@ -23,22 +23,24 @@
 namespace adblock::prefs {
 
 // Whether to block ads
-const char kEnableAdblock[] = "adblock.enable";
+const char kEnableAdblockLegacy[] = "adblock.enable";
 
-// Whether to allow acceptable ads or block them all
-const char kEnableAcceptableAds[] = "adblock.aa_enable";
+// Legacy: Whether to allow acceptable ads or block them all.
+// Used now just to map CLI switch. Otherwise use kAdblockSubscriptionsLegacy.
+const char kEnableAcceptableAdsLegacy[] = "adblock.aa_enable";
 
 // List of domains ad blocking will be disabled for
-const char kAdblockAllowedDomains[] = "adblock.allowed_domains";
+const char kAdblockAllowedDomainsLegacy[] = "adblock.allowed_domains";
 
 // List of custom filters added explicitly by the user
-const char kAdblockCustomFilters[] = "adblock.custom_filters";
+const char kAdblockCustomFiltersLegacy[] = "adblock.custom_filters";
 
 // List of recommended subscriptions
-const char kAdblockSubscriptions[] = "adblock.subscriptions";
+const char kAdblockSubscriptionsLegacy[] = "adblock.subscriptions";
 
-// List of custom (user defined) subscriptions
-const char kAdblockCustomSubscriptions[] = "adblock.custom_subscriptions";
+// Legacy: List of custom (user defined) subscriptions.
+// Use just kAdblockSubscriptionsLegacy.
+const char kAdblockCustomSubscriptionsLegacy[] = "adblock.custom_subscriptions";
 
 // Whether more options item is enabled in the UI
 const char kAdblockMoreOptionsEnabled[] = "adblock.more_options";
@@ -101,13 +103,13 @@ void RegisterTelemetryPrefs(PrefRegistrySimple* registry) {
 }
 
 void RegisterProfilePrefs(PrefRegistrySimple* registry) {
-  registry->RegisterBooleanPref(kEnableAdblock, true);
-  registry->RegisterBooleanPref(kEnableAcceptableAds, true);
+  registry->RegisterBooleanPref(kEnableAdblockLegacy, true);
+  registry->RegisterBooleanPref(kEnableAcceptableAdsLegacy, true);
   registry->RegisterBooleanPref(kAdblockMoreOptionsEnabled, false);
-  registry->RegisterListPref(kAdblockAllowedDomains, {});
-  registry->RegisterListPref(kAdblockCustomFilters, {});
-  registry->RegisterListPref(kAdblockSubscriptions, {});
-  registry->RegisterListPref(kAdblockCustomSubscriptions, {});
+  registry->RegisterListPref(kAdblockAllowedDomainsLegacy, {});
+  registry->RegisterListPref(kAdblockCustomFiltersLegacy, {});
+  registry->RegisterListPref(kAdblockSubscriptionsLegacy, {});
+  registry->RegisterListPref(kAdblockCustomSubscriptionsLegacy, {});
   registry->RegisterBooleanPref(kInstallFirstStartSubscriptions, true);
   registry->RegisterDictionaryPref(kSubscriptionSignatures);
   registry->RegisterStringPref(kLastUsedSchemaVersion, "");

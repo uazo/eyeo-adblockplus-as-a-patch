@@ -18,6 +18,7 @@
 #include <sstream>
 #include <vector>
 
+#include "base/at_exit.h"
 #include "base/command_line.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -56,6 +57,7 @@ bool Convert(base::FilePath input_path, GURL url, base::FilePath output_path) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
+  base::AtExitManager exit_manager;
   base::CommandLine::Init(argc, argv);
   auto* command_line = base::CommandLine::ForCurrentProcess();
 

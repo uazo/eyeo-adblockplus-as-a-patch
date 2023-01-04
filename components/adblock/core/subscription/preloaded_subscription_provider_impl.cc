@@ -89,7 +89,7 @@ PreloadedSubscriptionProviderImpl::~PreloadedSubscriptionProviderImpl() =
 PreloadedSubscriptionProviderImpl::PreloadedSubscriptionProviderImpl(
     PrefService* prefs) {
   adblocking_enabled_.Init(
-      prefs::kEnableAdblock, prefs,
+      prefs::kEnableAdblockLegacy, prefs,
       base::BindRepeating(
           &PreloadedSubscriptionProviderImpl::OnAdblockingEnabledChanged,
           base::Unretained(this)));

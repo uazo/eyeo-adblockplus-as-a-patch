@@ -25,8 +25,8 @@
 #include "base/sequence_checker.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "components/adblock/core/adblock_controller.h"
 #include "components/keyed_service/core/keyed_service.h"
-#include "components/prefs/pref_member.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "url/gurl.h"
 
@@ -34,14 +34,13 @@ namespace network {
 class SimpleURLLoader;
 }  // namespace network
 
-class PrefService;
-
 namespace adblock {
 /**
  * @brief Sends periodic pings to eyeo in order to count active users. Executed
  * from Browser process UI main thread.
  */
-class AdblockTelemetryService : public KeyedService {
+class AdblockTelemetryService : public KeyedService,
+                                public AdblockController::Observer {
  public:
   // Provides data and behavior relevant for a Telemetry "topic". A topic could
   // be "counting users" or "reporting filter list hits" for example.
@@ -66,7 +65,10 @@ class AdblockTelemetryService : public KeyedService {
         std::unique_ptr<std::string> response_content) = 0;
   };
   AdblockTelemetryService(
-      PrefService* prefs,
+      // TODO(mpawlowski): we're observing AdblockController and will disable
+      // telemetry when IsAdblockEnabled() == false. Should it stay enabled when
+      // some other FilteringConfigurations are enabled?
+      AdblockController* controller,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
       base::TimeDelta initial_delay,
       base::TimeDelta check_interval);
@@ -76,25 +78,27 @@ class AdblockTelemetryService : public KeyedService {
   void AddTopicProvider(std::unique_ptr<TopicProvider> topic_provider);
 
   // Starts periodic Telemetry requests, provided ad-blocking is enabled.
-  // If prefs::kEnableAdblock is false, the schedule will instead start when
-  // the pref becomes true.
+  // If ad blocking is disabled, the schedule will instead start when
+  // ad blocking becomes enabled.
   void Start();
 
   // KeyedService:
   void Shutdown() override;
 
+  // AdblockController::Observer:
+  void OnEnabledStateChanged() override;
+
  private:
-  void OnEnableAdblockChanged();
   void RunPeriodicCheck();
 
   SEQUENCE_CHECKER(sequence_checker_);
+  AdblockController* controller_;
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
   base::TimeDelta initial_delay_;
   base::TimeDelta check_interval_;
 
   class Conversation;
   std::vector<std::unique_ptr<Conversation>> ongoing_conversations_;
-  BooleanPrefMember enable_adblock_;
   base::OneShotTimer timer_;
 };
 

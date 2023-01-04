@@ -32,7 +32,7 @@ constexpr char kBlockedTestSub[] = "http://blocked.sub.com/";
 
 class FakeResourceClassificationRunner : public ResourceClassificationRunner {
  public:
-  MOCK_METHOD((mojom::FilterMatchResult),
+  MOCK_METHOD((FilterMatchResult),
               ShouldBlockPopup,
               (std::unique_ptr<SubscriptionCollection>,
                const GURL& opener,
@@ -45,9 +45,8 @@ class FakeResourceClassificationRunner : public ResourceClassificationRunner {
               (std::unique_ptr<SubscriptionCollection>,
                const GURL& request_url,
                int32_t resource_type,
-               int32_t process_id,
-               int32_t render_frame_id,
-               mojom::AdblockInterface::CheckFilterMatchCallback callback),
+               content::GlobalRenderFrameHostId,
+               CheckFilterMatchCallback callback),
               (override));
 
   MOCK_METHOD(void,
@@ -55,25 +54,23 @@ class FakeResourceClassificationRunner : public ResourceClassificationRunner {
               (std::unique_ptr<SubscriptionCollection>,
                const GURL& request_url,
                content::GlobalRenderFrameHostId render_frame_host,
-               mojom::AdblockInterface::CheckFilterMatchCallback callback),
+               CheckFilterMatchCallback callback),
               (override));
 
   MOCK_METHOD(void,
               CheckResponseFilterMatch,
               (std::unique_ptr<SubscriptionCollection>,
                const GURL& request_url,
-               int32_t process_id,
-               int32_t render_frame_id,
+               content::GlobalRenderFrameHostId,
                const scoped_refptr<net::HttpResponseHeaders>& headers,
-               mojom::AdblockInterface::CheckFilterMatchCallback callback),
+               CheckFilterMatchCallback callback),
               (override));
 
   MOCK_METHOD(void,
               CheckRewriteFilterMatch,
               (std::unique_ptr<SubscriptionCollection>,
                const GURL& url,
-               int32_t process_id,
-               int32_t render_frame_id,
+               content::GlobalRenderFrameHostId,
                base::OnceCallback<void(const absl::optional<GURL>&)> result),
               (override));
 
@@ -86,7 +83,7 @@ class FakeResourceClassificationRunner : public ResourceClassificationRunner {
   }
 
   void NotifyAdMatched(const GURL& url,
-                       mojom::FilterMatchResult result,
+                       FilterMatchResult result,
                        const std::vector<GURL>& parent_frame_urls,
                        ContentType content_type,
                        content::RenderFrameHost* render_frame_host,
@@ -120,11 +117,11 @@ TEST_F(AdblockSessionStatsTest, StatsDataCollected) {
   EXPECT_TRUE(session_stats_->GetSessionAllowedAdsCount().empty());
   EXPECT_TRUE(session_stats_->GetSessionBlockedAdsCount().empty());
 
-  classfier_.NotifyAdMatched(GURL(), mojom::FilterMatchResult::kAllowRule,
+  classfier_.NotifyAdMatched(GURL(), FilterMatchResult::kAllowRule,
                              std::vector<GURL>(), ContentType::Subdocument,
                              nullptr, GURL());
 
-  classfier_.NotifyAdMatched(GURL(), mojom::FilterMatchResult::kBlockRule,
+  classfier_.NotifyAdMatched(GURL(), FilterMatchResult::kBlockRule,
                              std::vector<GURL>(), ContentType::Subdocument,
                              nullptr, GURL());
 
@@ -134,11 +131,11 @@ TEST_F(AdblockSessionStatsTest, StatsDataCollected) {
 
   session_stats_->StartCollectingStats();
 
-  classfier_.NotifyAdMatched(GURL(), mojom::FilterMatchResult::kAllowRule,
+  classfier_.NotifyAdMatched(GURL(), FilterMatchResult::kAllowRule,
                              std::vector<GURL>(), ContentType::Subdocument,
                              nullptr, GURL{kAllowedTestSub});
 
-  classfier_.NotifyAdMatched(GURL(), mojom::FilterMatchResult::kBlockRule,
+  classfier_.NotifyAdMatched(GURL(), FilterMatchResult::kBlockRule,
                              std::vector<GURL>(), ContentType::Subdocument,
                              nullptr, GURL{kBlockedTestSub});
 
@@ -148,7 +145,7 @@ TEST_F(AdblockSessionStatsTest, StatsDataCollected) {
   EXPECT_EQ((std::map<GURL, long>{{GURL(kAllowedTestSub), 1}}), allowed_result);
   EXPECT_EQ((std::map<GURL, long>{{GURL(kBlockedTestSub), 1}}), blocked_result);
 
-  classfier_.NotifyAdMatched(GURL(), mojom::FilterMatchResult::kBlockRule,
+  classfier_.NotifyAdMatched(GURL(), FilterMatchResult::kBlockRule,
                              std::vector<GURL>(), ContentType::Subdocument,
                              nullptr, GURL{kBlockedTestSub});
 

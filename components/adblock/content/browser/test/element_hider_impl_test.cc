@@ -22,6 +22,7 @@
 #include "base/strings/string_util.h"
 #include "base/test/bind.h"
 #include "base/test/mock_callback.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "components/adblock/core/subscription/test/mock_subscription_collection.h"
 #include "components/adblock/core/subscription/test/mock_subscription_service.h"
 #include "content/public/test/test_renderer_host.h"
@@ -45,7 +46,8 @@ TEST_F(AdblockElementHiderImplTest, BatchesSelectors) {
   std::vector<base::StringPiece> emu_selectors;
 
   // SubscriptionService starts initialized.
-  EXPECT_CALL(sub_service_, IsInitialized()).WillOnce(testing::Return(true));
+  EXPECT_CALL(sub_service_, GetStatus())
+      .WillOnce(testing::Return(FilteringStatus::Active));
 
   ElementHiderImpl element_hide(&sub_service_);
   EXPECT_CALL(sub_service_, GetCurrentSnapshot())
@@ -64,7 +66,9 @@ TEST_F(AdblockElementHiderImplTest, BatchesSelectors) {
             .WillOnce(testing::Return(selectors));
         EXPECT_CALL(*collection, GetElementHideEmulationSelectors(kUrl))
             .WillOnce(testing::Return(emu_selectors));
-        return collection;
+        SubscriptionService::Snapshot snapshot;
+        snapshot.push_back(std::move(collection));
+        return snapshot;
       });
 
   element_hide.ApplyElementHidingEmulationOnPage(
@@ -96,7 +100,8 @@ TEST_F(AdblockElementHiderImplTest, AppliesElementHidingOnSiteWithWeirdUrl) {
       "uuid-in-package:429fcc4e-0696-4bad-b099-ee9175f023ad"};
 
   // SubscriptionService starts initialized.
-  EXPECT_CALL(sub_service_, IsInitialized()).WillOnce(testing::Return(true));
+  EXPECT_CALL(sub_service_, GetStatus())
+      .WillOnce(testing::Return(FilteringStatus::Active));
 
   ElementHiderImpl element_hide(&sub_service_);
   EXPECT_CALL(sub_service_, GetCurrentSnapshot())
@@ -119,7 +124,9 @@ TEST_F(AdblockElementHiderImplTest, AppliesElementHidingOnSiteWithWeirdUrl) {
         EXPECT_CALL(*collection,
                     GetElementHideEmulationSelectors(kNonStandardFrameUrl))
             .WillOnce(testing::Return(emu_selectors));
-        return collection;
+        SubscriptionService::Snapshot snapshot;
+        snapshot.push_back(std::move(collection));
+        return snapshot;
       });
 
   element_hide.ApplyElementHidingEmulationOnPage(
@@ -135,7 +142,8 @@ TEST_F(AdblockElementHiderImplTest, UninitializedSubscriptionService) {
   std::vector<base::StringPiece> emu_selectors;
 
   // SubscriptionService starts uninitialized, ElementHider will post a task.
-  EXPECT_CALL(sub_service_, IsInitialized()).WillOnce(testing::Return(false));
+  EXPECT_CALL(sub_service_, GetStatus())
+      .WillOnce(testing::Return(FilteringStatus::Initializing));
   // Remember the posted tasks.
   std::vector<base::OnceClosure> deferred_tasks;
   EXPECT_CALL(sub_service_, RunWhenInitialized(testing::_))
@@ -177,12 +185,14 @@ TEST_F(AdblockElementHiderImplTest, UninitializedSubscriptionService) {
             .WillOnce(testing::Return(selectors));
         EXPECT_CALL(*collection, GetElementHideEmulationSelectors(kUrl))
             .WillOnce(testing::Return(emu_selectors));
-        return collection;
+        SubscriptionService::Snapshot snapshot;
+        snapshot.push_back(std::move(collection));
+        return snapshot;
       });
 
   // From now on, SubscriptionService reports it is initialized.
-  EXPECT_CALL(sub_service_, IsInitialized())
-      .WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(sub_service_, GetStatus())
+      .WillRepeatedly(testing::Return(FilteringStatus::Active));
   // Run any tasks submitted to SubscriptionService by testee via
   // RunWhenInitialized().
   for (auto& task : deferred_tasks) {
@@ -192,7 +202,8 @@ TEST_F(AdblockElementHiderImplTest, UninitializedSubscriptionService) {
 }
 
 TEST_F(AdblockElementHiderImplTest, GeneratesSnippetsWhenAllowListedPage) {
-  EXPECT_CALL(sub_service_, IsInitialized()).WillOnce(testing::Return(true));
+  EXPECT_CALL(sub_service_, GetStatus())
+      .WillOnce(testing::Return(FilteringStatus::Active));
 
   EXPECT_CALL(sub_service_, GetCurrentSnapshot()).WillOnce([this]() {
     auto collection = std::make_unique<MockSubscriptionCollection>();
@@ -206,7 +217,9 @@ TEST_F(AdblockElementHiderImplTest, GeneratesSnippetsWhenAllowListedPage) {
         .WillOnce(testing::Return(GURL("about:blank")));
     EXPECT_CALL(*collection, GenerateSnippetsJson(kUrl, kFrameHierarchy))
         .WillOnce(testing::Return("[]"));
-    return collection;
+    SubscriptionService::Snapshot snapshot;
+    snapshot.push_back(std::move(collection));
+    return snapshot;
   });
 
   ElementHiderImpl element_hide(&sub_service_);
@@ -222,7 +235,8 @@ TEST_F(AdblockElementHiderImplTest, GeneratesSnippetsWhenAllowListedPage) {
 }
 
 TEST_F(AdblockElementHiderImplTest, GeneratesNothingDocumentAllowListed) {
-  EXPECT_CALL(sub_service_, IsInitialized()).WillOnce(testing::Return(true));
+  EXPECT_CALL(sub_service_, GetStatus())
+      .WillOnce(testing::Return(FilteringStatus::Active));
 
   EXPECT_CALL(sub_service_, GetCurrentSnapshot()).WillOnce([this]() {
     auto collection = std::make_unique<MockSubscriptionCollection>();
@@ -230,7 +244,9 @@ TEST_F(AdblockElementHiderImplTest, GeneratesNothingDocumentAllowListed) {
                 FindBySpecialFilter(SpecialFilterType::Document, kUrl,
                                     kFrameHierarchy, kSitekey))
         .WillOnce(testing::Return(GURL("about:blank")));
-    return collection;
+    SubscriptionService::Snapshot snapshot;
+    snapshot.push_back(std::move(collection));
+    return snapshot;
   });
 
   ElementHiderImpl element_hide(&sub_service_);

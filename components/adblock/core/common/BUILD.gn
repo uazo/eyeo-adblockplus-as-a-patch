@@ -20,8 +20,6 @@ source_set("common") {
     "adblock_prefs.h",
     "adblock_utils.cc",
     "adblock_utils.h",
-    "allowed_connection_type.cc",
-    "allowed_connection_type.h",
     "header_filter_data.h",
     "sitekey.h",
   ]

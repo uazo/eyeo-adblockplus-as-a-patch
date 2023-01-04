@@ -11,8 +11,6 @@ At the moment, the following settings are supported:
 | Subscriptions           | List    | Subscriptions to filter lists. |
 | Allowed domains         | List    | Domains on which no ads will be blocked, even when ad-blocking is enabled. |
 | Custom filters          | List    | Additional filters implemented via [filter language](https://help.eyeo.com/adblockplus/how-to-write-filters) |
-| Allowed connection type | String  | Connection type under which filter lists can be downloaded. |
-
 
 ## Implementation details
 

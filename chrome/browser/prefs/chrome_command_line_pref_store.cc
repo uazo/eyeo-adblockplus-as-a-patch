@@ -25,8 +25,8 @@
 #include "build/chromeos_buildflags.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
-#include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/adblock_switches.h"
+#include "components/adblock/core/common/adblock_prefs.h"
 #include "components/browser_sync/browser_sync_switches.h"
 #include "components/language/core/browser/pref_names.h"
 #include "components/proxy_config/proxy_config_dictionary.h"
@@ -97,10 +97,6 @@ const CommandLinePrefStore::BooleanSwitchToPreferenceMapEntry
 #endif
         {switches::kEnableLocalSyncBackend,
          syncer::prefs::kEnableLocalSyncBackend, true},
-        {adblock::switches::kDisableAdblock, adblock::prefs::kEnableAdblock,
-         false},
-        {adblock::switches::kDisableAcceptableAds,
-         adblock::prefs::kEnableAcceptableAds, false},
 #if !BUILDFLAG(IS_CHROMEOS_ASH) && !BUILDFLAG(IS_ANDROID)
         {switches::kUseSystemDefaultPrinter,
          prefs::kPrintPreviewUseSystemDefaultPrinter, true},

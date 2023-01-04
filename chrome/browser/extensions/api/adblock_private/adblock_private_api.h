@@ -58,40 +58,6 @@ void BrowserContextKeyedAPIFactory<
 
 namespace api {
 
-class AdblockPrivateSetUpdateConsentFunction : public ExtensionFunction {
- public:
-  DECLARE_EXTENSION_FUNCTION("adblockPrivate.setUpdateConsent",
-                             ADBLOCKPRIVATE_SETUPDATECONSENT)
-  AdblockPrivateSetUpdateConsentFunction();
-
- private:
-  ~AdblockPrivateSetUpdateConsentFunction() override;
-
-  ResponseAction Run() override;
-
-  AdblockPrivateSetUpdateConsentFunction(
-      const AdblockPrivateSetUpdateConsentFunction&) = delete;
-  AdblockPrivateSetUpdateConsentFunction& operator=(
-      const AdblockPrivateSetUpdateConsentFunction&) = delete;
-};
-
-class AdblockPrivateGetUpdateConsentFunction : public ExtensionFunction {
- public:
-  DECLARE_EXTENSION_FUNCTION("adblockPrivate.getUpdateConsent",
-                             ADBLOCKPRIVATE_GETUPDATECONSENT)
-  AdblockPrivateGetUpdateConsentFunction();
-
- private:
-  ~AdblockPrivateGetUpdateConsentFunction() override;
-
-  ResponseAction Run() override;
-
-  AdblockPrivateGetUpdateConsentFunction(
-      const AdblockPrivateGetUpdateConsentFunction&) = delete;
-  AdblockPrivateGetUpdateConsentFunction& operator=(
-      const AdblockPrivateGetUpdateConsentFunction&) = delete;
-};
-
 class AdblockPrivateSetEnabledFunction : public ExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("adblockPrivate.setEnabled",
@@ -282,6 +248,58 @@ class AdblockPrivateGetCustomSubscriptionsFunction : public ExtensionFunction {
       const AdblockPrivateGetCustomSubscriptionsFunction&) = delete;
   AdblockPrivateGetCustomSubscriptionsFunction& operator=(
       const AdblockPrivateGetCustomSubscriptionsFunction&) = delete;
+};
+
+class AdblockPrivateInstallSubscriptionFunction : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.installSubscription",
+                             ADBLOCKPRIVATE_INSTALLSUBSCRIPTION)
+  AdblockPrivateInstallSubscriptionFunction();
+
+ private:
+  ~AdblockPrivateInstallSubscriptionFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateInstallSubscriptionFunction(
+      const AdblockPrivateInstallSubscriptionFunction&) = delete;
+  AdblockPrivateInstallSubscriptionFunction& operator=(
+      const AdblockPrivateInstallSubscriptionFunction&) = delete;
+};
+
+class AdblockPrivateUninstallSubscriptionFunction : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.uninstallSubscription",
+                             ADBLOCKPRIVATE_UNINSTALLSUBSCRIPTION)
+  AdblockPrivateUninstallSubscriptionFunction();
+
+ private:
+  ~AdblockPrivateUninstallSubscriptionFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateUninstallSubscriptionFunction(
+      const AdblockPrivateUninstallSubscriptionFunction&) = delete;
+  AdblockPrivateUninstallSubscriptionFunction& operator=(
+      const AdblockPrivateUninstallSubscriptionFunction&) = delete;
+};
+
+class AdblockPrivateGetInstalledSubscriptionsFunction
+    : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.getInstalledSubscriptions",
+                             ADBLOCKPRIVATE_GETINSTALLEDSUBSCRIPTIONS)
+  AdblockPrivateGetInstalledSubscriptionsFunction();
+
+ private:
+  ~AdblockPrivateGetInstalledSubscriptionsFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateGetInstalledSubscriptionsFunction(
+      const AdblockPrivateGetInstalledSubscriptionsFunction&) = delete;
+  AdblockPrivateGetInstalledSubscriptionsFunction& operator=(
+      const AdblockPrivateGetInstalledSubscriptionsFunction&) = delete;
 };
 
 class AdblockPrivateAddAllowedDomainFunction : public ExtensionFunction {

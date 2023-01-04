@@ -39,10 +39,9 @@ FrameHierarchyBuilder::FrameHierarchyBuilder() = default;
 FrameHierarchyBuilder::~FrameHierarchyBuilder() = default;
 
 content::RenderFrameHost* FrameHierarchyBuilder::FindRenderFrameHost(
-    int32_t process_id,
-    int32_t routing_id) const {
+    content::GlobalRenderFrameHostId render_frame_host_id) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  return content::RenderFrameHost::FromID(process_id, routing_id);
+  return content::RenderFrameHost::FromID(render_frame_host_id);
 }
 
 std::vector<GURL> FrameHierarchyBuilder::BuildFrameHierarchy(

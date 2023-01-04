@@ -22,12 +22,12 @@ class PrefRegistrySimple;
 
 namespace adblock::prefs {
 
-extern const char kEnableAdblock[];
-extern const char kEnableAcceptableAds[];
-extern const char kAdblockAllowedDomains[];
-extern const char kAdblockCustomFilters[];
-extern const char kAdblockSubscriptions[];
-extern const char kAdblockCustomSubscriptions[];
+extern const char kEnableAdblockLegacy[];
+extern const char kEnableAcceptableAdsLegacy[];
+extern const char kAdblockAllowedDomainsLegacy[];
+extern const char kAdblockCustomFiltersLegacy[];
+extern const char kAdblockSubscriptionsLegacy[];
+extern const char kAdblockCustomSubscriptionsLegacy[];
 extern const char kAdblockMoreOptionsEnabled[];
 extern const char kInstallFirstStartSubscriptions[];
 extern const char kSubscriptionSignatures[];

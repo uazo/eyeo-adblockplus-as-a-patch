@@ -33,7 +33,7 @@ class MockResourceClassificationRunner : public ResourceClassificationRunner {
   void AddObserver(ResourceClassificationRunner::Observer*) override;
   void RemoveObserver(ResourceClassificationRunner::Observer*) override;
 
-  MOCK_METHOD((mojom::FilterMatchResult),
+  MOCK_METHOD((FilterMatchResult),
               ShouldBlockPopup,
               (std::unique_ptr<SubscriptionCollection>,
                const GURL&,
@@ -46,9 +46,8 @@ class MockResourceClassificationRunner : public ResourceClassificationRunner {
               (std::unique_ptr<SubscriptionCollection>,
                const GURL&,
                int32_t,
-               int32_t,
-               int32_t,
-               mojom::AdblockInterface::CheckFilterMatchCallback),
+               content::GlobalRenderFrameHostId,
+               CheckFilterMatchCallback),
               (override));
 
   MOCK_METHOD(void,
@@ -56,25 +55,23 @@ class MockResourceClassificationRunner : public ResourceClassificationRunner {
               (std::unique_ptr<SubscriptionCollection>,
                const GURL&,
                content::GlobalRenderFrameHostId,
-               mojom::AdblockInterface::CheckFilterMatchCallback),
+               CheckFilterMatchCallback),
               (override));
 
   MOCK_METHOD(void,
               CheckResponseFilterMatch,
               (std::unique_ptr<SubscriptionCollection>,
                const GURL&,
-               int32_t,
-               int32_t,
+               content::GlobalRenderFrameHostId,
                const scoped_refptr<net::HttpResponseHeaders>&,
-               mojom::AdblockInterface::CheckFilterMatchCallback),
+               CheckFilterMatchCallback),
               (override));
 
   MOCK_METHOD(void,
               CheckRewriteFilterMatch,
               (std::unique_ptr<SubscriptionCollection>,
                const GURL&,
-               int32_t,
-               int32_t,
+               content::GlobalRenderFrameHostId,
                base::OnceCallback<void(const absl::optional<GURL>&)>),
               (override));
 
