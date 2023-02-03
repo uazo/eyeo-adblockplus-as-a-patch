@@ -312,11 +312,11 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and whatever else without interference from each other.
-  'skia_revision': '664500fa939366283492a66fa9dca19c02283c87',
+  'skia_revision': '9f5ce0f89e2ba479fdb57eebd13204bbed86922b',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': '50c39f3891b1b30842ee91691da7ed2400d68afa',
+  'v8_revision': '4b4e473387ed62f7fcbc95a3bf05244ea0e76a0a',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
@@ -328,7 +328,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': '1d94eaddb44f1e8c16387e5207ef23de70cb3cd8',
+  'pdfium_revision': '89aa9f9ebe803480ec697fb39470ed106869e272',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling BoringSSL
   # and whatever else without interference from each other.
@@ -827,7 +827,7 @@ deps = {
 
   'src/clank': {
     'url': 'https://chrome-internal.googlesource.com/clank/internal/apps.git' + '@' +
-    '572cc1a0be4c03f0421b6ba52665ba88554efed7',
+    'fa33bbf6ed46946cf7b5aee6ad393413e3b09dbe',
     'condition': 'checkout_android and checkout_src_internal and not checkout_clank_via_src_internal',
   },
 
@@ -1271,7 +1271,7 @@ deps = {
     Var('chromium_git') + '/devtools/devtools-frontend' + '@' + Var('devtools_frontend_revision'),
 
   'src/third_party/devtools-frontend-internal': {
-      'url': 'https://chrome-internal.googlesource.com/devtools/devtools-internal.git' + '@' + '5cf34a1fd845758afac0fd8384955f86d989c913',
+      'url': 'https://chrome-internal.googlesource.com/devtools/devtools-internal.git' + '@' + '311659163fe00a68905de50376f1b62b3684fcaf',
     'condition': 'checkout_src_internal',
   },
 
@@ -1871,7 +1871,7 @@ deps = {
     Var('chromium_git') + '/external/github.com/gpuweb/cts.git' + '@' + '9eb57da4a0252044feac56418f4a306f5c66880a',
 
   'src/third_party/webrtc':
-    Var('webrtc_git') + '/src.git' + '@' + 'c71b34235eb0f1f8c7cd3b66a01bd003c1299e00',
+    Var('webrtc_git') + '/src.git' + '@' + '4e8a5ac68e8a4ae0588f54f2fdb8cbd1eb5fa50d',
 
   # Wuffs' canonical repository is at github.com/google/wuffs, but we use
   # Skia's mirror of Wuffs, the same as in upstream Skia's DEPS file.
@@ -1941,7 +1941,7 @@ deps = {
     Var('chromium_git') + '/v8/v8.git' + '@' +  Var('v8_revision'),
 
   'src-internal': {
-    'url': 'https://chrome-internal.googlesource.com/chrome/src-internal.git@67f1b40e780f7c3848d226ac0fb898101e703468',
+    'url': 'https://chrome-internal.googlesource.com/chrome/src-internal.git@d5386b63eb5bd20953dd7f2f3b79d234df2b5077',
     'condition': 'checkout_src_internal',
   },
 
