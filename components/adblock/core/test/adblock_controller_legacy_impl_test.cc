@@ -158,6 +158,19 @@ TEST_F(AdblockControllerLegacyImplTest, AllowedDomainsFollowLegacyPrefs) {
               testing::UnorderedElementsAre("www.google.com"));
 }
 
+TEST_F(AdblockControllerLegacyImplTest,
+       AllowedDomainsReturnedCorrectlyWhenNotOrdered) {
+  RecreateController();
+  testee_->AddAllowedDomain("c.com");
+  testee_->AddAllowedDomain("d.com");
+  testee_->AddAllowedDomain("b.com");
+  testee_->AddAllowedDomain("a.com");
+
+  allowed_domains_pref_.SetValue({"a.com", "d.com"});
+  EXPECT_THAT(filtering_configuration_.GetAllowedDomains(),
+              testing::UnorderedElementsAre("a.com", "d.com"));
+}
+
 TEST_F(AdblockControllerLegacyImplTest, CustomFiltersFollowLegacyPrefs) {
   custom_filters_pref_.SetValue({"google", "abc"});
   RecreateController();
@@ -167,6 +180,19 @@ TEST_F(AdblockControllerLegacyImplTest, CustomFiltersFollowLegacyPrefs) {
   custom_filters_pref_.SetValue({"abc"});
   EXPECT_THAT(filtering_configuration_.GetCustomFilters(),
               testing::UnorderedElementsAre("abc"));
+}
+
+TEST_F(AdblockControllerLegacyImplTest,
+       CustomFiltersReturnedCorrectlyWhenNotOrdered) {
+  RecreateController();
+  testee_->AddCustomFilter("c.com");
+  testee_->AddCustomFilter("d.com");
+  testee_->AddCustomFilter("b.com");
+  testee_->AddCustomFilter("a.com");
+
+  custom_filters_pref_.SetValue({"a.com", "d.com"});
+  EXPECT_THAT(filtering_configuration_.GetCustomFilters(),
+              testing::UnorderedElementsAre("a.com", "d.com"));
 }
 
 TEST_F(AdblockControllerLegacyImplTest, LegacyPrefsFollowApiCalls) {

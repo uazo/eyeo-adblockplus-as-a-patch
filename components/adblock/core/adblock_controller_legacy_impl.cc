@@ -209,6 +209,7 @@ void AdblockControllerLegacyImpl::OnPrefChangedAllowedDomains() {
                          domains_in_prefs.end());
   auto domains_in_configuration =
       adblock_filtering_configuration_->GetAllowedDomains();
+  base::ranges::sort(domains_in_configuration);
 
   std::vector<std::string> domains_to_add;
   base::ranges::set_difference(domains_in_prefs, domains_in_configuration,
@@ -230,6 +231,7 @@ void AdblockControllerLegacyImpl::OnPrefChangedCustomFilters() {
                          filters_in_prefs.end());
   auto filters_in_configuration =
       adblock_filtering_configuration_->GetCustomFilters();
+  base::ranges::sort(filters_in_configuration);
 
   std::vector<std::string> filters_to_add;
   base::ranges::set_difference(filters_in_prefs, filters_in_configuration,

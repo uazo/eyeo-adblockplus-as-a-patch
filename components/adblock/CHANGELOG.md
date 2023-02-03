@@ -1,7 +1,7 @@
 # Release Notes
 
 ## eyeo Chromium SDK 109.0
-* Updated to Chromium 109.0.5414.46
+* Updated to Chromium 109.0.5414.86
 * Removed deprecated Allowed Connection Type API (DPD-1582)
 * Deprecated the distinction between installing Built-In vs Custom subscriptions (DPD-1441)
   - Added API functions to install/uninstall/get subscriptions regardless of their provenance
@@ -20,6 +20,7 @@
   - The "ad-filtering" configuration remains the only possible configuration currently, maintaining
     all existing semantics and APIs
   - Support for multiple configurations is planned for a future release
+* Fixed invalid behavior when removing previously added custom filters and allowed domains
 
 
 ## eyeo Chromium SDK 108.0
@@ -29,7 +30,7 @@
   - Filter lists are now being compressed server-side and are very small (~400 kB)
   - It's no longer advantageous to download them only on Wi-Fi
   - APIs related to Allowed Connection Type are deprecated and non-functional
-  - Those APIs will be removed in version 111
+  - Those APIs will be removed in version 109
 * Ensure Telemetry pings trigger correctly after the computer wakes up from sleep (DPD-1559)
 * Ensure filter list download requests attach Accept-Language header (DPD-1405)
 * Fixed a use-after-free when element hiding was applied on a closed tab (DPD-1600)
