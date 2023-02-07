@@ -169,17 +169,14 @@
   </translations>
   <release seq="1">
     <messages fallback_to_english="true">
-      <message name="IDS_AD_BLOCK_SETTINGS_TITLE" desc="Title of Adblock settings menu item [CHAR-LIMIT=12]">
+      <message name="IDS_ADBLOCK_SETTINGS_TITLE" desc="Title of Adblock settings menu item [CHAR-LIMIT=12]">
         Ad blocking
-      </message>
-      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ENABLED_TITLE" desc="Title of SwitchPreference to enable/disable Adblock">
-        Adblock Plus
       </message>
       <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ENABLED_SUMMARY" desc="Summary of SwitchPreference to enable/disable Adblock">
         Allow ad blocking on websites in this app
       </message>
       <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_FILTER_LISTS_TITLE" desc="Title of MultiSelectListPreference to choose filter lists">
-        Language filters
+        Filter lists
       </message>
       <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_FILTER_LISTS_SUMMARY" desc="Summary of MultiSelectListPreference to choose filter lists">
         Add the languages in which you regularly browse websites in
@@ -199,9 +196,6 @@
       <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ADD_DOMAIN" desc="Hint of EditText for typing domain in allowed domains fragment">
         Enter URL
       </message>
-      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ALLOWED_DOMAINS" desc="Text of TextView above the list of allowed domains in allowed domains fragment">
-        Allowlist
-      </message>
       <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_MORE_OPTIONS_TITLE" desc="Title of the Preference and fragment additional options are shown at">
         More blocking options
       </message>
@@ -213,9 +207,6 @@
       </message>
       <message name="IDS_FRAGMENT_ADBLOCK_MORE_OPTIONS_ADD_CUSTOM_FILTER_LIST" desc="Hint shown in a EditView for adding custom filter list URL">
         http://example.org/myFilterList.txt
-      </message>
-      <message name="IDS_FRAGMENT_ADBLOCK_MORE_OPTIONS_CUSTOM_FILTER_LISTS_LIST" desc="Header shown above the list of custom filter lists">
-        Filter lists
       </message>
       <message name="IDS_FRAGMENT_ADBLOCK_MORE_OPTIONS_CUSTOM_FILTERS_TITLE" desc="Title of the Preference and fragment for adding custom filters">
         Custom Filters

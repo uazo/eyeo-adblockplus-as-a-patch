@@ -59,10 +59,10 @@ class InstalledSubscriptionImpl final : public InstalledSubscription {
                         const GURL& url,
                         const std::string& document_domain,
                         const SiteKey& sitekey) const final;
-  absl::optional<base::StringPiece> FindCspFilter(
-      const GURL& url,
-      const std::string& document_domain,
-      FilterCategory category) const final;
+  void FindCspFilters(const GURL& url,
+                      const std::string& document_domain,
+                      FilterCategory category,
+                      std::set<base::StringPiece>& results) const final;
   absl::optional<base::StringPiece> FindRewriteFilter(
       const GURL& url,
       const std::string& document_domain,

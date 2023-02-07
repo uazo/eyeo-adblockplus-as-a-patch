@@ -71,16 +71,13 @@
     "channel": "dev"
   },
   "action.isEnabled": {
-    // TODO(https://crbug.com/1189295): Upgrade to stable channel.
-    "channel": "dev"
+    "channel": "stable"
   },
   "action.getBadgeTextColor": {
-    // TODO(https://crbug.com/1337783): Upgrade to stable channel.
-    "channel": "dev"
+    "channel": "stable"
   },
   "action.setBadgeTextColor": {
-    // TODO(https://crbug.com/1337783): Upgrade to stable channel.
-    "channel": "dev"
+    "channel": "stable"
   },
   "activityLogPrivate": [{
     "dependencies": ["permission:activityLogPrivate"],
@@ -552,8 +549,7 @@
   }],
   "fileSystemProvider": [{
     "dependencies": ["permission:fileSystemProvider"],
-    "contexts": ["blessed_extension"],
-    "disallow_for_service_workers": true
+    "contexts": ["blessed_extension"]
   }, {
     "channel": "stable",
     "contexts": ["webui_untrusted"],
@@ -565,8 +561,7 @@
   "fileSystemProviderInternal": [{
     "internal": true,
     "dependencies": ["permission:fileSystemProvider"],
-    "contexts": ["blessed_extension"],
-    "disallow_for_service_workers": true
+    "contexts": ["blessed_extension"]
   }, {
     "internal": true,
     "channel": "stable",

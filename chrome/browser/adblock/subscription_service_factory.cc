@@ -30,6 +30,7 @@
 #include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/configuration/persistent_filtering_configuration.h"
 #include "components/adblock/core/converter/converter.h"
+#include "components/adblock/core/subscription/filtering_configuration_maintainer_impl.h"
 #include "components/adblock/core/subscription/installed_subscription_impl.h"
 #include "components/adblock/core/subscription/ongoing_subscription_request_impl.h"
 #include "components/adblock/core/subscription/preloaded_subscription_provider_impl.h"
@@ -79,10 +80,9 @@ constexpr net::BackoffEntry::Policy kRetryBackoffPolicy = {
 };
 
 std::unique_ptr<OngoingSubscriptionRequest> MakeOngoingSubscriptionRequest(
-    PrefService* prefs,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory) {
-  return std::make_unique<OngoingSubscriptionRequestImpl>(
-      prefs, &kRetryBackoffPolicy, url_loader_factory);
+  return std::make_unique<OngoingSubscriptionRequestImpl>(&kRetryBackoffPolicy,
+                                                          url_loader_factory);
 }
 
 ConverterResult ConvertFileToFlatbuffer(const GURL& subscription_url,
@@ -113,6 +113,41 @@ std::unique_ptr<SubscriptionUpdater> MakeSubscriptionUpdater() {
                                                    GetUpdateCheckInterval());
 }
 
+std::unique_ptr<FilteringConfigurationMaintainer>
+MakeFilterConfigurationMaintainer(
+    content::BrowserContext* context,
+    FilteringConfiguration* configuration,
+    FilteringConfigurationMaintainerImpl::SubscriptionUpdatedCallback
+        observer) {
+  auto* prefs = Profile::FromBrowserContext(context)->GetPrefs();
+  auto main_thread_task_runner = base::SequencedTaskRunnerHandle::Get();
+  auto* persistent_metadata =
+      SubscriptionPersistentMetadataFactory::GetForBrowserContext(context);
+  scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory =
+      context->GetDefaultStoragePartition()
+          ->GetURLLoaderFactoryForBrowserProcess();
+
+  const std::string storage_dir = configuration->GetName() + "_subscriptions";
+
+  auto storage = std::make_unique<SubscriptionPersistentStorageImpl>(
+      context->GetPath().AppendASCII(storage_dir),
+      std::make_unique<SubscriptionValidatorImpl>(prefs,
+                                                  CurrentSchemaVersion()),
+      persistent_metadata);
+  auto downloader = std::make_unique<SubscriptionDownloaderImpl>(
+      utils::GetAppInfo(),
+      base::BindRepeating(&MakeOngoingSubscriptionRequest, url_loader_factory),
+      base::BindRepeating(&ConvertFileToFlatbuffer), persistent_metadata);
+
+  auto maintainer = std::make_unique<FilteringConfigurationMaintainerImpl>(
+      configuration, std::move(storage), std::move(downloader),
+      std::make_unique<PreloadedSubscriptionProviderImpl>(),
+      MakeSubscriptionUpdater(), base::BindRepeating(&CustomFilterConverter),
+      persistent_metadata, observer);
+  maintainer->InitializeStorage();
+  return maintainer;
+}
+
 }  // namespace
 
 // static
@@ -137,31 +172,8 @@ SubscriptionServiceFactory::~SubscriptionServiceFactory() = default;
 
 KeyedService* SubscriptionServiceFactory::BuildServiceInstanceFor(
     content::BrowserContext* context) const {
-  auto* prefs = Profile::FromBrowserContext(context)->GetPrefs();
-  auto main_thread_task_runner = base::SequencedTaskRunnerHandle::Get();
-  auto* persistent_metadata =
-      SubscriptionPersistentMetadataFactory::GetForBrowserContext(context);
-  scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory =
-      context->GetDefaultStoragePartition()
-          ->GetURLLoaderFactoryForBrowserProcess();
-
-  auto storage = std::make_unique<SubscriptionPersistentStorageImpl>(
-      context->GetPath().AppendASCII("adblock_subscriptions"),
-      base::MakeRefCounted<SubscriptionValidatorImpl>(
-          prefs, CurrentSchemaVersion(), main_thread_task_runner),
-      persistent_metadata);
-  auto downloader = std::make_unique<SubscriptionDownloaderImpl>(
-      utils::GetAppInfo(),
-      base::BindRepeating(&MakeOngoingSubscriptionRequest,
-                          Profile::FromBrowserContext(context)->GetPrefs(),
-                          url_loader_factory),
-      base::BindRepeating(&ConvertFileToFlatbuffer), persistent_metadata);
-
   return new SubscriptionServiceImpl(
-      std::move(storage), std::move(downloader),
-      std::make_unique<PreloadedSubscriptionProviderImpl>(prefs),
-      MakeSubscriptionUpdater(), base::BindRepeating(&CustomFilterConverter),
-      persistent_metadata);
+      base::BindRepeating(&MakeFilterConfigurationMaintainer, context));
 }
 
 content::BrowserContext* SubscriptionServiceFactory::GetBrowserContextToUse(

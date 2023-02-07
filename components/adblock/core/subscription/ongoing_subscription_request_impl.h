@@ -27,7 +27,6 @@
 #include "base/timer/timer.h"
 #include "components/adblock/core/subscription/ongoing_subscription_request.h"
 #include "components/adblock/core/subscription/subscription_downloader.h"
-#include "components/prefs/pref_member.h"
 #include "net/base/backoff_entry.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
@@ -36,11 +35,7 @@ namespace adblock {
 
 class OngoingSubscriptionRequestImpl final : public OngoingSubscriptionRequest {
  public:
-  // TODO(mpawlowski): This still observes prefs::kEnableAdblockLegacy in
-  // |prefs|. This is no longer a valid way to become notified of needing to
-  // stop the download. Address in DPD-1568.
   OngoingSubscriptionRequestImpl(
-      PrefService* prefs,
       const net::BackoffEntry::Policy* backoff_policy,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory);
   ~OngoingSubscriptionRequestImpl() final;
@@ -51,17 +46,12 @@ class OngoingSubscriptionRequestImpl final : public OngoingSubscriptionRequest {
   size_t GetNumberOfRedirects() const final;
 
  private:
-  bool IsStarted() const;
-  bool IsConnectionAllowed() const;
-  void CheckConnectionAllowed();
   void StartInternal();
-  void StopInternal();
   void OnDownloadFinished(base::FilePath downloaded_file);
   void OnHeadersReceived(scoped_refptr<net::HttpResponseHeaders> headers);
   const char* MethodToString() const;
 
   SEQUENCE_CHECKER(sequence_checker_);
-  BooleanPrefMember adblocking_enabled_;
   std::unique_ptr<net::BackoffEntry> backoff_entry_;
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
   GURL url_;

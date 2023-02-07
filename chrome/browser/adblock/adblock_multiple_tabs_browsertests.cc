@@ -105,7 +105,7 @@ class AdblockMultipleTabsBrowserTest
                       const GURL& subscription) override {}
 
  protected:
-  const int kTabsCount = 4;
+  const int kTabsCount = 3;
   const char* kTestDomain = "example.com";
   std::set<int> tabs_with_blocked_resource_;
   std::set<int> tabs_with_allowed_resource_;

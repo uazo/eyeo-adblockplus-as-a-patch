@@ -43,11 +43,11 @@ class ContentSecurityPolicyInjectorImpl final
       InsertContentSecurityPolicyHeadersCallback callback) final;
 
  private:
-  void OnCspInjectionSearchFinished(
-      const GURL& request_url,
-      const scoped_refptr<net::HttpResponseHeaders>& headers,
+  void OnCspInjectionsSearchFinished(
+      const GURL request_url,
+      const scoped_refptr<net::HttpResponseHeaders> headers,
       InsertContentSecurityPolicyHeadersCallback callback,
-      std::string csp_injection);
+      std::set<base::StringPiece> csp_injections);
 
   void OnUpdatedHeadersParsed(
       InsertContentSecurityPolicyHeadersCallback callback,

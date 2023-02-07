@@ -42,7 +42,7 @@ public class AdblockAllowedDomainsFragment extends AdblockCustomItemFragment {
 
     @Override
     protected String getCustomItemTextViewText() {
-        return getString(R.string.fragment_adblock_settings_allowed_domains);
+        return getString(R.string.fragment_adblock_settings_allowed_domains_title);
     }
 
     @Override

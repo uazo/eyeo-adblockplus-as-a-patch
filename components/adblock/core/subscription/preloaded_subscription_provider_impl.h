@@ -23,8 +23,6 @@
 #include "components/adblock/core/subscription/preloaded_subscription_provider.h"
 
 #include "base/strings/string_piece_forward.h"
-#include "components/prefs/pref_member.h"
-#include "components/prefs/pref_service.h"
 
 namespace adblock {
 
@@ -32,10 +30,7 @@ class PreloadedSubscriptionProviderImpl final
     : public PreloadedSubscriptionProvider {
  public:
   ~PreloadedSubscriptionProviderImpl() final;
-  // TODO(mpawlowski): This still observes prefs::kEnableAdblockLegacy in
-  // |prefs|. This is no longer a valid way to become notified of needing to
-  // deallocate the preloaded subscriptions. Address in DPD-1568.
-  explicit PreloadedSubscriptionProviderImpl(PrefService* prefs);
+  PreloadedSubscriptionProviderImpl();
 
   void UpdateSubscriptions(std::vector<GURL> installed_subscriptions,
                            std::vector<GURL> pending_subscriptions) final;
@@ -45,10 +40,8 @@ class PreloadedSubscriptionProviderImpl final
 
  private:
   void UpdateSubscriptionsInternal();
-  void OnAdblockingEnabledChanged();
 
   class SingleSubscriptionProvider;
-  BooleanPrefMember adblocking_enabled_;
   std::vector<GURL> installed_subscriptions_;
   std::vector<GURL> pending_subscriptions_;
   std::vector<SingleSubscriptionProvider> providers_;

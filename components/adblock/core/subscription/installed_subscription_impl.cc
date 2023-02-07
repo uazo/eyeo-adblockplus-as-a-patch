@@ -124,21 +124,22 @@ bool InstalledSubscriptionImpl::HasPopupFilter(const GURL& url,
       url, absl::nullopt, opener_url.host(), sitekey.value(), category);
 }
 
-absl::optional<base::StringPiece> InstalledSubscriptionImpl::FindCspFilter(
+void InstalledSubscriptionImpl::FindCspFilters(
     const GURL& url,
     const std::string& document_domain,
-    FilterCategory category) const {
-  auto* filter = FindInternal(
-      category != FilterCategory::Allowing ? index_->url_csp_block()
-                                           : index_->url_csp_allow(),
-      url, absl::nullopt, document_domain, "", category);
-  if (!filter)
-    return absl::nullopt;
-  DCHECK(category == FilterCategory::Allowing || filter->csp_filter())
-      << "Blocking CSP filter must contain payload";
-  return filter->csp_filter() ? base::StringPiece(filter->csp_filter()->c_str(),
-                                                  filter->csp_filter()->size())
-                              : base::StringPiece();
+    FilterCategory category,
+    std::set<base::StringPiece>& results) const {
+  for (auto* filter : FindAllInternal(
+           category != FilterCategory::Allowing ? index_->url_csp_block()
+                                                : index_->url_csp_allow(),
+           url, absl::nullopt, document_domain, "", category)) {
+    DCHECK(category == FilterCategory::Allowing || filter->csp_filter())
+        << "Blocking CSP filter must contain payload";
+    results.insert(filter->csp_filter()
+                       ? base::StringPiece(filter->csp_filter()->c_str(),
+                                           filter->csp_filter()->size())
+                       : base::StringPiece());
+  }
 }
 
 absl::optional<base::StringPiece> InstalledSubscriptionImpl::FindRewriteFilter(

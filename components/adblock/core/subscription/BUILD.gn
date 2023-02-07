@@ -18,6 +18,9 @@ source_set("subscription") {
   sources = [
     "domain_splitter.cc",
     "domain_splitter.h",
+    "filtering_configuration_maintainer.h",
+    "filtering_configuration_maintainer_impl.cc",
+    "filtering_configuration_maintainer_impl.h",
     "installed_subscription.cc",
     "installed_subscription.h",
     "installed_subscription_impl.cc",
@@ -50,7 +53,6 @@ source_set("subscription") {
     "subscription_updater.h",
     "subscription_updater_impl.cc",
     "subscription_updater_impl.h",
-    "subscription_validator.cc",
     "subscription_validator.h",
     "subscription_validator_impl.cc",
     "subscription_validator_impl.h",
@@ -70,6 +72,8 @@ source_set("subscription") {
 source_set("test_support") {
   testonly = true
   sources = [
+    "test/mock_filtering_configuration_mainainer.cc",
+    "test/mock_filtering_configuration_mainainer.h",
     "test/mock_installed_subscription.cc",
     "test/mock_installed_subscription.h",
     "test/mock_subscription.cc",
@@ -88,6 +92,7 @@ source_set("test_support") {
 
   public_deps = [
     ":subscription",
+    "//components/adblock/core/configuration:test_support",
     "//testing/gmock",
     "//testing/gtest",
   ]
@@ -96,6 +101,7 @@ source_set("test_support") {
 source_set("unit_tests") {
   testonly = true
   sources = [
+    "test/filtering_configuration_maintainer_impl_test.cc",
     "test/installed_subscription_impl_test.cc",
     "test/ongoing_subscription_request_impl_test.cc",
     "test/preloaded_subscription_provider_impl_test.cc",

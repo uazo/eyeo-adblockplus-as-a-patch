@@ -48,13 +48,19 @@ AdblockWebContentObserver::~AdblockWebContentObserver() = default;
 
 void AdblockWebContentObserver::DidFinishNavigation(
     content::NavigationHandle* navigation_handle) {
+  if (base::ranges::none_of(
+          subscription_service_->GetInstalledFilteringConfigurations(),
+          &adblock::FilteringConfiguration::IsEnabled)) {
+    return;
+  }
   const GURL& url = navigation_handle->GetURL();
   VLOG(1) << "[eyeo] Finished navigation: URL=" << url
           << ", has_commited=" << navigation_handle->HasCommitted()
           << ", is_error=" << navigation_handle->IsErrorPage()
           << ", isInMainFrame=" << navigation_handle->IsInMainFrame();
-
   if (navigation_handle->HasCommitted()) {
+    if (!navigation_handle->GetRenderFrameHost())
+      return;
     if (!navigation_handle->IsErrorPage()) {
       DVLOG(3) << "[eyeo] Ready to inject JS to " << url.spec();
       HandleOnLoad(navigation_handle->GetRenderFrameHost());
@@ -81,12 +87,6 @@ void AdblockWebContentObserver::DidFinishNavigation(
 
 void AdblockWebContentObserver::HandleOnLoad(
     content::RenderFrameHost* frame_host) {
-  if (!subscription_service_ || subscription_service_->GetStatus() ==
-                                    adblock::FilteringStatus::Inactive) {
-    LOG(WARNING) << "[eyeo] Adblocking is disabled, skip apply element hiding.";
-    return;
-  }
-
   DCHECK(frame_host);
   const GURL url =
       frame_hierarchy_builder_->FindUrlForFrame(frame_host, web_contents());

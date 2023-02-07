@@ -58,11 +58,12 @@ class MockInstalledSubscription : public NiceMock<InstalledSubscription> {
                const std::string& document_domain,
                const SiteKey& sitekey),
               (override, const));
-  MOCK_METHOD(absl::optional<base::StringPiece>,
-              FindCspFilter,
+  MOCK_METHOD(void,
+              FindCspFilters,
               (const GURL& url,
                const std::string& document_domain,
-               FilterCategory category),
+               FilterCategory category,
+               std::set<base::StringPiece>& results),
               (override, const));
   MOCK_METHOD(absl::optional<base::StringPiece>,
               FindRewriteFilter,

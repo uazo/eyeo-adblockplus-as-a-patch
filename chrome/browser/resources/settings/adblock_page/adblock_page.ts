@@ -272,9 +272,10 @@ export class SettingsAdblockPageElement extends
    }
 
    private addCustomFilter() {
-      if (this.customFilterInput == undefined) return;
+      if (this.customFilterInput == undefined || this.customFilterInput ==  "") return;
       this.appendPrefListItem("adblock.custom_filters", this.customFilterInput);
-      this.push('customFilters', this.customFilterInput);
+      this.customFilterInput = "";
+      this.syncCustomFilters();
    }
 
    private removeAllowedDomain(e: Event) {
@@ -285,11 +286,12 @@ export class SettingsAdblockPageElement extends
    }
 
    private addAllowedDomain() {
-      if (this.allowedDomainInput == undefined) return;
+      if (this.allowedDomainInput == undefined || this.allowedDomainInput == "") return;
       const cleanedUrl = this.cleanUrl(this.allowedDomainInput);
       if (cleanedUrl == "") return;
       this.appendPrefListItem("adblock.allowed_domains", cleanedUrl);
-      this.push('allowedDomains', cleanedUrl);
+      this.allowedDomainInput = "";
+      this.syncAllowedDomains();
    }
 
    private removeCustomSubscription(e: Event) {
@@ -300,9 +302,10 @@ export class SettingsAdblockPageElement extends
    }
 
    private addCustomSubscription() {
-      if (this.customSubscriptionInput == undefined) return;
+      if (this.customSubscriptionInput == undefined || this.customSubscriptionInput == "") return;
       this.appendPrefListItem("adblock.custom_subscriptions", this.customSubscriptionInput);
-      this.push('customSubscriptions', this.customSubscriptionInput);
+      this.customSubscriptionInput = "";
+      this.syncCustomSubscriptions();
    }
 }
 

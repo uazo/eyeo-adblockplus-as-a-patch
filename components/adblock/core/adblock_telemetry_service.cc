@@ -63,7 +63,7 @@ net::NetworkTrafficAnnotationTag kTrafficAnnotation =
       policy {
         cookies_allowed: NO
         setting:
-          "Enabled or disabled via 'Adblock Plus' setting."
+          "Enabled or disabled via 'Ad blocking' setting."
         policy_exception_justification:
           "Parent setting may be controlled by policy"
         }

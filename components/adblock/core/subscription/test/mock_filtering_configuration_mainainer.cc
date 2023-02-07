@@ -15,10 +15,14 @@
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "components/adblock/core/subscription/subscription_validator.h"
+#include "components/adblock/core/subscription/test/mock_filtering_configuration_mainainer.h"
 
 namespace adblock {
 
-SubscriptionValidator::~SubscriptionValidator() = default;
+MockFilteringConfigurationMaintainer::MockFilteringConfigurationMaintainer() =
+    default;
+MockFilteringConfigurationMaintainer::~MockFilteringConfigurationMaintainer() {
+  Destructor();
+}
 
 }  // namespace adblock

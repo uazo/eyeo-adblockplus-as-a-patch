@@ -1656,19 +1656,48 @@ TEST_F(AdblockConverterTest, CspFilterForUrl) {
     test.com^$csp=script-src 'self'
     )");
 
-  EXPECT_EQ(subscriptions->FindCspFilter(GURL("https://test.com/resource.jpg"),
-                                         "test.com", FilterCategory::Blocking),
-            "script-src 'self'");
+  std::set<base::StringPiece> filters1;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Blocking, filters1);
+  EXPECT_THAT(filters1, testing::UnorderedElementsAre("script-src 'self'"));
 
   // Different URL, not found.
-  EXPECT_FALSE(
-      subscriptions->FindCspFilter(GURL("https://test.org/resource.jpg"),
-                                   "test.com", FilterCategory::Blocking));
+  std::set<base::StringPiece> filters2;
+  subscriptions->FindCspFilters(GURL("https://test.org/resource.jpg"),
+                                "test.com", FilterCategory::Blocking, filters2);
+  EXPECT_TRUE(filters2.empty());
 
   // Allowing filter, not found.
-  EXPECT_FALSE(
-      subscriptions->FindCspFilter(GURL("https://test.com/resource.jpg"),
-                                   "test.com", FilterCategory::Allowing));
+  std::set<base::StringPiece> filters3;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Allowing, filters3);
+  EXPECT_TRUE(filters3.empty());
+}
+
+TEST_F(AdblockConverterTest, MultipleCspFiltersForUrl) {
+  auto subscriptions = ConvertAndLoadRules(R"(
+    test.com^$csp=script-src 'first'
+    test.com^$csp=script-src 'second'
+    )");
+
+  std::set<base::StringPiece> filters1;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Blocking, filters1);
+  EXPECT_THAT(filters1, testing::UnorderedElementsAre(
+                            base::StringPiece("script-src 'first'"),
+                            base::StringPiece("script-src 'second'")));
+
+  // Different URL, not found.
+  std::set<base::StringPiece> filters2;
+  subscriptions->FindCspFilters(GURL("https://test.org/resource.jpg"),
+                                "test.com", FilterCategory::Blocking, filters2);
+  EXPECT_TRUE(filters2.empty());
+
+  // Allowing filter, not found.
+  std::set<base::StringPiece> filters3;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Allowing, filters3);
+  EXPECT_TRUE(filters3.empty());
 }
 
 TEST_F(AdblockConverterTest, CspFilterForDomain) {
@@ -1676,16 +1705,24 @@ TEST_F(AdblockConverterTest, CspFilterForDomain) {
     $csp=script-src 'self' '*' 'unsafe-inline',domain=dom_a.com|dom_b.com
     )");
 
-  EXPECT_EQ(subscriptions->FindCspFilter(GURL("https://test.com/resource.jpg"),
-                                         "dom_b.com", FilterCategory::Blocking),
-            "script-src 'self' '*' 'unsafe-inline'");
-  EXPECT_EQ(subscriptions->FindCspFilter(GURL("https://test.com/resource.jpg"),
-                                         "dom_a.com", FilterCategory::Blocking),
-            "script-src 'self' '*' 'unsafe-inline'");
-  // URL and domain flipped.
-  EXPECT_FALSE(
-      subscriptions->FindCspFilter(GURL("https://dom_a.com/resource.jpg"),
-                                   "test.com", FilterCategory::Blocking));
+  std::set<base::StringPiece> filters1;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "dom_b.com", FilterCategory::Blocking,
+                                filters1);
+  EXPECT_THAT(filters1, testing::UnorderedElementsAre(
+                            "script-src 'self' '*' 'unsafe-inline'"));
+
+  std::set<base::StringPiece> filters2;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "dom_a.com", FilterCategory::Blocking,
+                                filters2);
+  EXPECT_THAT(filters2, testing::UnorderedElementsAre(
+                            "script-src 'self' '*' 'unsafe-inline'"));
+
+  std::set<base::StringPiece> filters3;
+  subscriptions->FindCspFilters(GURL("https://dom_a.com/resource.jpg"),
+                                "test.com", FilterCategory::Blocking, filters3);
+  EXPECT_TRUE(filters3.empty());
 }
 
 TEST_F(AdblockConverterTest, AllowingCspFilterNoPayload) {
@@ -1694,14 +1731,19 @@ TEST_F(AdblockConverterTest, AllowingCspFilterNoPayload) {
     @@test.com^$csp
     )");
 
-  EXPECT_EQ(subscriptions->FindCspFilter(GURL("https://test.com/resource.jpg"),
-                                         "test.com", FilterCategory::Blocking),
-            "script-src 'self'");
+  std::set<base::StringPiece> blocking_filters;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Blocking,
+                                blocking_filters);
+  EXPECT_THAT(blocking_filters,
+              testing::UnorderedElementsAre("script-src 'self'"));
 
   // Allowing filter is found, with an empty payload.
-  EXPECT_EQ(subscriptions->FindCspFilter(GURL("https://test.com/resource.jpg"),
-                                         "test.com", FilterCategory::Allowing),
-            "");
+  std::set<base::StringPiece> allowing_filters;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Allowing,
+                                allowing_filters);
+  EXPECT_THAT(allowing_filters, testing::UnorderedElementsAre(""));
 }
 
 TEST_F(AdblockConverterTest, AllowingCspFilterWithPayload) {
@@ -1710,14 +1752,46 @@ TEST_F(AdblockConverterTest, AllowingCspFilterWithPayload) {
     @@test.com^$csp=script-src 'self'
     )");
 
-  EXPECT_EQ(subscriptions->FindCspFilter(GURL("https://test.com/resource.jpg"),
-                                         "test.com", FilterCategory::Blocking),
-            "script-src 'self'");
+  std::set<base::StringPiece> blocking_filters;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Blocking,
+                                blocking_filters);
+  EXPECT_THAT(blocking_filters,
+              testing::UnorderedElementsAre("script-src 'self'"));
 
   // Allowing filter is found, with payload.
-  EXPECT_EQ(subscriptions->FindCspFilter(GURL("https://test.com/resource.jpg"),
-                                         "test.com", FilterCategory::Allowing),
-            "script-src 'self'");
+  std::set<base::StringPiece> allowing_filters;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Allowing,
+                                allowing_filters);
+  EXPECT_THAT(allowing_filters,
+              testing::UnorderedElementsAre("script-src 'self'"));
+}
+
+TEST_F(AdblockConverterTest, MultipleAllowingCspFiltersWithPayload) {
+  auto subscriptions = ConvertAndLoadRules(R"(
+    test.com^$csp=script-src 'self'
+    @@test.com^$csp=script-src 'first'
+    @@test.com^$csp=script-src 'second'
+    )");
+
+  std::set<base::StringPiece> expected_blocking{"script-src 'self'"};
+
+  std::set<base::StringPiece> blocking_filters;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Blocking,
+                                blocking_filters);
+  EXPECT_EQ(expected_blocking, blocking_filters);
+
+  // Allowing filter is found, with payload.
+  std::set<base::StringPiece> expected_allowing{"script-src 'first'",
+                                                "script-src 'second'"};
+
+  std::set<base::StringPiece> allowing_filters;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Allowing,
+                                allowing_filters);
+  EXPECT_EQ(expected_allowing, allowing_filters);
 }
 
 TEST_F(AdblockConverterTest, DomainSpecificOnlyCspFilter) {
@@ -1727,9 +1801,11 @@ TEST_F(AdblockConverterTest, DomainSpecificOnlyCspFilter) {
     )");
 
   // It's not found when domain_specific_only = true.
-  EXPECT_FALSE(subscriptions->FindCspFilter(
+  std::set<base::StringPiece> results;
+  subscriptions->FindCspFilters(
       GURL("https://test.com/resource.jpg"), "test.com",
-      FilterCategory::DomainSpecificBlocking));
+      FilterCategory::DomainSpecificBlocking, results);
+  EXPECT_TRUE(results.empty());
 }
 
 TEST_F(AdblockConverterTest, ThirdPartyCspFilters) {
@@ -1739,22 +1815,25 @@ TEST_F(AdblockConverterTest, ThirdPartyCspFilters) {
     )");
 
   // only-third is only found when the URL is from a different domain.
-  EXPECT_EQ(
-      subscriptions->FindCspFilter(GURL("https://only-third.com/resource.jpg"),
-                                   "different.com", FilterCategory::Blocking),
-      "only-third");
-  EXPECT_FALSE(
-      subscriptions->FindCspFilter(GURL("https://only-third.com/resource.jpg"),
-                                   "only-third.com", FilterCategory::Blocking));
+
+  std::set<base::StringPiece> filters1;
+  subscriptions->FindCspFilters(GURL("https://only-third.com/resource.jpg"),
+                                "only-third.com", FilterCategory::Blocking,
+                                filters1);
+  EXPECT_TRUE(filters1.empty());
 
   // never-third is only found when the URL is from the same domain.
-  EXPECT_EQ(
-      subscriptions->FindCspFilter(GURL("https://never-third.com/resource.jpg"),
-                                   "never-third.com", FilterCategory::Blocking),
-      "never-third");
-  EXPECT_FALSE(
-      subscriptions->FindCspFilter(GURL("https://never-third.com/resource.jpg"),
-                                   "different.com", FilterCategory::Blocking));
+  std::set<base::StringPiece> filters2;
+  subscriptions->FindCspFilters(GURL("https://never-third.com/resource.jpg"),
+                                "never-third.com", FilterCategory::Blocking,
+                                filters2);
+  EXPECT_THAT(filters2, testing::UnorderedElementsAre("never-third"));
+
+  std::set<base::StringPiece> results3;
+  subscriptions->FindCspFilters(GURL("https://never-third.com/resource.jpg"),
+                                "different.com", FilterCategory::Blocking,
+                                results3);
+  EXPECT_TRUE(results3.empty());
 }
 
 TEST_F(AdblockConverterTest, BlockingCspFilterWithoutPayloadIgnored) {
@@ -1764,9 +1843,10 @@ TEST_F(AdblockConverterTest, BlockingCspFilterWithoutPayloadIgnored) {
     test.com^$csp
     )");
 
-  EXPECT_FALSE(
-      subscriptions->FindCspFilter(GURL("https://test.com/resource.jpg"),
-                                   "test.com", FilterCategory::Blocking));
+  std::set<base::StringPiece> results;
+  subscriptions->FindCspFilters(GURL("https://test.com/resource.jpg"),
+                                "test.com", FilterCategory::Blocking, results);
+  EXPECT_TRUE(results.empty());
 }
 
 TEST_F(AdblockConverterTest, RewriteValid) {
@@ -2140,6 +2220,18 @@ TEST_F(AdblockConverterTest, IdnUrl) {
       GURL(u"https://форум-трейдеров.рф/"), false);
   EXPECT_EQ(FilterSelectors(selectors),
             std::set<base::StringPiece>({"div[class=\"форум\"]"}));
+}
+
+TEST_F(AdblockConverterTest, CRLF) {
+  auto subscription =
+      ConvertAndLoadRules("!Version: xxx\r\ntest1.com\r\ntest2.com");
+  EXPECT_TRUE(subscription->HasUrlFilter(
+      GURL("https://test1.com/testfiles/a/b.png"), "test1.com",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+  EXPECT_TRUE(subscription->HasUrlFilter(
+      GURL("https://test2.com/testfiles/a/b.png"), "test2.com",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+  EXPECT_EQ(subscription->GetCurrentVersion(), "xxx");
 }
 
 // TODO(mpawlowski) support multiple CSP filters per URL + frame hierarchy:

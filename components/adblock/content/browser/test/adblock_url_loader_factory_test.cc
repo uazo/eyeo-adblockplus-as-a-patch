@@ -36,32 +36,33 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
+const std::string kTestUserAgent = "test-user-agent";
+
+enum class HostState { Alive, Dead };
+
 class TestURLLoaderFactory : public adblock::AdblockURLLoaderFactory {
  public:
   TestURLLoaderFactory(
       adblock::AdblockURLLoaderFactoryConfig config,
-      int32_t render_process_id,
-      int frame_tree_node_id,
+      content::GlobalRenderFrameHostId host_id,
       mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
       mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
       std::string user_agent_string,
       DisconnectCallback on_disconnect)
       : adblock::AdblockURLLoaderFactory(std::move(config),
-                                         render_process_id,
-                                         frame_tree_node_id,
+                                         host_id,
                                          std::move(receiver),
                                          std::move(target_factory),
                                          user_agent_string,
-                                         std::move(on_disconnect)) {}
+                                         std::move(on_disconnect)),
+        state_(HostState::Alive) {}
 
-  bool CheckRenderProcessValid() const override { return true; }
-  bool CheckRenderProcessAndFrameValid(
-      int32_t /*render_frame_id*/) const override {
-    return true;
-  }
+  bool CheckHostValid() const override { return state_ == HostState::Alive; }
+  void ApplyState(HostState state) { state_ = state; }
+
+ private:
+  HostState state_;
 };
-
-const std::string kTestUserAgent = "test-user-agent";
 
 struct RequestFlow {
   GURL url{"https://test.com"};
@@ -69,89 +70,9 @@ struct RequestFlow {
       adblock::FilterMatchResult::kAllowRule;
   adblock::FilterMatchResult response_match =
       adblock::FilterMatchResult::kAllowRule;
-  absl::optional<GURL> rewrite_url{};
-  bool subscription_service_ready = true;
   bool element_hidable = true;
-
-  bool IsRequestAllowed() const {
-    return request_match != adblock::FilterMatchResult::kBlockRule;
-  }
-
-  bool IsResponseAllowed() const {
-    return IsRequestAllowed() &&
-           response_match != adblock::FilterMatchResult::kBlockRule;
-  }
-
-  const GURL& ActualUrl() const {
-    return rewrite_url.has_value() ? rewrite_url.value() : url;
-  }
-
-  void ConfigureClassifier(adblock::MockResourceClassificationRunner& service) {
-    EXPECT_CALL(service, CheckRewriteFilterMatch(testing::_, url, testing::_,
-                                                 testing::_))
-        .WillOnce(
-            [&](auto, const GURL&, content::GlobalRenderFrameHostId,
-                base::OnceCallback<void(const absl::optional<GURL>&)> cb) {
-              std::move(cb).Run(rewrite_url);
-            });
-    EXPECT_CALL(service,
-                CheckRequestFilterMatch(testing::_, ActualUrl(), testing::_,
-                                        testing::_, testing::_))
-        .WillOnce([&](auto, const GURL&, int32_t,
-                      content::GlobalRenderFrameHostId,
-                      adblock::CheckFilterMatchCallback cb) {
-          std::move(cb).Run(request_match);
-        });
-    if (IsRequestAllowed()) {
-      EXPECT_CALL(service,
-                  CheckResponseFilterMatch(testing::_, ActualUrl(), testing::_,
-                                           testing::_, testing::_))
-          .WillOnce([&](auto, const GURL&, content::GlobalRenderFrameHostId,
-                        const auto&, adblock::CheckFilterMatchCallback cb) {
-            std::move(cb).Run(response_match);
-          });
-    } else {
-      EXPECT_CALL(service,
-                  CheckResponseFilterMatch(testing::_, ActualUrl(), testing::_,
-                                           testing::_, testing::_))
-          .Times(0);
-    }
-  }
-
-  void ConfigureElementHider(adblock::MockElementHider& service) {
-    if (!IsRequestAllowed() || !IsResponseAllowed()) {
-      EXPECT_CALL(service, IsElementTypeHideable(testing::_))
-          .WillOnce(testing::Return(element_hidable));
-      EXPECT_CALL(service, HideBlockedElement(url, testing::_))
-          .Times(element_hidable ? 1 : 0);
-    } else {
-      EXPECT_CALL(service, IsElementTypeHideable(testing::_)).Times(0);
-      EXPECT_CALL(service, HideBlockedElement(url, testing::_)).Times(0);
-    }
-  }
-
-  void ConfigureSitekeyStorage(adblock::MockSitekeyStorage& service) {
-    EXPECT_CALL(service,
-                ProcessResponseHeaders(ActualUrl(), testing::_, kTestUserAgent))
-        .Times(IsResponseAllowed() ? 1 : 0);
-  }
-
-  void ConfigureCspInjector(
-      adblock::MockAdblockContentSecurityPolicyInjector& service) {
-    if (IsResponseAllowed()) {
-      EXPECT_CALL(service, InsertContentSecurityPolicyHeadersIfApplicable(
-                               ActualUrl(), testing::_, testing::_, testing::_))
-          .WillOnce(
-              [&](const GURL&, auto, auto,
-                  adblock::InsertContentSecurityPolicyHeadersCallback cb) {
-                std::move(cb).Run(nullptr);
-              });
-    } else {
-      EXPECT_CALL(service, InsertContentSecurityPolicyHeadersIfApplicable(
-                               ActualUrl(), testing::_, testing::_, testing::_))
-          .Times(0);
-    }
-  }
+  network::mojom::RequestDestination destination =
+      network::mojom::RequestDestination::kEmpty;
 };
 
 class AdblockURLLoaderFactoryTest : public testing::Test {
@@ -162,35 +83,12 @@ class AdblockURLLoaderFactoryTest : public testing::Test {
   AdblockURLLoaderFactoryTest& operator=(const AdblockURLLoaderFactoryTest&) =
       delete;
 
-  void StartRequest(RequestFlow flow) {
+  void StartRequest() {
     auto request = std::make_unique<network::ResourceRequest>();
     request->url = flow.url;
+    request->destination = flow.destination;
+    ConfigureSubscriptionService();
 
-    EXPECT_CALL(subscription_service_, GetStatus())
-        .WillRepeatedly(
-            testing::Return(flow.subscription_service_ready
-                                ? adblock::FilteringStatus::Active
-                                : adblock::FilteringStatus::Initializing));
-    EXPECT_CALL(subscription_service_, RunWhenInitialized(testing::_))
-        .WillRepeatedly([&](base::OnceClosure task) {
-          deferred_tasks_.push_back(std::move(task));
-        });
-
-    EXPECT_CALL(subscription_service_, GetCurrentSnapshot())
-        .WillRepeatedly([]() {
-          adblock::SubscriptionService::Snapshot snapshot;
-          auto collection =
-              std::make_unique<adblock::MockSubscriptionCollection>();
-          // TODO(mpawlowski) will the collection be queried for classification?
-          // If yes, add EXPECT_CALL(collection, ...) here.
-          snapshot.push_back(std::move(collection));
-          return snapshot;
-        });
-
-    flow.ConfigureClassifier(resource_classifier_);
-    flow.ConfigureElementHider(element_hider_);
-    flow.ConfigureSitekeyStorage(sitekey_storage_);
-    flow.ConfigureCspInjector(csp_injector_);
     loader_ = network::SimpleURLLoader::Create(std::move(request),
                                                TRAFFIC_ANNOTATION_FOR_TESTS);
     mojo::Remote<network::mojom::URLLoaderFactory> factory_remote;
@@ -202,7 +100,7 @@ class AdblockURLLoaderFactoryTest : public testing::Test {
         adblock::AdblockURLLoaderFactoryConfig{
             &subscription_service_, &resource_classifier_, &element_hider_,
             &sitekey_storage_, &csp_injector_},
-        0, 0, std::move(factory_request),
+        content::GlobalRenderFrameHostId{}, std::move(factory_request),
         test_factory_receiver_.BindNewPipeAndPassRemote(), kTestUserAgent,
         base::BindOnce(&AdblockURLLoaderFactoryTest::OnDisconnect,
                        base::Unretained(this)));
@@ -211,19 +109,111 @@ class AdblockURLLoaderFactoryTest : public testing::Test {
     base::RunLoop().RunUntilIdle();
   }
 
-  void StartSubscriptionService() {
-    EXPECT_CALL(subscription_service_, GetStatus())
-        .WillRepeatedly(testing::Return(adblock::FilteringStatus::Active));
-    for (auto& task : deferred_tasks_) {
-      std::move(task).Run();
-    }
-    deferred_tasks_.clear();
-    base::RunLoop().RunUntilIdle();
+  void ConfigureSubscriptionService() {
+    EXPECT_CALL(subscription_service_, GetCurrentSnapshot())
+        .WillRepeatedly([]() {
+          adblock::SubscriptionService::Snapshot snapshot;
+          auto collection =
+              std::make_unique<adblock::MockSubscriptionCollection>();
+          // TODO(mpawlowski) will the collection be queried for classification?
+          // If yes, add EXPECT_CALL(collection, ...) here.
+          snapshot.push_back(std::move(collection));
+          return snapshot;
+        });
   }
 
   void OnDisconnect(adblock::AdblockURLLoaderFactory* factory) {
     EXPECT_EQ(factory, adblock_factory_.get());
     adblock_factory_.reset();
+  }
+
+  void ExpectCheckRewrite(HostState state = HostState::Alive) {
+    EXPECT_CALL(
+        resource_classifier_,
+        CheckRewriteFilterMatch(testing::_, flow.url, testing::_, testing::_))
+        .WillOnce(
+            [&, state](
+                auto, const GURL&, content::GlobalRenderFrameHostId,
+                base::OnceCallback<void(const absl::optional<GURL>&)> cb) {
+              adblock_factory_->ApplyState(state);
+              std::move(cb).Run({});
+            });
+  }
+
+  void InitializeFlow() {
+    ExpectCheckRewrite();
+    EXPECT_CALL(resource_classifier_,
+                CheckDocumentAllowlisted(testing::_, flow.url, testing::_))
+        .Times(0);
+    EXPECT_CALL(resource_classifier_,
+                CheckRequestFilterMatch(testing::_, flow.url, testing::_,
+                                        testing::_, testing::_))
+        .WillOnce([&](auto, const GURL&, adblock::ContentType,
+                      content::GlobalRenderFrameHostId,
+                      adblock::CheckFilterMatchCallback cb) {
+          std::move(cb).Run(flow.request_match);
+        });
+  }
+
+  void ExpectRequestAllowed(HostState state = HostState::Alive) {
+    EXPECT_CALL(resource_classifier_,
+                CheckResponseFilterMatch(testing::_, flow.url, testing::_,
+                                         testing::_, testing::_, testing::_))
+        .WillOnce([&, state](auto, const GURL&, adblock::ContentType,
+                             content::GlobalRenderFrameHostId, const auto&,
+                             adblock::CheckFilterMatchCallback cb) {
+          adblock_factory_->ApplyState(state);
+          std::move(cb).Run(flow.response_match);
+        });
+  }
+
+  void ExpectRequestBlockedOrNotHeppened() {
+    // if request was not processed or blocked, response processing should not
+    // take place.
+    EXPECT_CALL(resource_classifier_,
+                CheckResponseFilterMatch(testing::_, flow.url, testing::_,
+                                         testing::_, testing::_, testing::_))
+        .Times(0);
+  }
+
+  void ExpectElemhideDone() {
+    EXPECT_CALL(element_hider_, IsElementTypeHideable(testing::_))
+        .WillOnce(testing::Return(flow.element_hidable));
+    EXPECT_CALL(element_hider_, HideBlockedElement(flow.url, testing::_))
+        .Times(flow.element_hidable ? 1 : 0);
+  }
+
+  void ExpectElemhideSkipped() {
+    EXPECT_CALL(element_hider_, IsElementTypeHideable(testing::_)).Times(0);
+    EXPECT_CALL(element_hider_, HideBlockedElement(flow.url, testing::_))
+        .Times(0);
+  }
+
+  void ExpectResponseAllowed(HostState state = HostState::Alive) {
+    EXPECT_CALL(sitekey_storage_,
+                ProcessResponseHeaders(flow.url, testing::_, kTestUserAgent))
+        .Times(1);
+    EXPECT_CALL(csp_injector_,
+                InsertContentSecurityPolicyHeadersIfApplicable(
+                    flow.url, testing::_, testing::_, testing::_))
+        .WillOnce(
+            [&, state](const GURL&, auto, auto,
+                       adblock::InsertContentSecurityPolicyHeadersCallback cb) {
+              adblock_factory_->ApplyState(state);
+              std::move(cb).Run(nullptr);
+            });
+  }
+
+  void ExpectResponseBlockedOrNotHappened() {
+    // if response was not processed or blocked, headers processing should not
+    // take place.
+    EXPECT_CALL(sitekey_storage_,
+                ProcessResponseHeaders(flow.url, testing::_, kTestUserAgent))
+        .Times(0);
+    EXPECT_CALL(csp_injector_,
+                InsertContentSecurityPolicyHeadersIfApplicable(
+                    flow.url, testing::_, testing::_, testing::_))
+        .Times(0);
   }
 
   content::BrowserTaskEnvironment task_environment_;
@@ -237,53 +227,108 @@ class AdblockURLLoaderFactoryTest : public testing::Test {
   adblock::MockSitekeyStorage sitekey_storage_;
   adblock::MockAdblockContentSecurityPolicyInjector csp_injector_;
   std::vector<base::OnceClosure> deferred_tasks_;
+  RequestFlow flow;
 };
 
 TEST_F(AdblockURLLoaderFactoryTest, HappyPath) {
-  StartRequest({});
-  EXPECT_EQ(net::OK, loader_->NetError());
-}
-
-TEST_F(AdblockURLLoaderFactoryTest, WaitForInitialize) {
-  StartRequest({.subscription_service_ready = false});
-  StartSubscriptionService();
+  InitializeFlow();
+  ExpectRequestAllowed();
+  ExpectResponseAllowed();
+  ExpectElemhideSkipped();
+  StartRequest();
   EXPECT_EQ(net::OK, loader_->NetError());
 }
 
 TEST_F(AdblockURLLoaderFactoryTest, BlockedWithRequestFilter) {
-  StartRequest({.request_match = adblock::FilterMatchResult::kBlockRule});
+  flow.request_match = adblock::FilterMatchResult::kBlockRule;
+  InitializeFlow();
+  ExpectRequestBlockedOrNotHeppened();
+  ExpectResponseBlockedOrNotHappened();
+  ExpectElemhideDone();
+  StartRequest();
   EXPECT_EQ(net::ERR_BLOCKED_BY_ADMINISTRATOR, loader_->NetError());
 }
 
 TEST_F(AdblockURLLoaderFactoryTest, BlockedWithResponseFilter) {
-  StartRequest({.response_match = adblock::FilterMatchResult::kBlockRule});
+  flow.response_match = adblock::FilterMatchResult::kBlockRule;
+  InitializeFlow();
+  ExpectRequestAllowed();
+  ExpectResponseBlockedOrNotHappened();
+  ExpectElemhideDone();
+  StartRequest();
   EXPECT_EQ(net::ERR_BLOCKED_BY_ADMINISTRATOR, loader_->NetError());
 }
 
 TEST_F(AdblockURLLoaderFactoryTest, BlockedWithRequestFilterNonHideable) {
-  StartRequest({.request_match = adblock::FilterMatchResult::kBlockRule,
-                .element_hidable = false});
+  flow.request_match = adblock::FilterMatchResult::kBlockRule;
+  flow.element_hidable = false;
+  InitializeFlow();
+  ExpectRequestBlockedOrNotHeppened();
+  ExpectResponseBlockedOrNotHappened();
+  ExpectElemhideDone();
+  StartRequest();
   EXPECT_EQ(net::ERR_BLOCKED_BY_ADMINISTRATOR, loader_->NetError());
 }
 
 TEST_F(AdblockURLLoaderFactoryTest, BlockedWithResponseFilterNonHideable) {
-  StartRequest({.response_match = adblock::FilterMatchResult::kBlockRule,
-                .element_hidable = false});
+  flow.response_match = adblock::FilterMatchResult::kBlockRule;
+  flow.element_hidable = false;
+  InitializeFlow();
+  ExpectRequestAllowed();
+  ExpectResponseBlockedOrNotHappened();
+  ExpectElemhideDone();
+  StartRequest();
   EXPECT_EQ(net::ERR_BLOCKED_BY_ADMINISTRATOR, loader_->NetError());
 }
 
-// TODO: Rewrite will do redirect, it is required more tinkering for
-// TestURLLoaderFactory to handle this.
-/*
-TEST_F(AdblockURLLoaderFactoryTest, RewriteUrl) {
-  StartRequest({.rewrite_url = absl::optional<GURL>(GURL("http://other.com"))});
+TEST_F(AdblockURLLoaderFactoryTest, DocumentNavigation) {
+  flow.destination = network::mojom::RequestDestination::kDocument;
+  ExpectCheckRewrite();
+  EXPECT_CALL(resource_classifier_,
+              CheckDocumentAllowlisted(testing::_, flow.url, testing::_));
+  EXPECT_CALL(resource_classifier_,
+              CheckRequestFilterMatch(testing::_, flow.url, testing::_,
+                                      testing::_, testing::_))
+      .Times(0);
+
+  ExpectRequestAllowed();
+  ExpectResponseAllowed();
+  ExpectElemhideSkipped();
+  StartRequest();
   EXPECT_EQ(net::OK, loader_->NetError());
 }
-*/
 
-/*
- TODO:
- - Simulate CheckRenderProcessValid and CheckRenderProcessAndFrameValid is false
-   on various steps.
- - Simulate SubscriptionService is not initialized in the middle of flow.
-*/
+TEST_F(AdblockURLLoaderFactoryTest, FrameDiesWhileRewriteCheck) {
+  ExpectCheckRewrite(HostState::Dead);
+  EXPECT_CALL(resource_classifier_,
+              CheckDocumentAllowlisted(testing::_, flow.url, testing::_))
+      .Times(0);
+  EXPECT_CALL(resource_classifier_,
+              CheckRequestFilterMatch(testing::_, flow.url, testing::_,
+                                      testing::_, testing::_))
+      .Times(0);
+
+  ExpectRequestBlockedOrNotHeppened();
+  ExpectResponseBlockedOrNotHappened();
+  ExpectElemhideSkipped();
+  StartRequest();
+  EXPECT_EQ(net::OK, loader_->NetError());
+}
+
+TEST_F(AdblockURLLoaderFactoryTest, FrameDiesWhileRequestMatch) {
+  InitializeFlow();
+  ExpectRequestAllowed(HostState::Dead);
+  ExpectResponseBlockedOrNotHappened();
+  ExpectElemhideSkipped();
+  StartRequest();
+  EXPECT_EQ(net::OK, loader_->NetError());
+}
+
+TEST_F(AdblockURLLoaderFactoryTest, FrameDiesBeforeResposeMatch) {
+  InitializeFlow();
+  ExpectRequestAllowed();
+  ExpectResponseAllowed(HostState::Dead);
+  ExpectElemhideSkipped();
+  StartRequest();
+  EXPECT_EQ(net::OK, loader_->NetError());
+}

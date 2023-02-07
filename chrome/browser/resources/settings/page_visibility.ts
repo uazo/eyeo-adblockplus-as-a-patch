@@ -6,7 +6,7 @@
 // Use of this source code is governed by the GPLv3 that can be found in the
 // components/adblock/LICENSE file.
 
-import {loadTimeData} from 'chrome://resources/js/load_time_data.m.js';
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 
 /**
  * Specifies page visibility based on incognito status and Chrome OS guest mode.

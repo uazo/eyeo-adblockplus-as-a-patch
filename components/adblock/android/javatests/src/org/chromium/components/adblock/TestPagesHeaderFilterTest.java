@@ -88,6 +88,20 @@ public class TestPagesHeaderFilterTest {
     @Test
     @LargeTest
     @Feature({"adblock"})
+    public void testHeaderFilterImageAndComma() throws TimeoutException, InterruptedException {
+        mHelper.addCustomFilter(
+                "||abptestpages.org/testfiles/header/image2.png$header=date=\\x2c");
+        mHelper.loadUrl("https://abptestpages.org/en/filters/header");
+        Assert.assertEquals(1, mHelper.numBlocked());
+        Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_IMAGE));
+        Assert.assertTrue(
+                mHelper.isBlocked("https://abptestpages.org/testfiles/header/image2.png"));
+        mHelper.verifyDisplayedCount(0, "img[id='comma-fail-1']");
+    }
+
+    @Test
+    @LargeTest
+    @Feature({"adblock"})
     public void testHeaderFilterStylesheet() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
                 "||abptestpages.org/testfiles/header/$header=content-type=text/css");

@@ -36,66 +36,69 @@ class AdblockResourceClassifierImplTest : public ::testing::Test {
  public:
   void SetUp() override {
     classifier_ = base::MakeRefCounted<ResourceClassifierImpl>();
+    mock_subscription_collection_ = new MockSubscriptionCollection();
+    mock_snapshot_ = std::make_unique<SubscriptionService::Snapshot>();
+    mock_snapshot_->emplace_back(mock_subscription_collection_);
   }
 
   void FindBySubresourceFilterReturns(const absl::optional<GURL>& return_value,
                                       FilterCategory category) {
-    EXPECT_CALL(mock_subscription_collection_,
+    EXPECT_CALL(*mock_subscription_collection_,
                 FindBySubresourceFilter(_, _, _, _, category))
         .WillOnce(Return(return_value));
   }
 
   void FindBySpecialFilterReturns(const absl::optional<GURL>& return_value,
                                   SpecialFilterType type) {
-    EXPECT_CALL(mock_subscription_collection_,
+    EXPECT_CALL(*mock_subscription_collection_,
                 FindBySpecialFilter(type, _, _, _))
         .WillOnce(Return(return_value));
   }
 
   void FindByAllowFilterReturns(const absl::optional<GURL>& return_value) {
-    EXPECT_CALL(mock_subscription_collection_, FindByAllowFilter(_, _, _, _))
+    EXPECT_CALL(*mock_subscription_collection_, FindByAllowFilter(_, _, _, _))
         .WillOnce(Return(return_value));
   }
 
   void FindByPopupFilterReturns(const absl::optional<GURL>& return_value,
                                 FilterCategory category) {
-    EXPECT_CALL(mock_subscription_collection_,
+    EXPECT_CALL(*mock_subscription_collection_,
                 FindByPopupFilter(_, _, _, category))
         .WillOnce(Return(return_value));
   }
 
   void GetHeaderFiltersReturns(const std::set<HeaderFilterData>& return_value,
                                FilterCategory category) {
-    EXPECT_CALL(mock_subscription_collection_,
+    EXPECT_CALL(*mock_subscription_collection_,
                 GetHeaderFilters(_, _, _, category))
         .WillOnce(Return(return_value));
   }
 
   void AssertFindBySubresourceFilterNotCalled(FilterCategory category) {
-    EXPECT_CALL(mock_subscription_collection_,
+    EXPECT_CALL(*mock_subscription_collection_,
                 FindBySubresourceFilter(_, _, _, _, category))
         .Times(0);
   }
 
   void AssertFindBySpecialFilterNotCalled(SpecialFilterType type) {
-    EXPECT_CALL(mock_subscription_collection_,
+    EXPECT_CALL(*mock_subscription_collection_,
                 FindBySpecialFilter(type, _, _, _))
         .Times(0);
   }
 
   void AssertFindByAllowFilterNotCalled() {
-    EXPECT_CALL(mock_subscription_collection_, FindByAllowFilter(_, _, _, _))
+    EXPECT_CALL(*mock_subscription_collection_, FindByAllowFilter(_, _, _, _))
         .Times(0);
   }
 
   void AssertFindByPopupFilterNotCalled(FilterCategory category) {
-    EXPECT_CALL(mock_subscription_collection_,
+    EXPECT_CALL(*mock_subscription_collection_,
                 FindByPopupFilter(_, _, _, category))
         .Times(0);
   }
 
   void AssertGetHeaderFiltersNotCalled(FilterCategory category) {
-    EXPECT_CALL(mock_subscription_collection_,
+    EXPECT_CALL(*mock_subscription_collection_,
                 GetHeaderFilters(_, _, _, category))
         .Times(0);
   }
@@ -119,7 +122,8 @@ class AdblockResourceClassifierImplTest : public ::testing::Test {
       {"blocking_filter", kSourceUrl}};
   const std::set<HeaderFilterData> kDomainSpecificHeaderFilters = {
       {"domain_specific_filter", kSourceUrl}};
-  MockSubscriptionCollection mock_subscription_collection_;
+  MockSubscriptionCollection* mock_subscription_collection_;
+  std::unique_ptr<SubscriptionService::Snapshot> mock_snapshot_;
   scoped_refptr<ResourceClassifier> classifier_;
 };
 
@@ -133,12 +137,11 @@ TEST_F(AdblockResourceClassifierImplTest, BlockingFilterNotFound) {
   AssertFindBySubresourceFilterNotCalled(
       FilterCategory::DomainSpecificBlocking);
 
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyRequest(mock_subscription_collection_, kResourceAddress,
-                            {kParentAddress}, kContentType, kSitekey)
-          .decision,
-      Decision::Ignored);
+  EXPECT_EQ(classifier_
+                ->ClassifyRequest(std::move(*mock_snapshot_), kResourceAddress,
+                                  {kParentAddress}, kContentType, kSitekey)
+                .decision,
+            Decision::Ignored);
 }
 
 TEST_F(AdblockResourceClassifierImplTest, BlockingFilterFound) {
@@ -156,12 +159,11 @@ TEST_F(AdblockResourceClassifierImplTest, BlockingFilterFound) {
   AssertFindBySubresourceFilterNotCalled(
       FilterCategory::DomainSpecificBlocking);
 
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyRequest(mock_subscription_collection_, kResourceAddress,
-                            {kParentAddress}, kContentType, kSitekey)
-          .decision,
-      Decision::Blocked);
+  EXPECT_EQ(classifier_
+                ->ClassifyRequest(std::move(*mock_snapshot_), kResourceAddress,
+                                  {kParentAddress}, kContentType, kSitekey)
+                .decision,
+            Decision::Blocked);
 }
 
 TEST_F(AdblockResourceClassifierImplTest, BlockingAndAllowingFilterFound) {
@@ -178,12 +180,11 @@ TEST_F(AdblockResourceClassifierImplTest, BlockingAndAllowingFilterFound) {
   AssertFindBySubresourceFilterNotCalled(
       FilterCategory::DomainSpecificBlocking);
 
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyRequest(mock_subscription_collection_, kResourceAddress,
-                            {kParentAddress}, kContentType, kSitekey)
-          .decision,
-      Decision::Allowed);
+  EXPECT_EQ(classifier_
+                ->ClassifyRequest(std::move(*mock_snapshot_), kResourceAddress,
+                                  {kParentAddress}, kContentType, kSitekey)
+                .decision,
+            Decision::Allowed);
 }
 
 TEST_F(AdblockResourceClassifierImplTest, GenericBlockSearch) {
@@ -200,12 +201,11 @@ TEST_F(AdblockResourceClassifierImplTest, GenericBlockSearch) {
   AssertFindBySubresourceFilterNotCalled(
       FilterCategory::DomainSpecificBlocking);
 
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyRequest(mock_subscription_collection_, kResourceAddress,
-                            {kParentAddress}, kContentType, kSitekey)
-          .decision,
-      Decision::Blocked);
+  EXPECT_EQ(classifier_
+                ->ClassifyRequest(std::move(*mock_snapshot_), kResourceAddress,
+                                  {kParentAddress}, kContentType, kSitekey)
+                .decision,
+            Decision::Blocked);
 }
 
 TEST_F(AdblockResourceClassifierImplTest, DomainSpecificNotFound) {
@@ -225,12 +225,11 @@ TEST_F(AdblockResourceClassifierImplTest, DomainSpecificNotFound) {
   FindBySubresourceFilterReturns(absl::nullopt,
                                  FilterCategory::DomainSpecificBlocking);
 
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyRequest(mock_subscription_collection_, kResourceAddress,
-                            {kParentAddress}, kContentType, kSitekey)
-          .decision,
-      Decision::Ignored);
+  EXPECT_EQ(classifier_
+                ->ClassifyRequest(std::move(*mock_snapshot_), kResourceAddress,
+                                  {kParentAddress}, kContentType, kSitekey)
+                .decision,
+            Decision::Ignored);
 }
 
 TEST_F(AdblockResourceClassifierImplTest, DomainSpecificFound) {
@@ -250,12 +249,11 @@ TEST_F(AdblockResourceClassifierImplTest, DomainSpecificFound) {
   FindBySubresourceFilterReturns(absl::optional<GURL>(kSourceUrl),
                                  FilterCategory::DomainSpecificBlocking);
 
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyRequest(mock_subscription_collection_, kResourceAddress,
-                            {kParentAddress}, kContentType, kSitekey)
-          .decision,
-      Decision::Blocked);
+  EXPECT_EQ(classifier_
+                ->ClassifyRequest(std::move(*mock_snapshot_), kResourceAddress,
+                                  {kParentAddress}, kContentType, kSitekey)
+                .decision,
+            Decision::Blocked);
 }
 
 TEST_F(AdblockResourceClassifierImplTest, PopupNoHasFilters) {
@@ -263,7 +261,7 @@ TEST_F(AdblockResourceClassifierImplTest, PopupNoHasFilters) {
   AssertFindByPopupFilterNotCalled(FilterCategory::Allowing);
 
   EXPECT_EQ(classifier_
-                ->ClassifyPopup(mock_subscription_collection_, kResourceAddress,
+                ->ClassifyPopup(std::move(*mock_snapshot_), kResourceAddress,
                                 {kParentAddress}, kSitekey)
                 .decision,
             Decision::Ignored);
@@ -275,7 +273,7 @@ TEST_F(AdblockResourceClassifierImplTest, PopupHasBlockingFilter) {
   FindByPopupFilterReturns(absl::nullopt, FilterCategory::Allowing);
 
   EXPECT_EQ(classifier_
-                ->ClassifyPopup(mock_subscription_collection_, kResourceAddress,
+                ->ClassifyPopup(std::move(*mock_snapshot_), kResourceAddress,
                                 {kParentAddress}, kSitekey)
                 .decision,
             Decision::Blocked);
@@ -288,7 +286,7 @@ TEST_F(AdblockResourceClassifierImplTest, PopupHasAllowingFilter) {
                            FilterCategory::Allowing);
 
   EXPECT_EQ(classifier_
-                ->ClassifyPopup(mock_subscription_collection_, kResourceAddress,
+                ->ClassifyPopup(std::move(*mock_snapshot_), kResourceAddress,
                                 {kParentAddress}, kSitekey)
                 .decision,
             Decision::Allowed);
@@ -298,12 +296,11 @@ TEST_F(AdblockResourceClassifierImplTest, NoBlockingHeaderFilters) {
   GetHeaderFiltersReturns({}, FilterCategory::Blocking);
   AssertGetHeaderFiltersNotCalled(FilterCategory::Allowing);
 
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyResponse(mock_subscription_collection_, kResourceAddress,
-                             {kParentAddress}, kContentType, {})
-          .decision,
-      Decision::Ignored);
+  EXPECT_EQ(classifier_
+                ->ClassifyResponse(std::move(*mock_snapshot_), kResourceAddress,
+                                   {kParentAddress}, kContentType, {})
+                .decision,
+            Decision::Ignored);
 }
 
 TEST_F(AdblockResourceClassifierImplTest,
@@ -316,12 +313,11 @@ TEST_F(AdblockResourceClassifierImplTest,
   AssertGetHeaderFiltersNotCalled(FilterCategory::DomainSpecificBlocking);
   AssertGetHeaderFiltersNotCalled(FilterCategory::Allowing);
 
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyResponse(mock_subscription_collection_, kResourceAddress,
-                             {kParentAddress}, kContentType, {})
-          .decision,
-      Decision::Allowed);
+  EXPECT_EQ(classifier_
+                ->ClassifyResponse(std::move(*mock_snapshot_), kResourceAddress,
+                                   {kParentAddress}, kContentType, {})
+                .decision,
+            Decision::Allowed);
 }
 
 TEST_F(AdblockResourceClassifierImplTest,
@@ -333,12 +329,11 @@ TEST_F(AdblockResourceClassifierImplTest,
   GetHeaderFiltersReturns({}, FilterCategory::DomainSpecificBlocking);
   AssertGetHeaderFiltersNotCalled(FilterCategory::Allowing);
 
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyResponse(mock_subscription_collection_, kResourceAddress,
-                             {kParentAddress}, kContentType, {})
-          .decision,
-      Decision::Ignored);
+  EXPECT_EQ(classifier_
+                ->ClassifyResponse(std::move(*mock_snapshot_), kResourceAddress,
+                                   {kParentAddress}, kContentType, {})
+                .decision,
+            Decision::Ignored);
 }
 
 TEST_F(AdblockResourceClassifierImplTest,
@@ -353,12 +348,11 @@ TEST_F(AdblockResourceClassifierImplTest,
 
   auto headers = CreateResponseHeaders("not_matching");
   CHECK(headers);
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyResponse(mock_subscription_collection_, kResourceAddress,
-                             {kParentAddress}, kContentType, headers)
-          .decision,
-      Decision::Ignored);
+  EXPECT_EQ(classifier_
+                ->ClassifyResponse(std::move(*mock_snapshot_), kResourceAddress,
+                                   {kParentAddress}, kContentType, headers)
+                .decision,
+            Decision::Ignored);
 }
 
 TEST_F(AdblockResourceClassifierImplTest,
@@ -374,12 +368,11 @@ TEST_F(AdblockResourceClassifierImplTest,
   auto headers = CreateResponseHeaders(
       kDomainSpecificHeaderFilters.begin()->header_filter);
   CHECK(headers);
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyResponse(mock_subscription_collection_, kResourceAddress,
-                             {kParentAddress}, kContentType, headers)
-          .decision,
-      Decision::Blocked);
+  EXPECT_EQ(classifier_
+                ->ClassifyResponse(std::move(*mock_snapshot_), kResourceAddress,
+                                   {kParentAddress}, kContentType, headers)
+                .decision,
+            Decision::Blocked);
 }
 
 TEST_F(AdblockResourceClassifierImplTest, BlockingHeaderFiltersNoMatch) {
@@ -391,12 +384,11 @@ TEST_F(AdblockResourceClassifierImplTest, BlockingHeaderFiltersNoMatch) {
 
   auto headers = CreateResponseHeaders("no_match");
   CHECK(headers);
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyResponse(mock_subscription_collection_, kResourceAddress,
-                             {kParentAddress}, kContentType, headers)
-          .decision,
-      Decision::Ignored);
+  EXPECT_EQ(classifier_
+                ->ClassifyResponse(std::move(*mock_snapshot_), kResourceAddress,
+                                   {kParentAddress}, kContentType, headers)
+                .decision,
+            Decision::Ignored);
 }
 
 TEST_F(AdblockResourceClassifierImplTest,
@@ -410,12 +402,11 @@ TEST_F(AdblockResourceClassifierImplTest,
   auto headers =
       CreateResponseHeaders(kBlockingHeaderFilters.begin()->header_filter);
   CHECK(headers);
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyResponse(mock_subscription_collection_, kResourceAddress,
-                             {kParentAddress}, kContentType, headers)
-          .decision,
-      Decision::Blocked);
+  EXPECT_EQ(classifier_
+                ->ClassifyResponse(std::move(*mock_snapshot_), kResourceAddress,
+                                   {kParentAddress}, kContentType, headers)
+                .decision,
+            Decision::Blocked);
 }
 
 TEST_F(AdblockResourceClassifierImplTest,
@@ -429,11 +420,85 @@ TEST_F(AdblockResourceClassifierImplTest,
   auto headers =
       CreateResponseHeaders(kAllowingHeaderFilters.begin()->header_filter);
   CHECK(headers);
-  EXPECT_EQ(
-      classifier_
-          ->ClassifyResponse(mock_subscription_collection_, kResourceAddress,
-                             {kParentAddress}, kContentType, headers)
-          .decision,
-      Decision::Allowed);
+  EXPECT_EQ(classifier_
+                ->ClassifyResponse(std::move(*mock_snapshot_), kResourceAddress,
+                                   {kParentAddress}, kContentType, headers)
+                .decision,
+            Decision::Allowed);
 }
+
+TEST_F(AdblockResourceClassifierImplTest,
+       TwoConfigs_DefaultAllowsOtherBlocks_BlockingFilterFound) {
+  // Default configuration has allowing filter
+  FindBySubresourceFilterReturns(absl::optional<GURL>(kSourceUrl),
+                                 FilterCategory::Blocking);
+  FindByAllowFilterReturns(absl::optional<GURL>(kSourceUrl));
+
+  // Other configuration has blocking filter
+  auto mock_subscription_collection =
+      std::make_unique<MockSubscriptionCollection>();
+  EXPECT_CALL(*mock_subscription_collection,
+              FindBySubresourceFilter(_, _, _, _, FilterCategory::Blocking))
+      .WillOnce(Return(kSourceUrl));
+  EXPECT_CALL(*mock_subscription_collection, FindByAllowFilter(_, _, _, _))
+      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*mock_subscription_collection,
+              FindBySpecialFilter(SpecialFilterType::Genericblock, _, _, _))
+      .WillOnce(Return(absl::nullopt));
+
+  mock_snapshot_->push_back(std::move(mock_subscription_collection));
+  EXPECT_EQ(classifier_
+                ->ClassifyRequest(std::move(*mock_snapshot_), kResourceAddress,
+                                  {kParentAddress}, kContentType, kSitekey)
+                .decision,
+            Decision::Blocked);
+}
+
+TEST_F(AdblockResourceClassifierImplTest,
+       TwoConfigs_DefaultBlocksOtherIsNotChecked_BlockingFilterFound) {
+  // Default configuration has blocking filter
+  FindBySubresourceFilterReturns(absl::optional<GURL>(kSourceUrl),
+                                 FilterCategory::Blocking);
+  FindByAllowFilterReturns(absl::nullopt);
+  FindBySpecialFilterReturns(absl::nullopt, SpecialFilterType::Genericblock);
+
+  // Other configuration should not be called
+  auto mock_subscription_collection =
+      std::make_unique<MockSubscriptionCollection>();
+  EXPECT_CALL(*mock_subscription_collection,
+              FindBySubresourceFilter(_, _, _, _, FilterCategory::Blocking))
+      .Times(0);
+
+  mock_snapshot_->push_back(std::move(mock_subscription_collection));
+  EXPECT_EQ(classifier_
+                ->ClassifyRequest(std::move(*mock_snapshot_), kResourceAddress,
+                                  {kParentAddress}, kContentType, kSitekey)
+                .decision,
+            Decision::Blocked);
+}
+
+TEST_F(AdblockResourceClassifierImplTest,
+       TwoConfigs_DefaultAndOtherAllows_AllowingFilterFound) {
+  // Default configuration has allowing filter
+  FindBySubresourceFilterReturns(absl::optional<GURL>(kSourceUrl),
+                                 FilterCategory::Blocking);
+  FindByAllowFilterReturns(absl::optional<GURL>(kSourceUrl));
+
+  // Other configuration has also allowing filter
+  MockSubscriptionCollection* mock_subscription_collection =
+      new MockSubscriptionCollection();
+  EXPECT_CALL(*mock_subscription_collection,
+              FindBySubresourceFilter(_, _, _, _, FilterCategory::Blocking))
+      .WillOnce(Return(kSourceUrl));
+  EXPECT_CALL(*mock_subscription_collection, FindByAllowFilter(_, _, _, _))
+      .WillOnce(Return(absl::optional<GURL>(kSourceUrl)));
+
+  mock_snapshot_->emplace_back(mock_subscription_collection);
+  EXPECT_EQ(classifier_
+                ->ClassifyRequest(std::move(*mock_snapshot_), kResourceAddress,
+                                  {kParentAddress}, kContentType, kSitekey)
+                .decision,
+            Decision::Allowed);
+}
+
 }  // namespace adblock

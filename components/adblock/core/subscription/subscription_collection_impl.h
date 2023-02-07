@@ -66,10 +66,10 @@ class SubscriptionCollectionImpl final : public SubscriptionCollection {
       const SiteKey& sitekey) const final;
   std::vector<base::StringPiece> GetElementHideEmulationSelectors(
       const GURL& frame_url) const final;
-  std::string GenerateSnippetsJson(
+  base::Value::List GenerateSnippets(
       const GURL& frame_url,
       const std::vector<GURL>& frame_hierarchy) const final;
-  base::StringPiece GetCspInjection(
+  std::set<base::StringPiece> GetCspInjections(
       const GURL& request_url,
       const std::vector<GURL>& frame_hierarchy) const final;
   absl::optional<GURL> GetRewriteUrl(

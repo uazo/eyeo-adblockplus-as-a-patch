@@ -365,7 +365,7 @@ ConverterResult Converter::Convert(std::istream& stream,
   }
 
   std::string line;
-  while (std::getline(stream, line)) {
+  while (util::GetLine(stream, line)) {
     base::TrimWhitespaceASCII(line, base::TRIM_ALL, &line);
 
     if (!line.empty())

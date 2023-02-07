@@ -70,12 +70,12 @@ class MockSubscriptionCollection : public NiceMock<SubscriptionCollection> {
               GetElementHideEmulationSelectors,
               (const GURL& frame_url),
               (const, override));
-  MOCK_METHOD(std::string,
-              GenerateSnippetsJson,
+  MOCK_METHOD(base::Value::List,
+              GenerateSnippets,
               (const GURL& frame_url, const std::vector<GURL>& frame_hierarchy),
               (const, override));
-  MOCK_METHOD(base::StringPiece,
-              GetCspInjection,
+  MOCK_METHOD(std::set<base::StringPiece>,
+              GetCspInjections,
               (const GURL& frame_url, const std::vector<GURL>& frame_hierarchy),
               (const, override));
   MOCK_METHOD(absl::optional<GURL>,

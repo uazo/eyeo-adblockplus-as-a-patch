@@ -111,7 +111,7 @@ public class AdblockSettingsFragment
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        getActivity().setTitle(R.string.ad_block_settings_title);
+        getActivity().setTitle(R.string.adblock_settings_title);
     }
 
     @Override

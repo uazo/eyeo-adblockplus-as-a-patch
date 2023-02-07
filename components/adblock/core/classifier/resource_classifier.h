@@ -24,7 +24,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "components/adblock/core/common/content_type.h"
 #include "components/adblock/core/common/sitekey.h"
-#include "components/adblock/core/subscription/subscription_collection.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "net/http/http_response_headers.h"
 #include "url/gurl.h"
 
@@ -52,20 +52,20 @@ class ResourceClassifier
   };
 
   virtual ClassificationResult ClassifyRequest(
-      const SubscriptionCollection& subscription_collection,
+      const SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
       const std::vector<GURL>& frame_hierarchy,
       ContentType content_type,
       const SiteKey& sitekey) const = 0;
 
   virtual ClassificationResult ClassifyPopup(
-      const SubscriptionCollection& subscription_collection,
+      const SubscriptionService::Snapshot& subscription_collections,
       const GURL& popup_url,
       const GURL& opener_url,
       const SiteKey& sitekey) const = 0;
 
   virtual ClassificationResult ClassifyResponse(
-      const SubscriptionCollection& subscription_collection,
+      const SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
       const std::vector<GURL>& frame_hierarchy,
       ContentType content_type,

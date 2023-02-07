@@ -164,8 +164,6 @@ void AdblockControllerImpl::RemoveCustomSubscription(const GURL& url) {
 
 std::vector<scoped_refptr<Subscription>>
 AdblockControllerImpl::GetInstalledSubscriptions() const {
-  if (subscription_service_->GetStatus() != FilteringStatus::Active)
-    return {};
   return GetSubscriptionsThatMatchConfiguration();
 }
 

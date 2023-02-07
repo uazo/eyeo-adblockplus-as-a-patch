@@ -26,6 +26,12 @@
 
 namespace adblock {
 
+namespace util {
+
+std::istream& GetLine(std::istream& is, std::string& t);
+
+}
+
 class Metadata {
  public:
   static absl::optional<Metadata> Parse(std::istream& stream);

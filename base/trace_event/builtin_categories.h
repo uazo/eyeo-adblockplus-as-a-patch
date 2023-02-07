@@ -131,6 +131,7 @@
   X("offline_pages")                                                     \
   X("omnibox")                                                           \
   X("oobe")                                                              \
+  X("openscreen")                                                        \
   X("ozone")                                                             \
   X("partition_alloc")                                                   \
   X("passwords")                                                         \
@@ -187,6 +188,7 @@
   X("weblayer")                                                          \
   X("WebCore")                                                           \
   X("webrtc")                                                            \
+  X("webrtc_stats")                                                      \
   X("xr")                                                                \
   X(TRACE_DISABLED_BY_DEFAULT("android_view_hierarchy"))                 \
   X(TRACE_DISABLED_BY_DEFAULT("animation-worklet"))                      \
@@ -353,6 +355,7 @@
   X("shutdown,viz")                                                           \
   X("startup,benchmark,rail")                                                 \
   X("startup,rail")                                                           \
+  X("toplevel,Java")                                                          \
   X("toplevel,viz")                                                           \
   X("ui,input")                                                               \
   X("ui,latency")                                                             \

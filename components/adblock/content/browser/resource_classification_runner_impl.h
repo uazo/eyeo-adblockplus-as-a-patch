@@ -43,36 +43,42 @@ class ResourceClassificationRunnerImpl final
 
   // Performs a *synchronous* check, this can block the UI for a while!
   FilterMatchResult ShouldBlockPopup(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
-      const GURL& opener,
+      const SubscriptionService::Snapshot& subscription_collections,
       const GURL& popup_url,
+      const GURL& opener,
       content::RenderFrameHost* render_frame_host) final;
   void CheckRequestFilterMatch(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
-      int32_t resource_type,
+      ContentType adblock_resource_type,
       content::GlobalRenderFrameHostId render_frame_host_id,
       CheckFilterMatchCallback callback) final;
   void CheckRequestFilterMatchForWebSocket(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
       content::GlobalRenderFrameHostId render_frame_host_id,
       CheckFilterMatchCallback callback) final;
+  // No callback, just notify observers
+  void CheckDocumentAllowlisted(
+      SubscriptionService::Snapshot subscription_collections,
+      const GURL& request_url,
+      content::GlobalRenderFrameHostId render_frame_host_id) final;
   void CheckResponseFilterMatch(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL& response_url,
+      ContentType adblock_resource_type,
       content::GlobalRenderFrameHostId render_frame_host_id,
       const scoped_refptr<net::HttpResponseHeaders>& headers,
       CheckFilterMatchCallback callback) final;
   void CheckRewriteFilterMatch(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
       content::GlobalRenderFrameHostId render_frame_host_id,
       base::OnceCallback<void(const absl::optional<GURL>&)> result) final;
 
  private:
   void CheckRequestFilterMatchImpl(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
       ContentType adblock_type,
       content::GlobalRenderFrameHostId frame_host_id,
@@ -94,23 +100,23 @@ class ResourceClassificationRunnerImpl final
 
   static CheckResourceFilterMatchResult CheckRequestFilterMatchInternal(
       const scoped_refptr<ResourceClassifier>& resource_classifier,
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
-      const GURL& request_url,
-      const std::vector<GURL>& frame_hierarchy,
+      SubscriptionService::Snapshot subscription_collections,
+      const GURL request_url,
+      const std::vector<GURL> frame_hierarchy,
       ContentType adblock_resource_type,
-      const SiteKey& sitekey);
+      const SiteKey sitekey);
 
   void OnCheckResourceFilterMatchComplete(
-      const GURL& request_url,
-      const std::vector<GURL>& frame_hierarchy,
+      const GURL request_url,
+      const std::vector<GURL> frame_hierarchy,
       ContentType adblock_resource_type,
       content::GlobalRenderFrameHostId render_frame_host_id,
       CheckFilterMatchCallback callback,
-      const CheckResourceFilterMatchResult& result);
+      const CheckResourceFilterMatchResult result);
 
   static CheckResourceFilterMatchResult CheckResponseFilterMatchInternal(
-      const scoped_refptr<ResourceClassifier>& resource_classifier,
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      const scoped_refptr<ResourceClassifier> resource_classifier,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL response_url,
       const std::vector<GURL> frame_hierarchy,
       ContentType adblock_resource_type,
@@ -130,12 +136,8 @@ class ResourceClassificationRunnerImpl final
       base::OnceCallback<void(const absl::optional<GURL>&)> callback,
       absl::optional<GURL> url);
 
-  static absl::optional<GURL> CheckDocumentAllowlisted(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
-      const GURL& request_url);
-
   void ProcessDocumentAllowlistedResponse(
-      const GURL& request_url,
+      const GURL request_url,
       content::GlobalRenderFrameHostId render_frame_host_id,
       absl::optional<GURL> allowing_subscription);
 

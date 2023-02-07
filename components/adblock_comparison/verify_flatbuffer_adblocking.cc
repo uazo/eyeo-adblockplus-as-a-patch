@@ -38,6 +38,7 @@
 #include "components/adblock/core/subscription/installed_subscription_impl.h"
 #include "components/adblock/core/subscription/subscription_collection_impl.h"
 #include "components/adblock/core/subscription/subscription_config.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "components/adblock_comparison/libadblockplus_reference_database.h"
 
 namespace adblock::test {
@@ -104,8 +105,12 @@ class FlatbufferAdblockVerifier {
 
   bool FlatbufferUrlFilterImplementation(const test::Request& request) {
     std::vector<GURL> frame_hierarchy = {GURL("https://" + request.domain)};
+    SubscriptionService::Snapshot snapshot;
+    snapshot.push_back(
+        std::make_unique<SubscriptionCollectionImpl>(*fb_subscriptions_));
+
     auto result = classifier_->ClassifyRequest(
-        *fb_subscriptions_, request.url, frame_hierarchy,
+        std::move(snapshot), request.url, frame_hierarchy,
         static_cast<adblock::ContentType>(request.content_type), SiteKey());
     return result.decision ==
            ResourceClassifier::ClassificationResult::Decision::Blocked;
@@ -217,7 +222,7 @@ class FlatbufferAdblockVerifier {
 
  private:
   const base::FilePath reference_db_file_;
-  std::unique_ptr<adblock::SubscriptionCollection> fb_subscriptions_;
+  std::unique_ptr<adblock::SubscriptionCollectionImpl> fb_subscriptions_;
   scoped_refptr<ResourceClassifier> classifier_;
   base::Lock mismatches_count_lock_;
   std::map<LibadblockplusReferenceDatabase::MismatchType, int>

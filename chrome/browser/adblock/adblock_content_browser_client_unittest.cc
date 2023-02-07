@@ -19,6 +19,7 @@
 
 #include "base/callback_list.h"
 #include "base/run_loop.h"
+#include "base/test/gmock_move_support.h"
 #include "base/test/mock_callback.h"
 #include "chrome/browser/adblock/resource_classification_runner_factory.h"
 #include "chrome/browser/adblock/subscription_service_factory.h"
@@ -45,25 +46,6 @@ using testing::_;
 using testing::Return;
 
 namespace adblock {
-namespace {
-
-class DelayedInitSubscriptionService : public MockSubscriptionService {
- public:
-  FilteringStatus GetStatus() const override { return status_; }
-  void RunWhenInitialized(base::OnceClosure task) override {
-    deferred_tasks_.AddUnsafe(std::move(task));
-  }
-
-  void InitializeNow() {
-    status_ = FilteringStatus::Active;
-    deferred_tasks_.Notify();
-  }
-
-  FilteringStatus status_ = FilteringStatus::Initializing;
-  base::OnceClosureList deferred_tasks_;
-};
-
-}  // namespace
 
 class AdblockContentBrowserClientUnitTest
     : public ChromeRenderViewHostTestHarness {
@@ -73,7 +55,7 @@ class AdblockContentBrowserClientUnitTest
                 SubscriptionServiceFactory::GetInstance(),
                 base::BindRepeating([](content::BrowserContext* bc)
                                         -> std::unique_ptr<KeyedService> {
-                  return std::make_unique<DelayedInitSubscriptionService>();
+                  return std::make_unique<MockSubscriptionService>();
                 })),
             std::make_pair(
                 ResourceClassificationRunnerFactory::GetInstance(),
@@ -86,7 +68,7 @@ class AdblockContentBrowserClientUnitTest
   void SetUp() override {
     RenderViewHostTestHarness::SetUp();
 
-    subscription_service_ = static_cast<DelayedInitSubscriptionService*>(
+    subscription_service_ = static_cast<MockSubscriptionService*>(
         SubscriptionServiceFactory::GetForBrowserContext(profile()));
     resource_classification_runner_ =
         static_cast<MockResourceClassificationRunner*>(
@@ -94,89 +76,44 @@ class AdblockContentBrowserClientUnitTest
                 profile()));
   }
 
-  DelayedInitSubscriptionService* subscription_service_;
+  MockSubscriptionService* subscription_service_;
   MockResourceClassificationRunner* resource_classification_runner_;
 };
 
 TEST_F(AdblockContentBrowserClientUnitTest,
-       WillInterceptWebSocketWhenFilteringActive) {
+       WillInterceptWebSocketWhenFilteringEnabled) {
   AdblockContentBrowserClient content_client;
-  subscription_service_->status_ = FilteringStatus::Inactive;
-  EXPECT_FALSE(content_client.WillInterceptWebSocket(main_rfh()));
-  subscription_service_->status_ = FilteringStatus::Initializing;
-  EXPECT_TRUE(content_client.WillInterceptWebSocket(main_rfh()));
-  subscription_service_->status_ = FilteringStatus::Active;
+  subscription_service_->WillRequireFiltering(true);
   EXPECT_TRUE(content_client.WillInterceptWebSocket(main_rfh()));
 }
 
 TEST_F(AdblockContentBrowserClientUnitTest,
-       RenderFrameHostDiesBeforeSubscriptionServiceInitialized) {
+       WillNotInterceptWebSocketWhenFilteringDisabled) {
   AdblockContentBrowserClient content_client;
-
-  base::MockCallback<content::ContentBrowserClient::WebSocketFactory>
-      web_socket_factory;
-  // The web_socket_factory callback will never be called because the associated
-  // RenderFrameHost will be dead.
-  EXPECT_CALL(web_socket_factory, Run(_, _, _, _, _)).Times(0);
-
-  // In case the resource classification proceeds, let it finish to expose
-  // potential use-after-free.
-  ON_CALL(*subscription_service_, GetCurrentSnapshot()).WillByDefault([]() {
-    SubscriptionService::Snapshot snapshot;
-    snapshot.push_back(std::make_unique<MockSubscriptionCollection>());
-    return snapshot;
-  });
-
-  ON_CALL(*resource_classification_runner_,
-          CheckRequestFilterMatchForWebSocket(_, _, _, _))
-      .WillByDefault([&](auto subscription_collection, const auto& url,
-                         auto rfh_id, auto callback) {
-        std::move(callback).Run(FilterMatchResult::kAllowRule);
-      });
-
-  const net::SiteForCookies site_for_cookies;
-  content_client.CreateWebSocket(main_rfh(), web_socket_factory.Get(),
-                                 GURL("wss://domain.com/test"),
-                                 site_for_cookies, absl::nullopt, {});
-  // Tab is closed.
-  DeleteContents();
-
-  // SubscriptionService becomes initialized, triggers deferred classification
-  // of web socket. This does nothing.
-  subscription_service_->InitializeNow();
-
-  task_environment()->RunUntilIdle();
+  subscription_service_->WillRequireFiltering(false);
+  EXPECT_FALSE(content_client.WillInterceptWebSocket(main_rfh()));
 }
 
 TEST_F(AdblockContentBrowserClientUnitTest,
        RenderFrameHostDiesBeforeClassificationFinished) {
   const auto kSocketUrl = GURL("wss://domain.com/test");
-  // SubscriptionService is initialized from the start.
-  subscription_service_->InitializeNow();
-  // It will be queried for a SubscriptionCollection to classify the web socket
-  // connection.
+  subscription_service_->WillRequireFiltering(true);
   EXPECT_CALL(*subscription_service_, GetCurrentSnapshot()).WillOnce([]() {
     SubscriptionService::Snapshot snapshot;
     snapshot.push_back(std::make_unique<MockSubscriptionCollection>());
     return snapshot;
   });
-  // The SubscriptionCollection will be passed to ResourceClassificationRunner
-  // to run the classification asynchronously. Save the callback to run it
-  // later.
   CheckFilterMatchCallback classification_callback;
   EXPECT_CALL(*resource_classification_runner_,
               CheckRequestFilterMatchForWebSocket(_, kSocketUrl,
                                                   main_rfh()->GetGlobalId(), _))
-      .WillOnce([&](auto subscription_collection, const auto& url, auto rfh_id,
-                    auto callback) {
-        classification_callback = std::move(callback);
-      });
+      .WillOnce(MoveArg<3>(&classification_callback));
 
   AdblockContentBrowserClient content_client;
   base::MockCallback<content::ContentBrowserClient::WebSocketFactory>
       web_socket_factory;
-  // The web_socket_factory callback will never be called because the associated
-  // RenderFrameHost will be dead.
+  // The web_socket_factory callback will never be called because the
+  // associated RenderFrameHost will be dead.
   EXPECT_CALL(web_socket_factory, Run(_, _, _, _, _)).Times(0);
 
   const net::SiteForCookies site_for_cookies;
@@ -194,27 +131,18 @@ TEST_F(AdblockContentBrowserClientUnitTest,
 }
 
 TEST_F(AdblockContentBrowserClientUnitTest, WebSocketAllowed) {
+  subscription_service_->WillRequireFiltering(true);
   const auto kSocketUrl = GURL("wss://domain.com/test");
-  // SubscriptionService is initialized from the start.
-  subscription_service_->InitializeNow();
-  // It will be queried for a SubscriptionCollection to classify the web socket
-  // connection.
   EXPECT_CALL(*subscription_service_, GetCurrentSnapshot()).WillOnce([]() {
     SubscriptionService::Snapshot snapshot;
     snapshot.push_back(std::make_unique<MockSubscriptionCollection>());
     return snapshot;
   });
-  // The SubscriptionCollection will be passed to ResourceClassificationRunner
-  // to run the classification asynchronously. Save the callback to run it
-  // later.
   CheckFilterMatchCallback classification_callback;
   EXPECT_CALL(*resource_classification_runner_,
               CheckRequestFilterMatchForWebSocket(_, kSocketUrl,
                                                   main_rfh()->GetGlobalId(), _))
-      .WillOnce([&](auto subscription_collection, const auto& url, auto rfh_id,
-                    auto callback) {
-        classification_callback = std::move(callback);
-      });
+      .WillOnce(MoveArg<3>(&classification_callback));
 
   AdblockContentBrowserClient content_client;
   base::MockCallback<content::ContentBrowserClient::WebSocketFactory>
@@ -235,27 +163,18 @@ TEST_F(AdblockContentBrowserClientUnitTest, WebSocketAllowed) {
 }
 
 TEST_F(AdblockContentBrowserClientUnitTest, WebSocketBlocked) {
+  subscription_service_->WillRequireFiltering(true);
   const auto kSocketUrl = GURL("wss://domain.com/test");
-  // SubscriptionService is initialized from the start.
-  subscription_service_->InitializeNow();
-  // It will be queried for a SubscriptionCollection to classify the web socket
-  // connection.
   EXPECT_CALL(*subscription_service_, GetCurrentSnapshot()).WillOnce([]() {
     SubscriptionService::Snapshot snapshot;
     snapshot.push_back(std::make_unique<MockSubscriptionCollection>());
     return snapshot;
   });
-  // The SubscriptionCollection will be passed to ResourceClassificationRunner
-  // to run the classification asynchronously. Save the callback to run it
-  // later.
   CheckFilterMatchCallback classification_callback;
   EXPECT_CALL(*resource_classification_runner_,
               CheckRequestFilterMatchForWebSocket(_, kSocketUrl,
                                                   main_rfh()->GetGlobalId(), _))
-      .WillOnce([&](auto subscription_collection, const auto& url, auto rfh_id,
-                    auto callback) {
-        classification_callback = std::move(callback);
-      });
+      .WillOnce(MoveArg<3>(&classification_callback));
 
   AdblockContentBrowserClient content_client;
   base::MockCallback<content::ContentBrowserClient::WebSocketFactory>
