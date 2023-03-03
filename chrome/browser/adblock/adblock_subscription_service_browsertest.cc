@@ -14,9 +14,14 @@
  * You should have received a copy of the GNU General Public License
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/ranges/algorithm.h"
+#include "base/run_loop.h"
 #include "base/strings/string_split.h"
 #include "base/test/bind.h"
+#include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/adblock/subscription_persistent_metadata_factory.h"
@@ -26,6 +31,7 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/adblock/core/adblock_controller.h"
+#include "components/adblock/core/subscription/subscription_config.h"
 #include "components/adblock/core/subscription/subscription_service.h"
 #include "components/version_info/version_info.h"
 #include "content/public/test/browser_test.h"
@@ -63,8 +69,9 @@ class AdblockSubscriptionServiceBrowserTest
       const net::test_server::HttpRequest& request) {
     const auto accept_encoding_it =
         request.headers.find(net::HttpRequestHeaders::kAcceptEncoding);
-    if (accept_encoding_it == request.headers.end())
+    if (accept_encoding_it == request.headers.end()) {
       return false;
+    }
     const auto split_encodings =
         base::SplitString(accept_encoding_it->second, ",",
                           base::WhitespaceHandling::TRIM_WHITESPACE,
@@ -164,6 +171,30 @@ IN_PROC_BROWSER_TEST_F(AdblockSubscriptionServiceBrowserTest, LastVersion) {
   controller->AddObserver(this);
   // Wait for subscription update to trigger a network request.
   RunUntilBrowserProcessQuits();
+}
+
+IN_PROC_BROWSER_TEST_F(AdblockSubscriptionServiceBrowserTest,
+                       FilterFileDeletedAfterConversion) {
+  base::ScopedAllowBlockingForTesting allow_blocking;
+  ConversionExecutors* conversion_executors =
+      SubscriptionServiceFactory::GetInstance();
+  DCHECK(conversion_executors);
+  base::ScopedTempDir temp_dir;
+  ASSERT_TRUE(temp_dir.CreateUniqueTempDir());
+  const auto filter_list_path = temp_dir.GetPath().AppendASCII("easylist.txt");
+  std::vector<base::StringPiece> filter_list_contents = {
+      "[\"Adblock Plus 2.0\"]\n", "invalid file"};
+  for (const auto& file_content : filter_list_contents) {
+    base::WriteFile(filter_list_path, file_content);
+    ASSERT_TRUE(base::PathExists(filter_list_path));
+    base::RunLoop run_loop;
+    conversion_executors->ConvertFilterListFile(
+        DefaultSubscriptionUrl(), filter_list_path,
+        base::BindLambdaForTesting(
+            [&run_loop](ConversionResult result) { run_loop.Quit(); }));
+    run_loop.Run();
+    ASSERT_FALSE(base::PathExists(filter_list_path));
+  }
 }
 
 }  // namespace adblock

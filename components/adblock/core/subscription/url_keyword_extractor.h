@@ -23,8 +23,8 @@
 
 #include "absl/types/optional.h"
 
+#include "base/strings/string_piece.h"
 #include "base/strings/string_piece_forward.h"
-#include "third_party/re2/src/re2/re2.h"
 #include "url/gurl.h"
 
 namespace adblock {
@@ -49,11 +49,11 @@ class UrlKeywordExtractor {
  public:
   explicit UrlKeywordExtractor(base::StringPiece url);
   ~UrlKeywordExtractor();
-  absl::optional<std::string> GetNextKeyword();
+  absl::optional<base::StringPiece> GetNextKeyword();
 
  private:
-  re2::StringPiece input_;
-  re2::StringPiece::iterator end_of_last_keyword_;
+  std::string url_with_nulls_;
+  base::StringPiece input_;
 };
 
 }  // namespace adblock

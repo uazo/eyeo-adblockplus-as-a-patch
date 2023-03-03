@@ -344,10 +344,11 @@ TEST(PermissionsTest, CreateUnion) {
   std::unique_ptr<APIPermission> permission =
       permission_info->CreateAPIPermission();
   {
-    base::Value value(base::Value::Type::LIST);
-    value.Append("tcp-connect:*.example.com:80");
-    value.Append("udp-bind::8080");
-    value.Append("udp-send-to::8888");
+    base::Value::List list;
+    list.Append("tcp-connect:*.example.com:80");
+    list.Append("udp-bind::8080");
+    list.Append("udp-send-to::8888");
+    base::Value value(std::move(list));
     ASSERT_TRUE(permission->FromValue(&value, nullptr, nullptr));
   }
 
@@ -389,9 +390,10 @@ TEST(PermissionsTest, CreateUnion) {
 
   permission = permission_info->CreateAPIPermission();
   {
-    base::Value value(base::Value::Type::LIST);
-    value.Append("tcp-connect:*.example.com:80");
-    value.Append("udp-send-to::8899");
+    base::Value::List list;
+    list.Append("tcp-connect:*.example.com:80");
+    list.Append("udp-send-to::8899");
+    base::Value value(std::move(list));
     ASSERT_TRUE(permission->FromValue(&value, nullptr, nullptr));
   }
   apis2.insert(std::move(permission));
@@ -402,11 +404,12 @@ TEST(PermissionsTest, CreateUnion) {
 
   permission = permission_info->CreateAPIPermission();
   {
-    base::Value value(base::Value::Type::LIST);
-    value.Append("tcp-connect:*.example.com:80");
-    value.Append("udp-bind::8080");
-    value.Append("udp-send-to::8888");
-    value.Append("udp-send-to::8899");
+    base::Value::List list;
+    list.Append("tcp-connect:*.example.com:80");
+    list.Append("udp-bind::8080");
+    list.Append("udp-send-to::8888");
+    list.Append("udp-send-to::8899");
+    base::Value value(std::move(list));
     ASSERT_TRUE(permission->FromValue(&value, nullptr, nullptr));
   }
   // Insert a new permission socket permisssion which will replace the old one.
@@ -468,10 +471,11 @@ TEST(PermissionsTest, CreateIntersection) {
   std::unique_ptr<APIPermission> permission =
       permission_info->CreateAPIPermission();
   {
-    base::Value value(base::Value::Type::LIST);
-    value.Append("tcp-connect:*.example.com:80");
-    value.Append("udp-bind::8080");
-    value.Append("udp-send-to::8888");
+    base::Value::List list;
+    list.Append("tcp-connect:*.example.com:80");
+    list.Append("udp-bind::8080");
+    list.Append("udp-send-to::8888");
+    base::Value value(std::move(list));
     ASSERT_TRUE(permission->FromValue(&value, nullptr, nullptr));
   }
   apis1.insert(std::move(permission));
@@ -505,10 +509,11 @@ TEST(PermissionsTest, CreateIntersection) {
   apis2.insert(APIPermissionID::kClipboardWrite);
   permission = permission_info->CreateAPIPermission();
   {
-    base::Value value(base::Value::Type::LIST);
-    value.Append("udp-bind::8080");
-    value.Append("udp-send-to::8888");
-    value.Append("udp-send-to::8899");
+    base::Value::List list;
+    list.Append("udp-bind::8080");
+    list.Append("udp-send-to::8888");
+    list.Append("udp-send-to::8899");
+    base::Value value(std::move(list));
     ASSERT_TRUE(permission->FromValue(&value, nullptr, nullptr));
   }
   apis2.insert(std::move(permission));
@@ -516,9 +521,10 @@ TEST(PermissionsTest, CreateIntersection) {
   expected_apis.insert(APIPermissionID::kTab);
   permission = permission_info->CreateAPIPermission();
   {
-    base::Value value(base::Value::Type::LIST);
-    value.Append("udp-bind::8080");
-    value.Append("udp-send-to::8888");
+    base::Value::List list;
+    list.Append("udp-bind::8080");
+    list.Append("udp-send-to::8888");
+    base::Value value(std::move(list));
     ASSERT_TRUE(permission->FromValue(&value, nullptr, nullptr));
   }
   expected_apis.insert(std::move(permission));
@@ -579,10 +585,11 @@ TEST(PermissionsTest, CreateDifference) {
   std::unique_ptr<APIPermission> permission =
       permission_info->CreateAPIPermission();
   {
-    base::Value value(base::Value::Type::LIST);
-    value.Append("tcp-connect:*.example.com:80");
-    value.Append("udp-bind::8080");
-    value.Append("udp-send-to::8888");
+    base::Value::List list;
+    list.Append("tcp-connect:*.example.com:80");
+    list.Append("udp-bind::8080");
+    list.Append("udp-send-to::8888");
+    base::Value value(std::move(list));
     ASSERT_TRUE(permission->FromValue(&value, nullptr, nullptr));
   }
   apis1.insert(std::move(permission));
@@ -605,9 +612,10 @@ TEST(PermissionsTest, CreateDifference) {
   apis2.insert(APIPermissionID::kClipboardWrite);
   permission = permission_info->CreateAPIPermission();
   {
-    base::Value value(base::Value::Type::LIST);
-    value.Append("tcp-connect:*.example.com:80");
-    value.Append("udp-send-to::8899");
+    base::Value::List list;
+    list.Append("tcp-connect:*.example.com:80");
+    list.Append("udp-send-to::8899");
+    base::Value value(std::move(list));
     ASSERT_TRUE(permission->FromValue(&value, nullptr, nullptr));
   }
   apis2.insert(std::move(permission));
@@ -615,9 +623,10 @@ TEST(PermissionsTest, CreateDifference) {
   expected_apis.insert(APIPermissionID::kBackground);
   permission = permission_info->CreateAPIPermission();
   {
-    base::Value value(base::Value::Type::LIST);
-    value.Append("udp-bind::8080");
-    value.Append("udp-send-to::8888");
+    base::Value::List list;
+    list.Append("udp-bind::8080");
+    list.Append("udp-send-to::8888");
+    base::Value value(std::move(list));
     ASSERT_TRUE(permission->FromValue(&value, nullptr, nullptr));
   }
   expected_apis.insert(std::move(permission));
@@ -845,10 +854,12 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermissionID::kMediaRouterPrivate);
   skip.insert(APIPermissionID::kMetricsPrivate);
   skip.insert(APIPermissionID::kNetworkingCastPrivate);
+  skip.insert(APIPermissionID::kPdfViewerPrivate);
   skip.insert(APIPermissionID::kImageWriterPrivate);
   skip.insert(APIPermissionID::kResourcesPrivate);
   skip.insert(APIPermissionID::kRtcPrivate);
   skip.insert(APIPermissionID::kSafeBrowsingPrivate);
+  skip.insert(APIPermissionID::kSmartCardProviderPrivate);
   skip.insert(APIPermissionID::kSystemPrivate);
   skip.insert(APIPermissionID::kTabCaptureForTab);
   skip.insert(APIPermissionID::kTerminalPrivate);
@@ -858,8 +869,8 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermissionID::kWebrtcLoggingPrivate);
   skip.insert(APIPermissionID::kWebrtcLoggingPrivateAudioDebug);
   skip.insert(APIPermissionID::kWebstorePrivate);
-  skip.insert(APIPermissionID::kWebstoreWidgetPrivate);
   skip.insert(APIPermissionID::kWmDesksPrivate);
+  skip.insert(APIPermissionID::kSystemLog);
 
   // Adblock API is also private (in separate block to minimize conflicts).
   skip.insert(APIPermissionID::kAdblockPrivate);

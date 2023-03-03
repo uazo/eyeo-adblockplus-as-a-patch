@@ -25,6 +25,7 @@ source_set("test_support") {
     "test_request_reader.cc",
     "test_request_reader.h",
   ]
+
   public_deps = [
     "//base",
     "//base/test:test_support",
@@ -40,8 +41,9 @@ executable("verify_flatbuffer_adblocking") {
 
   sources = [ "verify_flatbuffer_adblocking.cc" ]
 
-  public_deps = [
+  deps = [
     ":test_support",
+    "//components/adblock/core/converter",
     "//components/adblock/core:core",
   ]
 }

@@ -24,6 +24,8 @@
 namespace adblock {
 namespace {
 
+using ClassificationResult = ResourceClassifier::ClassificationResult;
+
 absl::optional<HeaderFilterData> IsHeaderFilterOverruled(
     base::StringPiece blocking_header_filter,
     std::set<HeaderFilterData>& allowing_filters) {
@@ -41,17 +43,25 @@ absl::optional<HeaderFilterData> IsHeaderFilterOverruled(
   return absl::nullopt;
 }
 
-}  // namespace
+bool ContainsHeaderValue(const scoped_refptr<net::HttpResponseHeaders>& headers,
+                         base::StringPiece header_name,
+                         const std::string& header_value) {
+  size_t iter = 0;
+  std::string value;
+  while (headers->EnumerateHeader(&iter, header_name, &value)) {
+    if (value.find(header_value) != std::string::npos) {
+      return true;
+    }
+  }
+  return false;
+}
 
-ResourceClassifierImpl::~ResourceClassifierImpl() = default;
-
-ResourceClassifier::ClassificationResult
-ResourceClassifierImpl::ClassifyRequest(
+ClassificationResult ClassifyRequestWithSingleCollection(
     const SubscriptionCollection& subscription_collection,
     const GURL& request_url,
     const std::vector<GURL>& frame_hierarchy,
     ContentType content_type,
-    const SiteKey& sitekey) const {
+    const SiteKey& sitekey) {
   // Search all subscriptions for any blocking filters (generic or
   // domain-specific).
   const auto subscription_with_blocking_filter_it =
@@ -101,16 +111,16 @@ ResourceClassifierImpl::ClassifyRequest(
                               *subscription_with_blocking_filter_it};
 }
 
-ResourceClassifier::ClassificationResult ResourceClassifierImpl::ClassifyPopup(
+ClassificationResult ClassifyPopupWithSingleCollection(
     const SubscriptionCollection& subscription_collection,
     const GURL& popup_url,
-    const GURL& opener_url,
-    const SiteKey& sitekey) const {
+    const std::vector<GURL>& opener_frame_hierarchy,
+    const SiteKey& sitekey) {
   // Search all subscriptions for popup blocking filters (generic or
   // domain-specific).
   const auto subscription_with_blocking_filter_it =
-      subscription_collection.FindByPopupFilter(popup_url, opener_url, sitekey,
-                                                FilterCategory::Blocking);
+      subscription_collection.FindByPopupFilter(
+          popup_url, opener_frame_hierarchy, sitekey, FilterCategory::Blocking);
   if (!subscription_with_blocking_filter_it) {
     // Found no blocking filters in any of the subscriptions.
     return ClassificationResult{ClassificationResult::Decision::Ignored, {}};
@@ -118,25 +128,75 @@ ResourceClassifier::ClassificationResult ResourceClassifierImpl::ClassifyPopup(
   // Found a blocking filter but perhaps one of the subscriptions has an
   // allowing filter to override it?
   const auto subscription_with_allowing_filter_it =
-      subscription_collection.FindByPopupFilter(popup_url, opener_url, sitekey,
-                                                FilterCategory::Allowing);
+      subscription_collection.FindByPopupFilter(
+          popup_url, opener_frame_hierarchy, sitekey, FilterCategory::Allowing);
   if (subscription_with_allowing_filter_it) {
     // Found an overriding allowing filter:
     return ClassificationResult{ClassificationResult::Decision::Allowed,
                                 *subscription_with_allowing_filter_it};
+  }
+  const auto subscription_with_document_allowing_filter_it =
+      subscription_collection.FindBySpecialFilter(
+          SpecialFilterType::Document, popup_url, opener_frame_hierarchy,
+          sitekey);
+  if (subscription_with_document_allowing_filter_it) {
+    // Found an overriding document allowing filter for the frame hierarchy:
+    return ClassificationResult{ClassificationResult::Decision::Allowed,
+                                *subscription_with_document_allowing_filter_it};
   }
   // There is no overriding allowing filter, the popup should be blocked.
   return ClassificationResult{ClassificationResult::Decision::Blocked,
                               *subscription_with_blocking_filter_it};
 }
 
-ResourceClassifier::ClassificationResult
-ResourceClassifierImpl::ClassifyResponse(
+ClassificationResult CheckHeaderFiltersMatchResponseHeaders(
+    const GURL request_url,
+    const std::vector<GURL> frame_hierarchy,
+    const scoped_refptr<net::HttpResponseHeaders>& headers,
+    std::set<HeaderFilterData> blocking_filters,
+    std::set<HeaderFilterData> allowing_filters) {
+  ClassificationResult result{ClassificationResult::Decision::Ignored, {}};
+
+  for (const auto& filter : blocking_filters) {
+    auto key_value =
+        base::SplitString(filter.header_filter, "=", base::KEEP_WHITESPACE,
+                          base::SPLIT_WANT_NONEMPTY);
+    // If no '=' occurs, filter blocks response contains header, regardless
+    // header value
+    if (key_value.size() == 1u) {
+      if (headers->HasHeader(filter.header_filter)) {
+        if (auto allow_rule = IsHeaderFilterOverruled(filter.header_filter,
+                                                      allowing_filters)) {
+          result = {ClassificationResult::Decision::Allowed,
+                    allow_rule->subscription_url};
+        } else {
+          return ClassificationResult{ClassificationResult::Decision::Blocked,
+                                      filter.subscription_url};
+        }
+      }
+    } else {
+      DCHECK(key_value.size() == 2u);
+      if (ContainsHeaderValue(headers, key_value[0], key_value[1])) {
+        if (auto allow_rule = IsHeaderFilterOverruled(filter.header_filter,
+                                                      allowing_filters)) {
+          result = {ClassificationResult::Decision::Allowed,
+                    allow_rule->subscription_url};
+        } else {
+          return ClassificationResult{ClassificationResult::Decision::Blocked,
+                                      filter.subscription_url};
+        }
+      }
+    }
+  }
+  return result;
+}
+
+ClassificationResult ClassifyResponseWithSingleCollection(
     const SubscriptionCollection& subscription_collection,
     const GURL& request_url,
     const std::vector<GURL>& frame_hierarchy,
     ContentType content_type,
-    const scoped_refptr<net::HttpResponseHeaders>& response_headers) const {
+    const scoped_refptr<net::HttpResponseHeaders>& response_headers) {
   auto blocking_filters = subscription_collection.GetHeaderFilters(
       request_url, frame_hierarchy, content_type, FilterCategory::Blocking);
   if (blocking_filters.empty()) {
@@ -175,47 +235,71 @@ ResourceClassifierImpl::ClassifyResponse(
       std::move(blocking_filters), std::move(allowing_filters));
 }
 
-ResourceClassifier::ClassificationResult
-ResourceClassifierImpl::CheckHeaderFiltersMatchResponseHeaders(
-    const GURL request_url,
-    const std::vector<GURL> frame_hierarchy,
-    const scoped_refptr<net::HttpResponseHeaders>& headers,
-    std::set<HeaderFilterData> blocking_filters,
-    std::set<HeaderFilterData> allowing_filters) const {
-  ClassificationResult result{ClassificationResult::Decision::Ignored, {}};
+}  // namespace
 
-  for (const auto& filter : blocking_filters) {
-    auto key_value =
-        base::SplitString(filter.header_filter, "=", base::KEEP_WHITESPACE,
-                          base::SPLIT_WANT_NONEMPTY);
-    // If no '=' occurs, filter blocks response contains header, regardless
-    // header value
-    if (key_value.size() == 1u) {
-      if (headers->HasHeader(filter.header_filter)) {
-        if (auto allow_rule = IsHeaderFilterOverruled(filter.header_filter,
-                                                      allowing_filters)) {
-          result = {ClassificationResult::Decision::Allowed,
-                    allow_rule->subscription_url};
-        } else {
-          return ClassificationResult{ClassificationResult::Decision::Blocked,
-                                      filter.subscription_url};
-        }
-      }
-    } else {
-      DCHECK(key_value.size() == 2u);
-      if (headers->HasHeaderValue(key_value[0], key_value[1])) {
-        if (auto allow_rule = IsHeaderFilterOverruled(filter.header_filter,
-                                                      allowing_filters)) {
-          result = {ClassificationResult::Decision::Allowed,
-                    allow_rule->subscription_url};
-        } else {
-          return ClassificationResult{ClassificationResult::Decision::Blocked,
-                                      filter.subscription_url};
-        }
-      }
+ResourceClassifierImpl::~ResourceClassifierImpl() = default;
+
+ClassificationResult ResourceClassifierImpl::ClassifyRequest(
+    const SubscriptionService::Snapshot subscription_collections,
+    const GURL& request_url,
+    const std::vector<GURL>& frame_hierarchy,
+    ContentType content_type,
+    const SiteKey& sitekey) const {
+  auto classification =
+      ClassificationResult{ClassificationResult::Decision::Ignored, {}};
+  for (const auto& collection : subscription_collections) {
+    auto result = ClassifyRequestWithSingleCollection(
+        *collection, request_url, frame_hierarchy, content_type, sitekey);
+    if (result.decision == ClassificationResult::Decision::Blocked) {
+      return result;
+    }
+    if (result.decision == ClassificationResult::Decision::Allowed) {
+      classification = result;
     }
   }
-  return result;
+  return classification;
+}
+
+ClassificationResult ResourceClassifierImpl::ClassifyPopup(
+    const SubscriptionService::Snapshot& subscription_collections,
+    const GURL& popup_url,
+    const std::vector<GURL>& opener_frame_hierarchy,
+    const SiteKey& sitekey) const {
+  auto classification =
+      ClassificationResult{ClassificationResult::Decision::Ignored, {}};
+  for (const auto& collection : subscription_collections) {
+    auto result = ClassifyPopupWithSingleCollection(
+        *collection, popup_url, opener_frame_hierarchy, sitekey);
+    if (result.decision == ClassificationResult::Decision::Blocked) {
+      return result;
+    }
+    if (result.decision == ClassificationResult::Decision::Allowed) {
+      classification = result;
+    }
+  }
+  return classification;
+}
+
+ClassificationResult ResourceClassifierImpl::ClassifyResponse(
+    const SubscriptionService::Snapshot subscription_collections,
+    const GURL& request_url,
+    const std::vector<GURL>& frame_hierarchy,
+    ContentType content_type,
+    const scoped_refptr<net::HttpResponseHeaders>& response_headers) const {
+  auto classification =
+      ClassificationResult{ClassificationResult::Decision::Ignored, {}};
+  for (const auto& collection : subscription_collections) {
+    auto result = ClassifyResponseWithSingleCollection(
+        *collection, request_url, frame_hierarchy, content_type,
+        response_headers);
+    if (result.decision == ClassificationResult::Decision::Blocked) {
+      return result;
+    }
+    if (result.decision == ClassificationResult::Decision::Allowed) {
+      classification = result;
+    }
+  }
+  return classification;
 }
 
 }  // namespace adblock

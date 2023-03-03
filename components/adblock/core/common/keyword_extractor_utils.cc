@@ -16,11 +16,12 @@
  */
 
 #include "components/adblock/core/common/keyword_extractor_utils.h"
+#include "base/strings/string_piece.h"
 
 namespace adblock {
 namespace utils {
 
-bool IsBadKeyword(const std::string& value) {
+bool IsBadKeyword(base::StringPiece value) {
   return value == "http" || value == "https" || value == "com" ||
          value == "js" || value.size() < 2;
 }

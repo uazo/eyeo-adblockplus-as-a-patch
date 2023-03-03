@@ -27,6 +27,6 @@ Following classes are also important to understand workflow:
 
 The Chromium classes that are particularly important for our implementation are:
 
-* `RenderFrameHost`: To find the frame hierarchy, and to execute CSS and JavaScript.
+* `RenderFrameHost`: To find the [frame hierarchy](ad-filtering/README.md#frame-heirarchy), and to execute CSS and JavaScript.
 * `WebContentsObserver`: To receive page load events, as well as injecting element hiding. Parent of `AdblockWebContentsObserver`.
 * `ChromeContentBrowserClient`: For setup of URL loader factories for processing network requests, handle web sockets, popups, etc. Parent of `AdblockContentBrowserClient`.

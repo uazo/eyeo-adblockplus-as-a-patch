@@ -32,36 +32,49 @@ class MockResourceClassificationRunner : public ResourceClassificationRunner {
 
   void AddObserver(ResourceClassificationRunner::Observer*) override;
   void RemoveObserver(ResourceClassificationRunner::Observer*) override;
+  void NotifyAdMatched(const GURL& url,
+                       FilterMatchResult result,
+                       const std::vector<GURL>& parent_frame_urls,
+                       ContentType content_type,
+                       content::RenderFrameHost* render_frame_host,
+                       const GURL& subscription);
 
   MOCK_METHOD((FilterMatchResult),
               ShouldBlockPopup,
-              (std::unique_ptr<SubscriptionCollection>,
-               const GURL&,
+              (const SubscriptionService::Snapshot&,
                const GURL&,
                content::RenderFrameHost*),
               (override));
 
   MOCK_METHOD(void,
               CheckRequestFilterMatch,
-              (std::unique_ptr<SubscriptionCollection>,
+              (const SubscriptionService::Snapshot,
                const GURL&,
-               int32_t,
+               ContentType,
                content::GlobalRenderFrameHostId,
                CheckFilterMatchCallback),
               (override));
 
   MOCK_METHOD(void,
               CheckRequestFilterMatchForWebSocket,
-              (std::unique_ptr<SubscriptionCollection>,
+              (const SubscriptionService::Snapshot,
                const GURL&,
                content::GlobalRenderFrameHostId,
                CheckFilterMatchCallback),
               (override));
 
   MOCK_METHOD(void,
+              CheckDocumentAllowlisted,
+              (SubscriptionService::Snapshot,
+               const GURL& request_url,
+               content::GlobalRenderFrameHostId render_frame_host_id),
+              (override));
+
+  MOCK_METHOD(void,
               CheckResponseFilterMatch,
-              (std::unique_ptr<SubscriptionCollection>,
+              (const SubscriptionService::Snapshot,
                const GURL&,
+               ContentType,
                content::GlobalRenderFrameHostId,
                const scoped_refptr<net::HttpResponseHeaders>&,
                CheckFilterMatchCallback),
@@ -69,7 +82,7 @@ class MockResourceClassificationRunner : public ResourceClassificationRunner {
 
   MOCK_METHOD(void,
               CheckRewriteFilterMatch,
-              (std::unique_ptr<SubscriptionCollection>,
+              (const SubscriptionService::Snapshot,
                const GURL&,
                content::GlobalRenderFrameHostId,
                base::OnceCallback<void(const absl::optional<GURL>&)>),

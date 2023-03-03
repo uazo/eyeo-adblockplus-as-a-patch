@@ -19,16 +19,18 @@
 
 #include <memory>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/files/file.h"
 #include "base/files/file_path.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/strings/string_piece_forward.h"
 #include "base/strings/string_split.h"
+#include "base/test/bind.h"
 #include "base/test/mock_callback.h"
 #include "base/test/task_environment.h"
 #include "components/adblock/core/common/flatbuffer_data.h"
 #include "components/adblock/core/subscription/subscription_downloader.h"
+#include "components/adblock/core/subscription/test/mock_conversion_executors.h"
 #include "components/adblock/core/subscription/test/mock_subscription_persistent_metadata.h"
 #include "components/prefs/pref_service.h"
 #include "gmock/gmock-actions.h"
@@ -66,7 +68,7 @@ class AdblockSubscriptionDownloaderImplTest : public testing::Test {
     app_info_.version = "123";
     app_info_.client_os = "Linux";
     downloader_ = std::make_unique<SubscriptionDownloaderImpl>(
-        app_info_, request_maker_.Get(), converter_callback_.Get(),
+        app_info_, request_maker_.Get(), &conversion_executor_,
         &persistent_metadata_);
   }
 
@@ -101,9 +103,7 @@ class AdblockSubscriptionDownloaderImplTest : public testing::Test {
   utils::AppInfo app_info_;
   base::MockCallback<SubscriptionDownloaderImpl::SubscriptionRequestMaker>
       request_maker_;
-  base::MockCallback<
-      SubscriptionDownloaderImpl::ConvertFileToFlatbufferCallback>
-      converter_callback_;
+  MockConversionExecutors conversion_executor_;
   MockSubscriptionPersistentMetadata persistent_metadata_;
   std::unique_ptr<SubscriptionDownloaderImpl> downloader_;
 
@@ -265,14 +265,13 @@ TEST_F(AdblockSubscriptionDownloaderImplTest,
   // DownloadCompletedCallback will be called with a correctly converted
   // FlatbufferData.
   EXPECT_CALL(download_completed_callback, Run(testing::NotNull()));
-  // Converter callback is run to convert downloaded path into a flatbuffer.
-  EXPECT_CALL(converter_callback_,
-              Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path))
-      .WillOnce([&]() {
-        ConverterResult result;
-        result.data = std::make_unique<FakeBuffer>();
-        return result;
-      });
+  EXPECT_CALL(conversion_executor_,
+              ConvertFilterListFile(kSubscriptionUrlHttps,
+                                    downloaded_flatbuffer_path, testing::_))
+      .WillOnce(testing::WithArgs<2>(
+          testing::Invoke([](base::OnceCallback<void(ConversionResult)> cb) {
+            std::move(cb).Run(std::make_unique<FakeBuffer>());
+          })));
   // OngoingSubscriptionRequest calls ResponseCallback with a path to file with
   // valid flatbuffer content:
   response_callback.Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path,
@@ -312,16 +311,13 @@ TEST_F(AdblockSubscriptionDownloaderImplTest,
   const base::FilePath downloaded_flatbuffer_path(FILE_PATH_LITERAL("file.fb"));
   // DownloadCompletedCallback will not be called
   EXPECT_CALL(download_completed_callback, Run(testing::_)).Times(0);
-  // Converter callback is run to convert downloaded path into a flatbuffer and
-  // returns redirect URL
-  EXPECT_CALL(converter_callback_,
-              Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path))
-      .WillOnce([&]() {
-        ConverterResult result;
-        result.status = ConverterResult::Redirect;
-        result.redirect_url = redirect_url;
-        return result;
-      });
+  EXPECT_CALL(conversion_executor_,
+              ConvertFilterListFile(kSubscriptionUrlHttps,
+                                    downloaded_flatbuffer_path, testing::_))
+      .WillOnce(testing::WithArgs<2>(testing::Invoke(
+          [&redirect_url](base::OnceCallback<void(ConversionResult)> cb) {
+            std::move(cb).Run(redirect_url);
+          })));
   // OngoingSubscriptionRequest calls ResponseCallback with a path to file with
   // valid flatbuffer content:
   response_callback.Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path,
@@ -364,16 +360,13 @@ TEST_F(AdblockSubscriptionDownloaderImplTest,
   // DownloadCompletedCallback will be called with null due to exceeding max
   // number of redirects
   EXPECT_CALL(download_completed_callback, Run(testing::IsNull())).Times(1);
-  // Converter callback is run to convert downloaded path into a flatbuffer and
-  // returns redirect URL
-  EXPECT_CALL(converter_callback_,
-              Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path))
-      .WillOnce([&]() {
-        ConverterResult result;
-        result.status = ConverterResult::Redirect;
-        result.redirect_url = redirect_url;
-        return result;
-      });
+  EXPECT_CALL(conversion_executor_,
+              ConvertFilterListFile(kSubscriptionUrlHttps,
+                                    downloaded_flatbuffer_path, testing::_))
+      .WillOnce(testing::WithArgs<2>(testing::Invoke(
+          [&redirect_url](base::OnceCallback<void(ConversionResult)> cb) {
+            std::move(cb).Run(redirect_url);
+          })));
   // OngoingSubscriptionRequest calls ResponseCallback with a path to file with
   // valid flatbuffer content:
   response_callback.Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path,
@@ -415,17 +408,13 @@ TEST_F(AdblockSubscriptionDownloaderImplTest, NoRetryWhenConversionFailed) {
   // DownloadCompletedCallback gets called with nullptr, due to conversion
   // error.
   EXPECT_CALL(download_completed_callback, Run(testing::IsNull()));
-
-  // Converter callback is run to convert downloaded path into a flatbuffer. But
-  // it returns a null, indicating the downloaded file could not be converted to
-  // flatbuffer.
-  EXPECT_CALL(converter_callback_,
-              Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path))
-      .WillOnce([&]() {
-        ConverterResult result;
-        result.status = ConverterResult::Error;
-        return result;
-      });
+  EXPECT_CALL(conversion_executor_,
+              ConvertFilterListFile(kSubscriptionUrlHttps,
+                                    downloaded_flatbuffer_path, testing::_))
+      .WillOnce(testing::WithArgs<2>(
+          testing::Invoke([](base::OnceCallback<void(ConversionResult)> cb) {
+            std::move(cb).Run(ConversionError("Error"));
+          })));
   // OngoingSubscriptionRequest calls ResponseCallback with a path to file with
   // invalid flatbuffer content:
   response_callback.Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path,
@@ -466,16 +455,13 @@ TEST_F(AdblockSubscriptionDownloaderImplTest,
   const base::FilePath downloaded_flatbuffer_path(FILE_PATH_LITERAL("file.fb"));
   // DownloadCompletedCallback will be called with nullptr.
   EXPECT_CALL(download_completed_callback, Run(testing::IsNull()));
-  // Converter callback is run to convert downloaded path into a flatbuffer. But
-  // it returns a null, indicating the downloaded file could not be converted to
-  // flatbuffer.
-  EXPECT_CALL(converter_callback_,
-              Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path))
-      .WillOnce([&]() {
-        ConverterResult result;
-        result.status = ConverterResult::Error;
-        return result;
-      });
+  EXPECT_CALL(conversion_executor_,
+              ConvertFilterListFile(kSubscriptionUrlHttps,
+                                    downloaded_flatbuffer_path, testing::_))
+      .WillOnce(testing::WithArgs<2>(
+          testing::Invoke([](base::OnceCallback<void(ConversionResult)> cb) {
+            std::move(cb).Run(ConversionError("Error"));
+          })));
   // OngoingSubscriptionRequest calls ResponseCallback with a path to file with
   // invalid flatbuffer content:
   response_callback.Run(kSubscriptionUrlHttps, downloaded_flatbuffer_path,

@@ -35,21 +35,9 @@ class MockAdblockController : public NiceMock<AdblockController> {
   void AddObserver(AdblockController::Observer* observer) override;
   void RemoveObserver(AdblockController::Observer* observer) override;
   MOCK_METHOD(void, SetAdblockEnabled, (bool enabled), (override));
-  MOCK_METHOD(bool, IsAdblockEnabled, (), (const override));
+  MOCK_METHOD(bool, IsAdblockEnabled, (), (const, override));
   MOCK_METHOD(void, SetAcceptableAdsEnabled, (bool enabled), (override));
-  MOCK_METHOD(bool, IsAcceptableAdsEnabled, (), (const override));
-  MOCK_METHOD(void, SelectBuiltInSubscription, (const GURL& url), (override));
-  MOCK_METHOD(void, UnselectBuiltInSubscription, (const GURL& url), (override));
-  MOCK_METHOD(std::vector<scoped_refptr<Subscription>>,
-              GetSelectedBuiltInSubscriptions,
-              (),
-              (const, override));
-  MOCK_METHOD(void, AddCustomSubscription, (const GURL& url), (override));
-  MOCK_METHOD(void, RemoveCustomSubscription, (const GURL& url), (override));
-  MOCK_METHOD(std::vector<scoped_refptr<Subscription>>,
-              GetCustomSubscriptions,
-              (),
-              (const, override));
+  MOCK_METHOD(bool, IsAcceptableAdsEnabled, (), (const, override));
   MOCK_METHOD(void, InstallSubscription, (const GURL& url), (override));
   MOCK_METHOD(void, UninstallSubscription, (const GURL& url), (override));
   MOCK_METHOD(std::vector<scoped_refptr<Subscription>>,

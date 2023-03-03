@@ -33,4 +33,17 @@ void MockResourceClassificationRunner::RemoveObserver(
   observers_.RemoveObserver(observer);
 }
 
+void MockResourceClassificationRunner::NotifyAdMatched(
+    const GURL& url,
+    FilterMatchResult result,
+    const std::vector<GURL>& parent_frame_urls,
+    ContentType content_type,
+    content::RenderFrameHost* render_frame_host,
+    const GURL& subscription) {
+  for (auto& observer : observers_) {
+    observer.OnAdMatched(url, result, parent_frame_urls, content_type,
+                         render_frame_host, subscription);
+  }
+}
+
 }  // namespace adblock

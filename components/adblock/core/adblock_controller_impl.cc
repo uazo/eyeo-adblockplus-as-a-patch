@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "absl/types/optional.h"
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/command_line.h"
 #include "base/logging.h"
 #include "base/ranges/algorithm.h"
@@ -46,15 +46,6 @@
 namespace adblock {
 
 namespace {
-
-bool IsKnownSubscription(
-    const std::vector<KnownSubscriptionInfo>& known_subscriptions,
-    const GURL& url) {
-  return base::ranges::any_of(known_subscriptions,
-                              [&](const auto& known_subscription) {
-                                return known_subscription.url == url;
-                              });
-}
 
 template <typename T>
 std::vector<T> MigrateItemsFromList(PrefService* pref_service,
@@ -146,55 +137,9 @@ void AdblockControllerImpl::UninstallSubscription(const GURL& url) {
   adblock_filtering_configuration_->RemoveFilterList(url);
 }
 
-void AdblockControllerImpl::SelectBuiltInSubscription(const GURL& url) {
-  InstallSubscription(url);
-}
-
-void AdblockControllerImpl::UnselectBuiltInSubscription(const GURL& url) {
-  UninstallSubscription(url);
-}
-
-void AdblockControllerImpl::AddCustomSubscription(const GURL& url) {
-  InstallSubscription(url);
-}
-
-void AdblockControllerImpl::RemoveCustomSubscription(const GURL& url) {
-  UninstallSubscription(url);
-}
-
 std::vector<scoped_refptr<Subscription>>
 AdblockControllerImpl::GetInstalledSubscriptions() const {
-  if (subscription_service_->GetStatus() != FilteringStatus::Active)
-    return {};
   return GetSubscriptionsThatMatchConfiguration();
-}
-
-std::vector<scoped_refptr<Subscription>>
-AdblockControllerImpl::GetSelectedBuiltInSubscriptions() const {
-  auto selected = GetInstalledSubscriptions();
-  std::vector<KnownSubscriptionInfo> known = GetKnownSubscriptions();
-  selected.erase(base::ranges::remove_if(selected,
-                                         [&](const auto& subscription) {
-                                           return !IsKnownSubscription(
-                                               known,
-                                               subscription->GetSourceUrl());
-                                         }),
-                 selected.end());
-  return selected;
-}
-
-std::vector<scoped_refptr<Subscription>>
-AdblockControllerImpl::GetCustomSubscriptions() const {
-  auto selected = GetInstalledSubscriptions();
-  std::vector<KnownSubscriptionInfo> known = GetKnownSubscriptions();
-  selected.erase(base::ranges::remove_if(selected,
-                                         [&](const auto& subscription) {
-                                           return IsKnownSubscription(
-                                               known,
-                                               subscription->GetSourceUrl());
-                                         }),
-                 selected.end());
-  return selected;
 }
 
 void AdblockControllerImpl::AddAllowedDomain(const std::string& domain) {

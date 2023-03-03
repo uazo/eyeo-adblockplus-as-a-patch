@@ -18,6 +18,8 @@
 #ifndef COMPONENTS_ADBLOCK_CORE_SUBSCRIPTION_TEST_MOCK_SUBSCRIPTION_SERVICE_H_
 #define COMPONENTS_ADBLOCK_CORE_SUBSCRIPTION_TEST_MOCK_SUBSCRIPTION_SERVICE_H_
 
+#include <vector>
+#include "components/adblock/core/configuration/fake_filtering_configuration.h"
 #include "components/adblock/core/configuration/filtering_configuration.h"
 #include "components/adblock/core/subscription/subscription_service.h"
 
@@ -31,8 +33,6 @@ class MockSubscriptionService : public NiceMock<SubscriptionService> {
  public:
   MockSubscriptionService();
   ~MockSubscriptionService() override;
-  MOCK_METHOD(FilteringStatus, GetStatus, (), (override, const));
-  MOCK_METHOD(void, RunWhenInitialized, (base::OnceClosure task), (override));
   MOCK_METHOD(std::vector<scoped_refptr<Subscription>>,
               GetCurrentSubscriptions,
               (FilteringConfiguration*),
@@ -42,11 +42,22 @@ class MockSubscriptionService : public NiceMock<SubscriptionService> {
               InstallFilteringConfiguration,
               (std::unique_ptr<FilteringConfiguration> configuration),
               (override));
-
+  MOCK_METHOD(std::vector<FilteringConfiguration*>,
+              GetInstalledFilteringConfigurations,
+              (),
+              (override));
   void AddObserver(SubscriptionObserver* observer) final;
   void RemoveObserver(SubscriptionObserver* observer) final;
 
+  void WillRequireFiltering(bool filtering_required) {
+    filtering_configuration_.is_enabled = filtering_required;
+    EXPECT_CALL(*this, GetInstalledFilteringConfigurations())
+        .WillRepeatedly(testing::Return(
+            std::vector<FilteringConfiguration*>{&filtering_configuration_}));
+  }
+
   SubscriptionObserver* observer_ = nullptr;
+  FakeFilteringConfiguration filtering_configuration_;
 };
 
 }  // namespace adblock

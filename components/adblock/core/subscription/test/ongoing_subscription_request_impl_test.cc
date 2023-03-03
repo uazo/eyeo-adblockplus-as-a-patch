@@ -19,15 +19,11 @@
 
 #include <memory>
 
-#include "base/callback_helpers.h"
+#include "base/functional/callback_helpers.h"
 #include "base/files/file_util.h"
 #include "base/strings/string_piece_forward.h"
 #include "base/test/mock_callback.h"
 #include "base/test/task_environment.h"
-#include "components/adblock/core/common/adblock_prefs.h"
-#include "components/prefs/testing_pref_service.h"
-#include "components/sync_preferences/testing_pref_service_syncable.h"
-#include "net/base/mock_network_change_notifier.h"
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/url_loader_completion_status.h"
@@ -44,10 +40,8 @@ class AdblockOngoingSubscriptionRequestImplTest
     : public testing::TestWithParam<OngoingSubscriptionRequest::Method> {
  public:
   void SetUp() final {
-    prefs::RegisterProfilePrefs(pref_service_.registry());
-    pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
     ongoing_request_ = std::make_unique<OngoingSubscriptionRequestImpl>(
-        &pref_service_, &kRetryBackoffPolicy, test_shared_url_loader_factory_);
+        &kRetryBackoffPolicy, test_shared_url_loader_factory_);
   }
 
   base::StringPiece MethodAsString(OngoingSubscriptionRequest::Method method) {
@@ -67,14 +61,11 @@ class AdblockOngoingSubscriptionRequestImplTest
 
   base::test::TaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
-  std::unique_ptr<net::test::MockNetworkChangeNotifier>
-      network_change_notifier_ = net::test::MockNetworkChangeNotifier::Create();
   network::TestURLLoaderFactory test_url_loader_factory_;
   scoped_refptr<network::SharedURLLoaderFactory>
       test_shared_url_loader_factory_{
           base::MakeRefCounted<network::WeakWrapperSharedURLLoaderFactory>(
               &test_url_loader_factory_)};
-  sync_preferences::TestingPrefServiceSyncable pref_service_;
   const GURL kUrl{"https://url.com/filter"};
   const net::BackoffEntry::Policy kRetryBackoffPolicy = {
       0,      // Number of initial errors to ignore.
@@ -87,24 +78,6 @@ class AdblockOngoingSubscriptionRequestImplTest
   };
   std::unique_ptr<OngoingSubscriptionRequestImpl> ongoing_request_;
 };
-
-TEST_P(AdblockOngoingSubscriptionRequestImplTest,
-       RequestDeferredUntilAdblockingEnabled) {
-  // Initially, adblocking is disabled globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, false);
-  base::MockCallback<OngoingSubscriptionRequest::ResponseCallback>
-      response_callback;
-  ongoing_request_->Start(kUrl, GetParam(), response_callback.Get());
-
-  // Download did not start yet.
-  EXPECT_EQ(test_url_loader_factory_.NumPending(), 0);
-
-  // Adblocking gets enabled globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
-
-  // Download started.
-  VerifyRequestSent();
-}
 
 TEST_P(AdblockOngoingSubscriptionRequestImplTest,
        RequestCompletedSuccessfully) {
@@ -277,46 +250,6 @@ TEST_P(AdblockOngoingSubscriptionRequestImplTest,
   test_url_loader_factory_.SimulateResponseForPendingRequest(kUrl.spec(),
                                                              "content");
   task_environment_.RunUntilIdle();
-}
-
-TEST_P(AdblockOngoingSubscriptionRequestImplTest,
-       RequestStoppedAndStartedWhenAdblockingPrefToggled) {
-  base::MockCallback<OngoingSubscriptionRequest::ResponseCallback>
-      response_callback;
-  ongoing_request_->Start(kUrl, GetParam(), response_callback.Get());
-
-  ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
-
-  EXPECT_CALL(response_callback, Run(testing::_, testing::_, testing::_))
-      .WillRepeatedly([&](const GURL&, base::FilePath downloaded_file,
-                          scoped_refptr<net::HttpResponseHeaders> headers) {
-        ongoing_request_->Retry();
-      });
-
-  test_url_loader_factory_.SimulateResponseForPendingRequest(kUrl.spec(),
-                                                             "content");
-  task_environment_.RunUntilIdle();
-  // A retry attempt task has been posted.
-  EXPECT_EQ(task_environment_.GetPendingMainThreadTaskCount(), 1u);
-  // The delay matches the retry policy
-  EXPECT_EQ(task_environment_.NextMainThreadPendingTaskDelay().InMilliseconds(),
-            kRetryBackoffPolicy.initial_delay_ms);
-
-  // Adblocking is disabled globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, false);
-
-  // Fast-forward time until the retry task was scheduled to execute.
-  task_environment_.FastForwardBy(
-      task_environment_.NextMainThreadPendingTaskDelay());
-
-  // A retry request was not sent, as the request is now disallowed.
-  ASSERT_EQ(test_url_loader_factory_.NumPending(), 0);
-
-  // Adblocking is enabled globally.
-  pref_service_.SetBoolean(prefs::kEnableAdblockLegacy, true);
-
-  // Request was started.
-  VerifyRequestSent();
 }
 
 TEST_F(AdblockOngoingSubscriptionRequestImplTest,

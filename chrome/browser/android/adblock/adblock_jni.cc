@@ -24,24 +24,15 @@
 #include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
 #include "base/android/jni_weak_ref.h"
-#include "base/command_line.h"
 #include "base/logging.h"
-#include "base/version.h"
 #include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/android/adblock/adblock_jni_factory.h"
-#include "chrome/browser/android/tab_android.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "components/adblock/android/jni_headers/AdblockComposeFilterSuggestionsCallback_jni.h"
 #include "components/adblock/android/jni_headers/AdblockController_jni.h"
 #include "components/adblock/android/jni_headers/AdblockElement_jni.h"
-#include "components/adblock/core/adblock_switches.h"
-#include "components/adblock/core/common/adblock_utils.h"
-#include "components/prefs/pref_service.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/render_frame_host.h"
-#include "content/public/browser/render_process_host.h"
-#include "content/public/browser/web_contents.h"
 
 using base::android::AttachCurrentThread;
 using base::android::CheckException;
@@ -144,23 +135,6 @@ void ComposeFilterSuggestionsResult(
                                                       j_filters);
 }
 
-constexpr int kNoId = -1;
-
-int GetTabId(content::RenderFrameHost* render_frame_host) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-
-  auto* web_contents =
-      content::WebContents::FromRenderFrameHost(render_frame_host);
-  if (!web_contents)
-    return kNoId;
-
-  auto* tab = TabAndroid::FromWebContents(web_contents);
-  if (!tab)
-    return kNoId;
-
-  return tab->GetAndroidId();
-}
-
 ScopedJavaLocalRef<jobject> ToJava(JNIEnv* env,
                                    ScopedJavaLocalRef<jclass>& url_class,
                                    jmethodID& url_constructor,
@@ -213,24 +187,11 @@ std::vector<ScopedJavaLocalRef<jobject>> CSubscriptionsToJObjects(
   return jobjects;
 }
 
-std::vector<std::string> SubscriptionsToUrls(
-    const std::vector<scoped_refptr<Subscription>>& subscriptions) {
-  std::vector<std::string> urls;
-  urls.reserve(subscriptions.size());
-  base::ranges::transform(
-      subscriptions, std::back_inserter(urls),
-      [](const auto& sub) { return sub->GetSourceUrl().spec(); });
-  return urls;
-}
-
 }  // namespace
 
-AdblockJNI::AdblockJNI(ResourceClassificationRunner* classification_runner,
-                       AdblockController* controller)
-    : classification_runner_(classification_runner), controller_(controller) {
+AdblockJNI::AdblockJNI(AdblockController* controller)
+    : controller_(controller) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (classification_runner_)  // Might not be there in unit tests.
-    classification_runner_->AddObserver(this);
   if (controller_)
     controller_->AddObserver(this);
 }
@@ -239,102 +200,11 @@ AdblockJNI::~AdblockJNI() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (controller_)
     controller_->RemoveObserver(this);
-  if (classification_runner_)
-    classification_runner_->RemoveObserver(this);
 }
 
 void AdblockJNI::Bind(JavaObjectWeakGlobalRef weak_java_controller) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   weak_java_controller_ = weak_java_controller;
-}
-
-void AdblockJNI::OnAdMatched(const GURL& url,
-                             FilterMatchResult result,
-                             const std::vector<GURL>& parent_frame_urls,
-                             ContentType content_type,
-                             content::RenderFrameHost* render_frame_host,
-                             const GURL& subscription) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(render_frame_host);
-  DCHECK(result == FilterMatchResult::kBlockRule ||
-         result == FilterMatchResult::kAllowRule);
-  if (!has_counters_observers_)
-    return;
-  const bool was_blocked = result == FilterMatchResult::kBlockRule;
-  DVLOG(3) << "[eyeo] Ad matched " << url << "(type: " << content_type
-           << (was_blocked ? ", blocked" : ", allowed") << ")";
-  JNIEnv* env = AttachCurrentThread();
-
-  ScopedJavaLocalRef<jobject> obj = weak_java_controller_.get(env);
-  if (obj.is_null())
-    return;
-
-  ScopedJavaLocalRef<jstring> j_url = ConvertUTF8ToJavaString(env, url.spec());
-  ScopedJavaLocalRef<jobjectArray> j_parents =
-      ToJavaArrayOfStrings(env, adblock::utils::ConvertURLs(parent_frame_urls));
-  ScopedJavaLocalRef<jstring> j_subscription =
-      ConvertUTF8ToJavaString(env, subscription.spec());
-  int tab_id = GetTabId(render_frame_host);
-  Java_AdblockController_adMatchedCallback(
-      env, obj, j_url, was_blocked, j_parents, j_subscription,
-      static_cast<int>(content_type), tab_id);
-}
-
-void AdblockJNI::OnPageAllowed(const GURL& url,
-                               content::RenderFrameHost* render_frame_host,
-                               const GURL& subscription) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(render_frame_host);
-  if (!has_counters_observers_)
-    return;
-  DVLOG(3) << "[eyeo] Page allowed " << url;
-  JNIEnv* env = AttachCurrentThread();
-
-  ScopedJavaLocalRef<jobject> obj = weak_java_controller_.get(env);
-  if (obj.is_null())
-    return;
-
-  ScopedJavaLocalRef<jstring> j_url = ConvertUTF8ToJavaString(env, url.spec());
-  ScopedJavaLocalRef<jstring> j_subscription =
-      ConvertUTF8ToJavaString(env, subscription.spec());
-  int tab_id = GetTabId(render_frame_host);
-  Java_AdblockController_pageAllowedCallback(env, obj, j_url, j_subscription,
-                                             tab_id);
-}
-
-void AdblockJNI::OnPopupMatched(const GURL& url,
-                                FilterMatchResult result,
-                                const GURL& opener_url,
-                                content::RenderFrameHost* render_frame_host,
-                                const GURL& subscription) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(render_frame_host);
-  DCHECK(result == FilterMatchResult::kBlockRule ||
-         result == FilterMatchResult::kAllowRule);
-  if (!has_counters_observers_)
-    return;
-  const bool was_blocked = result == FilterMatchResult::kBlockRule;
-  DVLOG(3) << "[eyeo] Popup matched " << url
-           << (was_blocked ? ", blocked" : ", allowed");
-  JNIEnv* env = AttachCurrentThread();
-
-  ScopedJavaLocalRef<jobject> obj = weak_java_controller_.get(env);
-  if (obj.is_null())
-    return;
-
-  ScopedJavaLocalRef<jstring> j_url = ConvertUTF8ToJavaString(env, url.spec());
-  ScopedJavaLocalRef<jstring> j_opener =
-      ConvertUTF8ToJavaString(env, opener_url.spec());
-  ScopedJavaLocalRef<jstring> j_subscription =
-      ConvertUTF8ToJavaString(env, subscription.spec());
-  int tab_id = GetTabId(render_frame_host);
-  Java_AdblockController_popupMatchedCallback(env, obj, j_url, was_blocked,
-                                              j_opener, j_subscription, tab_id);
-}
-
-void AdblockJNI::SetHasAdblockCountersObservers(bool has_observers) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  has_counters_observers_ = has_observers;
 }
 
 void AdblockJNI::OnSubscriptionUpdated(const GURL& url) {
@@ -350,16 +220,6 @@ void AdblockJNI::OnSubscriptionUpdated(const GURL& url) {
 
 }  // namespace adblock
 
-static void JNI_AdblockController_SetHasAdblockCountersObservers(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& jcaller,
-    jboolean has_observers) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return;
-  adblock::GetJNI()->SetHasAdblockCountersObservers(has_observers == JNI_TRUE);
-}
-
 static void JNI_AdblockController_Bind(
     JNIEnv* env,
     const base::android::JavaParamRef<jobject>& caller) {
@@ -368,45 +228,6 @@ static void JNI_AdblockController_Bind(
     return;
   JavaObjectWeakGlobalRef weak_controller_ref(env, caller);
   adblock::GetJNI()->Bind(weak_controller_ref);
-}
-
-static jboolean JNI_AdblockController_IsAdblockEnabled(JNIEnv* env) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DCHECK(adblock::GetController());
-  return adblock::GetController()->IsAdblockEnabled() ? JNI_TRUE : JNI_FALSE;
-}
-
-static jboolean JNI_AdblockController_IsAcceptableAdsEnabled(JNIEnv* env) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DCHECK(adblock::GetController());
-  return adblock::GetController()->IsAcceptableAdsEnabled() ? JNI_TRUE
-                                                            : JNI_FALSE;
-}
-
-static void JNI_AdblockController_SetAdblockEnabled(JNIEnv* env,
-                                                    jboolean j_aa_enabled) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DCHECK(adblock::GetController());
-  return adblock::GetController()->SetAdblockEnabled(j_aa_enabled == JNI_TRUE);
-}
-
-static void JNI_AdblockController_SetAcceptableAdsEnabled(
-    JNIEnv* env,
-    jboolean j_aa_enabled) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DCHECK(adblock::GetController());
-  return adblock::GetController()->SetAcceptableAdsEnabled(j_aa_enabled ==
-                                                           JNI_TRUE);
-}
-
-static void JNI_AdblockController_InstallSubscription(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& url) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return;
-  adblock::GetController()->InstallSubscription(
-      GURL{ConvertJavaStringToUTF8(url)});
 }
 
 static base::android::ScopedJavaLocalRef<jobjectArray>
@@ -419,108 +240,6 @@ JNI_AdblockController_GetInstalledSubscriptions(JNIEnv* env) {
   return ToJavaArrayOfObjects(
       env, adblock::CSubscriptionsToJObjects(
                env, adblock::GetController()->GetInstalledSubscriptions()));
-}
-
-static void JNI_AdblockController_UninstallSubscription(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& url) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return;
-  adblock::GetController()->UninstallSubscription(
-      GURL{ConvertJavaStringToUTF8(url)});
-}
-
-static void JNI_AdblockController_SelectSubscription(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& url) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return;
-  adblock::GetController()->SelectBuiltInSubscription(
-      GURL{ConvertJavaStringToUTF8(url)});
-}
-
-static base::android::ScopedJavaLocalRef<jobjectArray>
-JNI_AdblockController_GetSelectedSubscriptions(JNIEnv* env) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return ToJavaArrayOfStrings(env, std::vector<std::string>{});
-
-  return ToJavaArrayOfStrings(
-      env, adblock::SubscriptionsToUrls(
-               adblock::GetController()->GetSelectedBuiltInSubscriptions()));
-}
-
-static void JNI_AdblockController_UnselectSubscription(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& url) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return;
-
-  adblock::GetController()->UnselectBuiltInSubscription(
-      GURL{ConvertJavaStringToUTF8(url)});
-}
-
-static void JNI_AdblockController_AddCustomSubscription(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& url) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return;
-  adblock::GetController()->AddCustomSubscription(
-      GURL{ConvertJavaStringToUTF8(url)});
-}
-
-static base::android::ScopedJavaLocalRef<jobjectArray>
-JNI_AdblockController_GetCustomSubscriptions(JNIEnv* env) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return ToJavaArrayOfStrings(env, std::vector<std::string>{});
-
-  return ToJavaArrayOfStrings(
-      env, adblock::SubscriptionsToUrls(
-               adblock::GetController()->GetCustomSubscriptions()));
-}
-
-static void JNI_AdblockController_RemoveCustomSubscription(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& url) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return;
-  adblock::GetController()->RemoveCustomSubscription(
-      GURL{ConvertJavaStringToUTF8(url)});
-}
-
-static void JNI_AdblockController_AddAllowedDomain(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& domain) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return;
-  adblock::GetController()->AddAllowedDomain(ConvertJavaStringToUTF8(domain));
-}
-
-static void JNI_AdblockController_RemoveAllowedDomain(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& domain) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return;
-  adblock::GetController()->RemoveAllowedDomain(
-      ConvertJavaStringToUTF8(domain));
-}
-
-static base::android::ScopedJavaLocalRef<jobjectArray>
-JNI_AdblockController_GetAllowedDomains(JNIEnv* env) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
-    return ToJavaArrayOfStrings(env, std::vector<std::string>{});
-
-  return ToJavaArrayOfStrings(env,
-                              adblock::GetController()->GetAllowedDomains());
 }
 
 static base::android::ScopedJavaLocalRef<jobjectArray>
@@ -540,17 +259,12 @@ JNI_AdblockController_GetSelectedSubscriptionVersion(
     JNIEnv* env,
     const base::android::JavaParamRef<jstring>& subscription) {
   const GURL url(ConvertJavaStringToUTF8(subscription));
-  const auto built_in_subscriptions =
-      adblock::GetController()->GetSelectedBuiltInSubscriptions();
-  auto it = base::ranges::find(built_in_subscriptions, url,
+  const auto installed_subscriptions =
+      adblock::GetController()->GetInstalledSubscriptions();
+  auto it = base::ranges::find(installed_subscriptions, url,
                                &adblock::Subscription::GetSourceUrl);
-  if (it == built_in_subscriptions.end()) {
-    const auto custom_subscriptions =
-        adblock::GetController()->GetCustomSubscriptions();
-    it = base::ranges::find(custom_subscriptions, url,
-                            &adblock::Subscription::GetSourceUrl);
-    if (it == custom_subscriptions.end())
-      return ConvertUTF8ToJavaString(env, {});
+  if (it == installed_subscriptions.end()) {
+    return ConvertUTF8ToJavaString(env, {});
   }
   ScopedJavaLocalRef<jstring> j_version =
       ConvertUTF8ToJavaString(env, (*it)->GetCurrentVersion());
@@ -567,36 +281,4 @@ static void JNI_AdblockController_ComposeFilterSuggestions(
   base::android::ScopedJavaGlobalRef<jobject> element_ref(element);
   base::android::ScopedJavaGlobalRef<jobject> callback_ref(callback);
   adblock::ComposeFilterSuggestionsResult(element_ref, callback_ref, {});
-}
-
-static void JNI_AdblockController_AddCustomFilter(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& filter) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  auto* controller = adblock::GetController();
-  if (!controller)
-    return;
-
-  controller->AddCustomFilter(ConvertJavaStringToUTF8(filter));
-}
-
-static void JNI_AdblockController_RemoveCustomFilter(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& filter) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  auto* controller = adblock::GetController();
-  if (!controller)
-    return;
-
-  controller->RemoveCustomFilter(ConvertJavaStringToUTF8(filter));
-}
-
-static base::android::ScopedJavaLocalRef<jobjectArray>
-JNI_AdblockController_GetCustomFilters(JNIEnv* env) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  auto* controller = adblock::GetController();
-  if (!controller)
-    return ToJavaArrayOfStrings(env, std::vector<std::string>{});
-
-  return ToJavaArrayOfStrings(env, controller->GetCustomFilters());
 }

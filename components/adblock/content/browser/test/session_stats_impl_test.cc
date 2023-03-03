@@ -18,6 +18,7 @@
 #include "components/adblock/content/browser/session_stats_impl.h"
 
 #include "base/test/mock_callback.h"
+#include "components/adblock/content/browser/test/mock_resource_classification_runner.h"
 #include "components/adblock/core/common/adblock_constants.h"
 #include "content/public/test/browser_task_environment.h"
 #include "content/public/test/test_renderer_host.h"
@@ -30,75 +31,6 @@ namespace {
 constexpr char kAllowedTestSub[] = "http://allowed.sub.com/";
 constexpr char kBlockedTestSub[] = "http://blocked.sub.com/";
 
-class FakeResourceClassificationRunner : public ResourceClassificationRunner {
- public:
-  MOCK_METHOD((FilterMatchResult),
-              ShouldBlockPopup,
-              (std::unique_ptr<SubscriptionCollection>,
-               const GURL& opener,
-               const GURL& popup_url,
-               content::RenderFrameHost* render_frame_host),
-              (override));
-
-  MOCK_METHOD(void,
-              CheckRequestFilterMatch,
-              (std::unique_ptr<SubscriptionCollection>,
-               const GURL& request_url,
-               int32_t resource_type,
-               content::GlobalRenderFrameHostId,
-               CheckFilterMatchCallback callback),
-              (override));
-
-  MOCK_METHOD(void,
-              CheckRequestFilterMatchForWebSocket,
-              (std::unique_ptr<SubscriptionCollection>,
-               const GURL& request_url,
-               content::GlobalRenderFrameHostId render_frame_host,
-               CheckFilterMatchCallback callback),
-              (override));
-
-  MOCK_METHOD(void,
-              CheckResponseFilterMatch,
-              (std::unique_ptr<SubscriptionCollection>,
-               const GURL& request_url,
-               content::GlobalRenderFrameHostId,
-               const scoped_refptr<net::HttpResponseHeaders>& headers,
-               CheckFilterMatchCallback callback),
-              (override));
-
-  MOCK_METHOD(void,
-              CheckRewriteFilterMatch,
-              (std::unique_ptr<SubscriptionCollection>,
-               const GURL& url,
-               content::GlobalRenderFrameHostId,
-               base::OnceCallback<void(const absl::optional<GURL>&)> result),
-              (override));
-
-  void AddObserver(Observer* observer) override {
-    observers_.AddObserver(observer);
-  }
-
-  void RemoveObserver(Observer* observer) override {
-    observers_.RemoveObserver(observer);
-  }
-
-  void NotifyAdMatched(const GURL& url,
-                       FilterMatchResult result,
-                       const std::vector<GURL>& parent_frame_urls,
-                       ContentType content_type,
-                       content::RenderFrameHost* render_frame_host,
-                       const GURL& subscription) {
-    for (auto& observer : observers_) {
-      observer.OnAdMatched(url, result, parent_frame_urls,
-                           static_cast<ContentType>(content_type),
-                           render_frame_host, subscription);
-    }
-  }
-
- private:
-  base::ObserverList<Observer> observers_;
-};
-
 }  // namespace
 
 class AdblockSessionStatsTest : public testing::Test {
@@ -109,7 +41,7 @@ class AdblockSessionStatsTest : public testing::Test {
     session_stats_ = std::make_unique<SessionStatsImpl>(&classfier_);
   }
 
-  FakeResourceClassificationRunner classfier_;
+  MockResourceClassificationRunner classfier_;
   std::unique_ptr<SessionStatsImpl> session_stats_;
 };
 

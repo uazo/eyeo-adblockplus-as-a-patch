@@ -103,7 +103,7 @@ Use of this source code is governed by the GPLv3 that can be found in the compon
         android:fragment="org.chromium.components.adblock.settings.AdblockSettingsFragment"
         android:key="adblock"
         android:order="18"
-        android:title="@string/ad_block_settings_title" />
+        android:title="@string/adblock_settings_title" />
     <Preference
         android:fragment="org.chromium.components.browser_ui.site_settings.SiteSettings"
         android:key="content_settings"

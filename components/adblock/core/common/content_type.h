@@ -40,6 +40,7 @@ enum ContentType {
 };
 
 std::string ContentTypeToString(ContentType content_type);
+ContentType ContentTypeFromString(const std::string& content_type);
 
 }  // namespace adblock
 

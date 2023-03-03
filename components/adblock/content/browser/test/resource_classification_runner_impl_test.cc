@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 
-#include "base/callback_forward.h"
+#include "base/functional/callback_forward.h"
 #include "base/test/bind.h"
 #include "base/test/mock_callback.h"
 #include "components/adblock/content/browser/test/mock_frame_hierarchy_builder.h"
@@ -80,16 +80,14 @@ class AdblockResourceClassificationRunnerImplTest
     std::unique_ptr<MockFrameHierarchyBuilder> mock_frame_hierarchy_builder =
         std::make_unique<MockFrameHierarchyBuilder>();
     mock_frame_hierarchy_builder_ = mock_frame_hierarchy_builder.get();
-
-    mock_subscription_collection_ =
-        std::make_unique<MockSubscriptionCollection>();
-
+    auto collection = std::make_unique<MockSubscriptionCollection>();
+    mock_subscription_collection_ = collection.get();
+    mock_snapshot_ = std::make_unique<SubscriptionService::Snapshot>();
+    mock_snapshot_->push_back(std::move(collection));
     mock_resource_classifier_ = base::MakeRefCounted<MockResourceClassifier>();
-
     classification_runner_ = std::make_unique<ResourceClassificationRunnerImpl>(
         mock_resource_classifier_, std::move(mock_frame_hierarchy_builder),
         &mock_sitekey_storage_);
-
     classification_runner_->AddObserver(&mock_observer_);
   }
 
@@ -136,17 +134,13 @@ class AdblockResourceClassificationRunnerImplTest
                             main_rfh(), kSubscriptionUrl));
   }
 
-  void PageAllowedWillBeNotified(GURL url) {
-    EXPECT_CALL(mock_observer_,
-                OnPageAllowed(url, main_rfh(), kSubscriptionUrl));
-  }
-
   MockObserver mock_observer_;
   MockSitekeyStorage mock_sitekey_storage_;
   MockFrameHierarchyBuilder* mock_frame_hierarchy_builder_;
   scoped_refptr<MockResourceClassifier> mock_resource_classifier_;
   std::unique_ptr<ResourceClassificationRunnerImpl> classification_runner_;
-  std::unique_ptr<MockSubscriptionCollection> mock_subscription_collection_;
+  MockSubscriptionCollection* mock_subscription_collection_;
+  std::unique_ptr<SubscriptionService::Snapshot> mock_snapshot_;
 
   const GURL kUrl{"https://test.com/url.x"};
   const GURL kWebsocketUrl{"wss://test.com/url.x"};
@@ -177,8 +171,7 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
                           FilterMatchResult::kBlockRule);
 
   classification_runner_->CheckRequestFilterMatch(
-      std::move(mock_subscription_collection_), kUrl,
-      static_cast<int>(blink::mojom::ResourceType::kImage),
+      std::move(*mock_snapshot_), kUrl, ContentType::Image,
       main_rfh()->GetGlobalId(), callback.Get());
 
   task_environment()->RunUntilIdle();
@@ -204,8 +197,8 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
                           FilterMatchResult::kBlockRule);
 
   classification_runner_->CheckRequestFilterMatchForWebSocket(
-      std::move(mock_subscription_collection_), kWebsocketUrl,
-      main_rfh()->GetGlobalId(), callback.Get());
+      std::move(*mock_snapshot_), kWebsocketUrl, main_rfh()->GetGlobalId(),
+      callback.Get());
   task_environment()->RunUntilIdle();
 }
 
@@ -223,47 +216,56 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
   EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
 
   classification_runner_->CheckRequestFilterMatch(
-      std::move(mock_subscription_collection_), kUrl,
-      static_cast<int>(blink::mojom::ResourceType::kImage),
+      std::move(*mock_snapshot_), kUrl, ContentType::Image,
       main_rfh()->GetGlobalId(), callback.Get());
 
   task_environment()->RunUntilIdle();
 }
 
 TEST_F(AdblockResourceClassificationRunnerImplTest,
-       CheckRequestFilterMatch_MainFrameAlwaysAllowed) {
-  // The final callback will be called with kNoRule result, because
-  // we don't allow any blocking rules for main frames.
-  base::MockCallback<CheckFilterMatchCallback> callback;
-  EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
+       CheckRequestFilterMatch_AllowlistedMainframeInOneConfig) {
+  EXPECT_CALL(mock_observer_, OnPageAllowed(kUrl, main_rfh(), kSubscriptionUrl))
+      .Times(0);
+
+  // In default config page is not allowlisted...
   EXPECT_CALL(*mock_subscription_collection_,
               FindBySpecialFilter(SpecialFilterType::Document, kUrl,
-                                  std::vector<GURL>(), SiteKey()));
+                                  std::vector<GURL>(), SiteKey()))
+      .WillOnce(testing::Return(absl::nullopt));
 
-  classification_runner_->CheckRequestFilterMatch(
-      std::move(mock_subscription_collection_), kUrl,
-      static_cast<int>(blink::mojom::ResourceType::kMainFrame),
-      main_rfh()->GetGlobalId(), callback.Get());
+  // ...so the other config is not even asked
+  auto collection = std::make_unique<MockSubscriptionCollection>();
+  EXPECT_CALL(*collection,
+              FindBySpecialFilter(SpecialFilterType::Document, kUrl,
+                                  std::vector<GURL>(), SiteKey()))
+      .Times(0);
+  mock_snapshot_->push_back(std::move(collection));
+
+  classification_runner_->CheckDocumentAllowlisted(
+      std::move(*mock_snapshot_), kUrl, main_rfh()->GetGlobalId());
 
   task_environment()->RunUntilIdle();
 }
 
 TEST_F(AdblockResourceClassificationRunnerImplTest,
-       CheckRequestFilterMatch_AllowlistedMainframe) {
-  // The final callback will be called with kNoRule result.
-  base::MockCallback<CheckFilterMatchCallback> callback;
-  EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
-  PageAllowedWillBeNotified(kUrl);
+       CheckRequestFilterMatch_AllowlistedMainframeInTwoConfigs) {
+  EXPECT_CALL(mock_observer_,
+              OnPageAllowed(kUrl, main_rfh(), kSubscriptionUrl));
 
   EXPECT_CALL(*mock_subscription_collection_,
               FindBySpecialFilter(SpecialFilterType::Document, kUrl,
                                   std::vector<GURL>(), SiteKey()))
       .WillOnce(testing::Return(absl::optional<GURL>{kSubscriptionUrl}));
 
-  classification_runner_->CheckRequestFilterMatch(
-      std::move(mock_subscription_collection_), kUrl,
-      static_cast<int>(blink::mojom::ResourceType::kMainFrame),
-      main_rfh()->GetGlobalId(), callback.Get());
+  auto collection = std::make_unique<MockSubscriptionCollection>();
+  EXPECT_CALL(*collection,
+              FindBySpecialFilter(SpecialFilterType::Document, kUrl,
+                                  std::vector<GURL>(), SiteKey()))
+      .WillOnce(testing::Return(absl::optional<GURL>{kSubscriptionUrl}));
+  mock_snapshot_->push_back(std::move(collection));
+
+  classification_runner_->CheckDocumentAllowlisted(
+      std::move(*mock_snapshot_), kUrl, main_rfh()->GetGlobalId());
 
   task_environment()->RunUntilIdle();
 }
@@ -281,8 +283,8 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
   EXPECT_CALL(callback, Run(FilterMatchResult::kBlockRule));
 
   classification_runner_->CheckRequestFilterMatch(
-      std::move(mock_subscription_collection_), kUrl,
-      static_cast<int>(blink::mojom::ResourceType::kImage),
+      std::move(*mock_snapshot_), kUrl, ContentType::Image,
+
       main_rfh()->GetGlobalId(), callback.Get());
 
   // Before running the thread loop, destroy the RFH.
@@ -307,8 +309,8 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
   EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
 
   classification_runner_->CheckResponseFilterMatch(
-      std::move(mock_subscription_collection_), kUrl, main_rfh()->GetGlobalId(),
-      {}, callback.Get());
+      std::move(*mock_snapshot_), kUrl, ContentType::Image,
+      main_rfh()->GetGlobalId(), {}, callback.Get());
 
   task_environment()->RunUntilIdle();
 }
@@ -327,8 +329,8 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
   ClassifierReturnsResponseClassification(kUrl, headers, Decision::Blocked);
 
   classification_runner_->CheckResponseFilterMatch(
-      std::move(mock_subscription_collection_), kUrl, main_rfh()->GetGlobalId(),
-      headers, callback.Get());
+      std::move(*mock_snapshot_), kUrl, ContentType::Image,
+      main_rfh()->GetGlobalId(), headers, callback.Get());
 
   EXPECT_CALL(callback, Run(FilterMatchResult::kBlockRule));
   EXPECT_CALL(mock_observer_,
@@ -351,8 +353,8 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
   ClassifierReturnsResponseClassification(kUrl, headers, Decision::Allowed);
 
   classification_runner_->CheckResponseFilterMatch(
-      std::move(mock_subscription_collection_), kUrl, main_rfh()->GetGlobalId(),
-      headers, callback.Get());
+      std::move(*mock_snapshot_), kUrl, ContentType::Image,
+      main_rfh()->GetGlobalId(), headers, callback.Get());
 
   EXPECT_CALL(callback, Run(FilterMatchResult::kAllowRule));
   EXPECT_CALL(mock_observer_,
@@ -375,8 +377,8 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
   ClassifierReturnsResponseClassification(kUrl, headers, Decision::Ignored);
 
   classification_runner_->CheckResponseFilterMatch(
-      std::move(mock_subscription_collection_), kUrl, main_rfh()->GetGlobalId(),
-      headers, callback.Get());
+      std::move(*mock_snapshot_), kUrl, ContentType::Image,
+      main_rfh()->GetGlobalId(), headers, callback.Get());
 
   EXPECT_CALL(callback, Run(FilterMatchResult::kNoRule));
   task_environment()->RunUntilIdle();

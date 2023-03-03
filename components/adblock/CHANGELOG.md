@@ -1,5 +1,15 @@
 # Release Notes
 
+## eyeo Chromium SDK 110.0
+* Updated to Chromium 110.0.5481.50
+* Support multiple FilteringConfigurations (DPD-1568)
+* Fixed potential crash in SubscriptionValidator (DPD-1709)
+* Covered AdblockURLLoaderFactory with UT (DPD-1634)
+* Fixed desktop setting page (DPD-1663)
+* Added CRLF support in filter lists converter
+* Added support for multiple CSP filters per resource (DPD-1145)
+* Simplified resource type detection (DPD-1437)
+
 ## eyeo Chromium SDK 109.0
 * Updated to Chromium 109.0.5414.86
 * Removed deprecated Allowed Connection Type API (DPD-1582)

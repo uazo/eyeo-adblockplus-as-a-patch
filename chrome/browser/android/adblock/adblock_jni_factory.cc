@@ -20,7 +20,6 @@
 #include <memory>
 
 #include "chrome/browser/adblock/adblock_controller_factory.h"
-#include "chrome/browser/adblock/resource_classification_runner_factory.h"
 #include "chrome/browser/android/adblock/adblock_jni.h"
 #include "chrome/browser/profiles/incognito_helpers.h"
 #include "chrome/browser/profiles/profile.h"
@@ -46,7 +45,6 @@ AdblockJNIFactory::AdblockJNIFactory()
           "AdblockJNI",
           BrowserContextDependencyManager::GetInstance()) {
   DependsOn(AdblockControllerFactory::GetInstance());
-  DependsOn(ResourceClassificationRunnerFactory::GetInstance());
 }
 
 AdblockJNIFactory::~AdblockJNIFactory() = default;
@@ -54,7 +52,6 @@ AdblockJNIFactory::~AdblockJNIFactory() = default;
 KeyedService* AdblockJNIFactory::BuildServiceInstanceFor(
     content::BrowserContext* context) const {
   return new AdblockJNI(
-      ResourceClassificationRunnerFactory::GetForBrowserContext(context),
       AdblockControllerFactory::GetForBrowserContext(context));
 }
 

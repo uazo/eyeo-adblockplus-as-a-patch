@@ -16,7 +16,7 @@ enum IsolatedWorldIDs : int32_t {
   // world.
   ISOLATED_WORLD_ID_GLOBAL = 0,
 
-  // Isolated world for Adblock Plus (element hiding)
+  // Isolated world for eyeo ad blocking (element hiding)
   ISOLATED_WORLD_ID_ADBLOCK,
 
   // Custom isolated world ids used by other embedders should start from here.

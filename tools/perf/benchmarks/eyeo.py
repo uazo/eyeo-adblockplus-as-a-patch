@@ -63,7 +63,6 @@ class PerfTimeTests(PerfTestBase):
     options.AppendExtraBrowserArgs(
         '--force-online-connection-state-for-indicator')
 
-
 class PerfMemoryTests(PerfTestBase):
   options = {'pageset_repeat': 3}
 
@@ -98,6 +97,17 @@ class PerfMemoryTests(PerfTestBase):
     options.AppendExtraBrowserArgs(
         '--force-online-connection-state-for-indicator')
 
+class MemoryFilterListFullPagesetAdHeavyDisableAdblock(PerfMemoryTests):
+  @classmethod
+  def Name(cls):
+    return "eyeo.memory_full_filter_list_pageset_adheavy_disable_adblock"
+
+  def SetExtraBrowserOptions(self, options):
+    options.AppendExtraBrowserArgs('--disable-adblock')
+
+  def CreateStorySet(self, options):
+    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
+
 class MemoryFilterListFullPagesetAdHeavyDisableAa(PerfMemoryTests):
   @classmethod
   def Name(cls):
@@ -107,7 +117,7 @@ class MemoryFilterListFullPagesetAdHeavyDisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetAdHeavyDefault(PerfMemoryTests):
   @classmethod
@@ -115,27 +125,7 @@ class MemoryFilterListFullPagesetAdHeavyDefault(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_adheavy_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
-
-class MemoryFilterListMinPagesetAdHeavyDefault(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory_min_filter_list_pageset_adheavy_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinPagesetAdHeavyDisableAa(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory_min_filter_list_pageset_adheavy_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
+    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedDisableAdblock(PerfMemoryTests):
   @classmethod
@@ -146,8 +136,7 @@ class MemoryFilterListFullPagesetExtendedDisableAdblock(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoExtendedPageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedDisableAa(PerfMemoryTests):
   @classmethod
@@ -158,8 +147,7 @@ class MemoryFilterListFullPagesetExtendedDisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoExtendedPageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedDefault(PerfMemoryTests):
   @classmethod
@@ -167,8 +155,7 @@ class MemoryFilterListFullPagesetExtendedDefault(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_extended_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoExtendedPageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetSmallDisableAdblock(PerfMemoryTests):
   @classmethod
@@ -179,8 +166,7 @@ class MemoryFilterListFullPagesetSmallDisableAdblock(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoSmallPageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetSmallDisableAa(PerfMemoryTests):
   @classmethod
@@ -191,8 +177,7 @@ class MemoryFilterListFullPagesetSmallDisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoSmallPageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetSmallDefault(PerfMemoryTests):
   @classmethod
@@ -200,8 +185,7 @@ class MemoryFilterListFullPagesetSmallDefault(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_small_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoSmallPageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetSingleDisableAdblock(PerfMemoryTests):
   @classmethod
@@ -212,8 +196,7 @@ class MemoryFilterListFullPagesetSingleDisableAdblock(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoSinglePageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoSinglePageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetSingleDisableAa(PerfMemoryTests):
   @classmethod
@@ -224,8 +207,7 @@ class MemoryFilterListFullPagesetSingleDisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoSinglePageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoSinglePageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetSingleDefault(PerfMemoryTests):
   @classmethod
@@ -233,82 +215,18 @@ class MemoryFilterListFullPagesetSingleDefault(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_single_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoSinglePageSet(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoSinglePageSet(take_memory_measurement = True, is_desktop = self.is_desktop)
 
-
-class MemoryFilterListMinifiedPagesetExtendedDisableAdblock(PerfMemoryTests):
+class PltFilterListFullPagesetAdHeavyDisableAdblock(PerfTimeTests):
   @classmethod
   def Name(cls):
-    return "eyeo.memory_min_filter_list_pageset_extended_disable_adblock"
+    return "eyeo.plt_full_filter_list_pageset_adheavy_disable_adblock"
 
   def SetExtraBrowserOptions(self, options):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-
-class MemoryFilterListMinifiedPagesetExtendedDisableAa(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory_min_filter_list_pageset_extended_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-
-class MemoryFilterListMinifiedPagesetExtendedDefault(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory_min_filter_list_pageset_extended_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-
-class MemoryFilterListMinifiedPagesetSmallDisableAdblock(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory_min_filter_list_pageset_small_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-
-class MemoryFilterListMinifiedPagesetSmallDisableAa(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory_min_filter_list_pageset_small_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-
-class MemoryFilterListMinifiedPagesetSmallDefault(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory_min_filter_list_pageset_small_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-
-class PltFilterListFullPagesetAdHeavyDefault(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt_full_filter_list_pageset_adheavy_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetAdHeavyDisableAa(PerfTimeTests):
   @classmethod
@@ -319,26 +237,15 @@ class PltFilterListFullPagesetAdHeavyDisableAa(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = False, is_desktop = self.is_desktop)
 
-class PltFilterListMinPagesetAdHeavyDefault(PerfTimeTests):
+class PltFilterListFullPagesetAdHeavyDefault(PerfTimeTests):
   @classmethod
   def Name(cls):
-    return "eyeo.plt_min_filter_list_pageset_adheavy_default"
+    return "eyeo.plt_full_filter_list_pageset_adheavy_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinPagesetAdHeavyDisableAa(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt_min_filter_list_pageset_adheavy_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
+    return page_sets.EyeoAdHeavyPageSet(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedDisableAdblock(PerfTimeTests):
   @classmethod
@@ -349,8 +256,7 @@ class PltFilterListFullPagesetExtendedDisableAdblock(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoExtendedPageSet(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedDisableAa(PerfTimeTests):
   @classmethod
@@ -361,8 +267,7 @@ class PltFilterListFullPagesetExtendedDisableAa(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoExtendedPageSet(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedDefault(PerfTimeTests):
   @classmethod
@@ -370,8 +275,7 @@ class PltFilterListFullPagesetExtendedDefault(PerfTimeTests):
     return "eyeo.plt_full_filter_list_pageset_extended_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoExtendedPageSet(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetSmallDisableAdblock(PerfTimeTests):
   @classmethod
@@ -382,8 +286,7 @@ class PltFilterListFullPagesetSmallDisableAdblock(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoSmallPageSet(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetSmallDisableAa(PerfTimeTests):
   @classmethod
@@ -394,8 +297,7 @@ class PltFilterListFullPagesetSmallDisableAa(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoSmallPageSet(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetSmallDefault(PerfTimeTests):
   @classmethod
@@ -403,74 +305,7 @@ class PltFilterListFullPagesetSmallDefault(PerfTimeTests):
     return "eyeo.plt_full_filter_list_pageset_small_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
-
-
-class PltFilterListMinifiedPagesetExtendedDisableAdblock(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt_min_filter_list_pageset_extended_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-
-class PltFilterListMinifiedPagesetExtendedDisableAa(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt_min_filter_list_pageset_extended_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-
-class PltFilterListMinifiedPagesetExtendedDefault(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt_min_filter_list_pageset_extended_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSet(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-
-class PltFilterListMinifiedPagesetSmallDisableAdblock(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt_min_filter_list_pageset_small_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-
-class PltFilterListMinifiedPagesetSmallDisableAa(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt_min_filter_list_pageset_small_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-
-class PltFilterListMinifiedPagesetSmallDefault(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt_min_filter_list_pageset_small_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoSmallPageSet(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
+    return page_sets.EyeoSmallPageSet(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt1DisableAdblock(PerfMemoryTests):
   @classmethod
@@ -481,7 +316,7 @@ class MemoryFilterListFullPagesetExtendedPt1DisableAdblock(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt1DisableAa(PerfMemoryTests):
   @classmethod
@@ -492,7 +327,7 @@ class MemoryFilterListFullPagesetExtendedPt1DisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt1Default(PerfMemoryTests):
   @classmethod
@@ -500,7 +335,7 @@ class MemoryFilterListFullPagesetExtendedPt1Default(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_extended_pt1_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt2DisableAdblock(PerfMemoryTests):
   @classmethod
@@ -511,7 +346,7 @@ class MemoryFilterListFullPagesetExtendedPt2DisableAdblock(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt2DisableAa(PerfMemoryTests):
   @classmethod
@@ -522,7 +357,7 @@ class MemoryFilterListFullPagesetExtendedPt2DisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt2Default(PerfMemoryTests):
   @classmethod
@@ -530,7 +365,7 @@ class MemoryFilterListFullPagesetExtendedPt2Default(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_extended_pt2_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt3DisableAdblock(PerfMemoryTests):
   @classmethod
@@ -541,7 +376,7 @@ class MemoryFilterListFullPagesetExtendedPt3DisableAdblock(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt3DisableAa(PerfMemoryTests):
   @classmethod
@@ -552,7 +387,7 @@ class MemoryFilterListFullPagesetExtendedPt3DisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt3Default(PerfMemoryTests):
   @classmethod
@@ -560,7 +395,7 @@ class MemoryFilterListFullPagesetExtendedPt3Default(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_extended_pt3_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt4DisableAdblock(PerfMemoryTests):
   @classmethod
@@ -571,7 +406,7 @@ class MemoryFilterListFullPagesetExtendedPt4DisableAdblock(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt4DisableAa(PerfMemoryTests):
   @classmethod
@@ -582,7 +417,7 @@ class MemoryFilterListFullPagesetExtendedPt4DisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt4Default(PerfMemoryTests):
   @classmethod
@@ -590,7 +425,7 @@ class MemoryFilterListFullPagesetExtendedPt4Default(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_extended_pt4_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt5DisableAdblock(PerfMemoryTests):
   @classmethod
@@ -601,7 +436,7 @@ class MemoryFilterListFullPagesetExtendedPt5DisableAdblock(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt5DisableAa(PerfMemoryTests):
   @classmethod
@@ -612,7 +447,7 @@ class MemoryFilterListFullPagesetExtendedPt5DisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt5Default(PerfMemoryTests):
   @classmethod
@@ -620,7 +455,7 @@ class MemoryFilterListFullPagesetExtendedPt5Default(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_extended_pt5_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt6DisableAdblock(PerfMemoryTests):
   @classmethod
@@ -631,7 +466,7 @@ class MemoryFilterListFullPagesetExtendedPt6DisableAdblock(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt6DisableAa(PerfMemoryTests):
   @classmethod
@@ -642,7 +477,7 @@ class MemoryFilterListFullPagesetExtendedPt6DisableAa(PerfMemoryTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class MemoryFilterListFullPagesetExtendedPt6Default(PerfMemoryTests):
   @classmethod
@@ -650,187 +485,7 @@ class MemoryFilterListFullPagesetExtendedPt6Default(PerfMemoryTests):
     return "eyeo.memory_full_filter_list_pageset_extended_pt6_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = True, minified = False, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt1DisableAdblock(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt1_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt1DisableAa(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt1_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt1Default(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt1_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt2DisableAdblock(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt2_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt2DisableAa(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt2_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt2Default(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt2_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt3DisableAdblock(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt3_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt3DisableAa(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt3_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt3Default(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt3_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt4DisableAdblock(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt4_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt4DisableAa(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt4_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt4Default(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt4_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt5DisableAdblock(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt5_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt5DisableAa(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt5_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt5Default(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt5_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt6DisableAdblock(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt6_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt6DisableAa(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt6_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
-
-class MemoryFilterListMinifiedPagesetExtendedPt6Default(PerfMemoryTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.memory-filter-list-minified-pageset_extended_pt6_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = True, minified = True, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = True, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt1DisableAdblock(PerfTimeTests):
   @classmethod
@@ -841,7 +496,7 @@ class PltFilterListFullPagesetExtendedPt1DisableAdblock(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt1DisableAa(PerfTimeTests):
   @classmethod
@@ -852,7 +507,7 @@ class PltFilterListFullPagesetExtendedPt1DisableAa(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt1Default(PerfTimeTests):
   @classmethod
@@ -860,7 +515,7 @@ class PltFilterListFullPagesetExtendedPt1Default(PerfTimeTests):
     return "eyeo.plt_full_filter_list_pageset_extended_pt1_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt2DisableAdblock(PerfTimeTests):
   @classmethod
@@ -871,7 +526,7 @@ class PltFilterListFullPagesetExtendedPt2DisableAdblock(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt2DisableAa(PerfTimeTests):
   @classmethod
@@ -882,7 +537,7 @@ class PltFilterListFullPagesetExtendedPt2DisableAa(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt2Default(PerfTimeTests):
   @classmethod
@@ -890,7 +545,7 @@ class PltFilterListFullPagesetExtendedPt2Default(PerfTimeTests):
     return "eyeo.plt_full_filter_list_pageset_extended_pt2_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt3DisableAdblock(PerfTimeTests):
   @classmethod
@@ -901,7 +556,7 @@ class PltFilterListFullPagesetExtendedPt3DisableAdblock(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt3DisableAa(PerfTimeTests):
   @classmethod
@@ -912,7 +567,7 @@ class PltFilterListFullPagesetExtendedPt3DisableAa(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt3Default(PerfTimeTests):
   @classmethod
@@ -920,7 +575,7 @@ class PltFilterListFullPagesetExtendedPt3Default(PerfTimeTests):
     return "eyeo.plt_full_filter_list_pageset_extended_pt3_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt4DisableAdblock(PerfTimeTests):
   @classmethod
@@ -931,7 +586,7 @@ class PltFilterListFullPagesetExtendedPt4DisableAdblock(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt4DisableAa(PerfTimeTests):
   @classmethod
@@ -942,7 +597,7 @@ class PltFilterListFullPagesetExtendedPt4DisableAa(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt4Default(PerfTimeTests):
   @classmethod
@@ -950,7 +605,7 @@ class PltFilterListFullPagesetExtendedPt4Default(PerfTimeTests):
     return "eyeo.plt_full_filter_list_pageset_extended_pt4_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt5DisableAdblock(PerfTimeTests):
   @classmethod
@@ -961,7 +616,7 @@ class PltFilterListFullPagesetExtendedPt5DisableAdblock(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt5DisableAa(PerfTimeTests):
   @classmethod
@@ -972,7 +627,7 @@ class PltFilterListFullPagesetExtendedPt5DisableAa(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt5Default(PerfTimeTests):
   @classmethod
@@ -980,7 +635,7 @@ class PltFilterListFullPagesetExtendedPt5Default(PerfTimeTests):
     return "eyeo.plt_full_filter_list_pageset_extended_pt5_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt6DisableAdblock(PerfTimeTests):
   @classmethod
@@ -991,7 +646,7 @@ class PltFilterListFullPagesetExtendedPt6DisableAdblock(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-adblock')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt6DisableAa(PerfTimeTests):
   @classmethod
@@ -1002,7 +657,7 @@ class PltFilterListFullPagesetExtendedPt6DisableAa(PerfTimeTests):
     options.AppendExtraBrowserArgs('--disable-aa')
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = False, is_desktop = self.is_desktop)
 
 class PltFilterListFullPagesetExtendedPt6Default(PerfTimeTests):
   @classmethod
@@ -1010,184 +665,4 @@ class PltFilterListFullPagesetExtendedPt6Default(PerfTimeTests):
     return "eyeo.plt_full_filter_list_pageset_extended_pt6_default"
 
   def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = False, minified = False, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt1DisableAdblock(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt1_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt1DisableAa(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt1_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt1Default(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt1_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt1(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt2DisableAdblock(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt2_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt2DisableAa(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt2_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt2Default(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt2_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt2(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt3DisableAdblock(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt3_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt3DisableAa(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt3_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt3Default(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt3_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt3(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt4DisableAdblock(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt4_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt4DisableAa(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt4_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt4Default(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt4_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt4(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt5DisableAdblock(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt5_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt5DisableAa(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt5_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt5Default(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt5_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt5(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt6DisableAdblock(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt6_disable_adblock"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-adblock')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt6DisableAa(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt6_disable_aa"
-
-  def SetExtraBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--disable-aa')
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
-
-class PltFilterListMinifiedPagesetExtendedPt6Default(PerfTimeTests):
-  @classmethod
-  def Name(cls):
-    return "eyeo.plt-filter-list-minified-pageset_extended_pt6_default"
-
-  def CreateStorySet(self, options):
-    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = False, minified = True, is_desktop = self.is_desktop)
+    return page_sets.EyeoExtendedPageSetPt6(take_memory_measurement = False, is_desktop = self.is_desktop)

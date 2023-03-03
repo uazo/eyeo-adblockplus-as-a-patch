@@ -28,6 +28,7 @@
 #include "components/adblock/core/common/flatbuffer_data.h"
 #include "components/adblock/core/schema/filter_list_schema_generated.h"
 #include "components/adblock/core/subscription/installed_subscription.h"
+#include "components/adblock/core/subscription/regex_matcher.h"
 
 namespace adblock {
 
@@ -52,17 +53,17 @@ class InstalledSubscriptionImpl final : public InstalledSubscription {
                     const SiteKey& sitekey,
                     FilterCategory category) const final;
   bool HasPopupFilter(const GURL& url,
-                      const GURL& opener_url,
+                      const std::string& document_domain,
                       const SiteKey& sitekey,
                       FilterCategory category) const final;
   bool HasSpecialFilter(SpecialFilterType type,
                         const GURL& url,
                         const std::string& document_domain,
                         const SiteKey& sitekey) const final;
-  absl::optional<base::StringPiece> FindCspFilter(
-      const GURL& url,
-      const std::string& document_domain,
-      FilterCategory category) const final;
+  void FindCspFilters(const GURL& url,
+                      const std::string& document_domain,
+                      FilterCategory category,
+                      std::set<base::StringPiece>& results) const final;
   absl::optional<base::StringPiece> FindRewriteFilter(
       const GURL& url,
       const std::string& document_domain,
@@ -85,63 +86,36 @@ class InstalledSubscriptionImpl final : public InstalledSubscription {
  private:
   friend class base::RefCountedThreadSafe<InstalledSubscriptionImpl>;
   ~InstalledSubscriptionImpl() final;
+  enum class FindStrategy {
+    FindFirst,
+    FindAll,
+  };
 
   using UrlFilterIndex =
       flatbuffers::Vector<flatbuffers::Offset<flat::UrlFiltersByKeyword>>;
   using Domains = flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>;
-
-  // Returns whether any filter in |category| matches the remaining parameters.
-  // Does not allow finding *which* particular it is. This allows optimized,
-  // "bulk" matching checks.
-  bool MatchesInternal(const UrlFilterIndex* index,
-                       const GURL& url,
-                       absl::optional<ContentType> content_type,
-                       const std::string& document_domain,
-                       const std::string& sitekey,
-                       FilterCategory category) const;
   // Finds the first filter in |category| that matches the remaining parameters.
-  // This is generally slower than |MatchesInternal| but allows inspecting the
-  // found filter.
-  const flat::UrlFilter* FindInternal(const UrlFilterIndex* index,
-                                      const GURL& url,
-                                      absl::optional<ContentType> content_type,
-                                      const std::string& document_domain,
-                                      const std::string& sitekey,
-                                      FilterCategory category) const;
   // Finds all filters in category that matchers the remaining parameters.
-  std::vector<const flat::UrlFilter*> FindAllInternal(
+  std::vector<const flat::UrlFilter*> FindInternal(
       const UrlFilterIndex* index,
-      const GURL& url,
-      absl::optional<ContentType> content_type,
-      const std::string& document_domain,
-      const std::string& sitekey,
-      FilterCategory category) const;
-  bool FilterPresentForKeyword(const UrlFilterIndex* index,
-                               const std::string& keyword,
-                               const GURL& url,
-                               absl::optional<ContentType> content_type,
-                               const std::string& document_domain,
-                               const std::string& sitekey,
-                               FilterCategory category,
-                               bool is_third_party_request) const;
-  const flat::UrlFilter* FindFilterForKeyword(
-      const UrlFilterIndex* index,
-      const std::string& keyword,
       const GURL& url,
       absl::optional<ContentType> content_type,
       const std::string& document_domain,
       const std::string& sitekey,
       FilterCategory category,
-      bool is_third_party_request) const;
-  std::vector<const flat::UrlFilter*> FindAllFiltersForKeyword(
+      FindStrategy strategy) const;
+  void FindFiltersForKeyword(
       const UrlFilterIndex* index,
-      const std::string& keyword,
+      base::StringPiece keyword,
       const GURL& url,
+      const GURL& lowercase_url,
       absl::optional<ContentType> content_type,
       const std::string& document_domain,
       const std::string& sitekey,
       FilterCategory category,
-      bool is_third_party_request) const;
+      bool is_third_party_request,
+      FindStrategy strategy,
+      std::vector<const flat::UrlFilter*>& out_results) const;
   bool CandidateFilterViable(const flat::UrlFilter* candidate,
                              absl::optional<ContentType> content_type,
                              const std::string& document_domain,
@@ -167,6 +141,7 @@ class InstalledSubscriptionImpl final : public InstalledSubscription {
   const InstallationState installation_state_;
   const base::Time installation_time_;
   const flat::Subscription* index_ = nullptr;
+  const std::unique_ptr<RegexMatcher> regex_matcher_;
 };
 
 }  // namespace adblock

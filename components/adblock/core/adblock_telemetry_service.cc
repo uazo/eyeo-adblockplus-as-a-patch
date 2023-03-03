@@ -19,7 +19,7 @@
 
 #include <string>
 
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string_number_conversions.h"
@@ -63,7 +63,7 @@ net::NetworkTrafficAnnotationTag kTrafficAnnotation =
       policy {
         cookies_allowed: NO
         setting:
-          "Enabled or disabled via 'Adblock Plus' setting."
+          "Enabled or disabled via 'Ad blocking' setting."
         policy_exception_justification:
           "Parent setting may be controlled by policy"
         }

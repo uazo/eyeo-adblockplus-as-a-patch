@@ -23,7 +23,9 @@
 
 #include "absl/types/optional.h"
 #include "base/containers/span.h"
+#include "base/strings/string_piece.h"
 #include "base/strings/string_piece_forward.h"
+#include "base/values.h"
 #include "components/adblock/core/common/content_type.h"
 #include "components/adblock/core/common/header_filter_data.h"
 #include "components/adblock/core/common/sitekey.h"
@@ -48,7 +50,7 @@ class SubscriptionCollection {
       FilterCategory category) const = 0;
   virtual absl::optional<GURL> FindByPopupFilter(
       const GURL& popup_url,
-      const GURL& opener_url,
+      const std::vector<GURL>& frame_hierarchy,
       const SiteKey& sitekey,
       FilterCategory category) const = 0;
   virtual absl::optional<GURL> FindByAllowFilter(
@@ -69,11 +71,11 @@ class SubscriptionCollection {
   virtual std::vector<base::StringPiece> GetElementHideEmulationSelectors(
       const GURL& frame_url) const = 0;
 
-  virtual std::string GenerateSnippetsJson(
+  virtual base::Value::List GenerateSnippets(
       const GURL& frame_url,
       const std::vector<GURL>& frame_hierarchy) const = 0;
 
-  virtual base::StringPiece GetCspInjection(
+  virtual std::set<base::StringPiece> GetCspInjections(
       const GURL& request_url,
       const std::vector<GURL>& frame_hierarchy) const = 0;
 

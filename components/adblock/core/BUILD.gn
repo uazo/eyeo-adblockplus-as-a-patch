@@ -107,8 +107,6 @@ source_set("core") {
     "adblock_controller.h",
     "adblock_controller_impl.cc",
     "adblock_controller_impl.h",
-    "adblock_controller_legacy_impl.cc",  # Remove in 111
-    "adblock_controller_legacy_impl.h",  # Remove in 111
     "adblock_switches.cc",
     "adblock_switches.h",
     "adblock_telemetry_service.cc",
@@ -128,10 +126,13 @@ source_set("core") {
   public_deps = [
     "//components/adblock/core/classifier",
     "//components/adblock/core/common",
+    "//components/adblock/core/common:utils",
     "//components/adblock/core/configuration",
-    "//components/adblock/core/converter",
     "//components/adblock/core/subscription",
-    "//components/pref_registry:pref_registry",
+    "//components/keyed_service/core",
+    "//components/pref_registry",
+    "//components/prefs",
+    "//components/version_info",
   ]
 
   all_dependent_configs = [ ":adblock_core_config" ]
@@ -159,7 +160,6 @@ source_set("unit_tests") {
   sources = [
     "test/activeping_telemetry_topic_provider_test.cc",
     "test/adblock_controller_impl_test.cc",
-    "test/adblock_controller_legacy_impl_test.cc",  # Remove in 111
     "test/adblock_telemetry_service_unittest.cc",
     "test/bundled_subscription_test.cc",
     "test/sitekey_storage_impl_test.cc",
@@ -172,6 +172,7 @@ source_set("unit_tests") {
     "//components/adblock/core/configuration:test_support",
     "//components/adblock/core/subscription:test_support",
     "//components/prefs:test_support",
+    "//components/resources:components_resources_grit",
     "//components/sync_preferences:test_support",
     "//net:test_support",
     "//services/network:test_support",

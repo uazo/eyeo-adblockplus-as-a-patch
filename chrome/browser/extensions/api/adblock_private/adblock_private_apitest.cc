@@ -139,66 +139,6 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, GetBuiltInSubscriptions) {
   EXPECT_TRUE(RunTest("getBuiltInSubscriptions")) << message_;
 }
 
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, SelectedSubscriptionsDataSchema) {
-  EXPECT_TRUE(RunTest("selectedSubscriptionsDataSchema")) << message_;
-}
-
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest,
-                       SelectBuiltInSubscriptionsInvalidURL) {
-  EXPECT_TRUE(RunTest("selectBuiltInSubscriptionsInvalidURL")) << message_;
-}
-
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest,
-                       SelectBuiltInSubscriptionsNotBuiltIn) {
-  EXPECT_TRUE(RunTest("selectBuiltInSubscriptionsNotBuiltIn")) << message_;
-}
-
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest,
-                       UnselectBuiltInSubscriptionsInvalidURL) {
-  EXPECT_TRUE(RunTest("unselectBuiltInSubscriptionsInvalidURL")) << message_;
-}
-
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest,
-                       UnselectBuiltInSubscriptionsNotBuiltIn) {
-  EXPECT_TRUE(RunTest("unselectBuiltInSubscriptionsNotBuiltIn")) << message_;
-}
-
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, BuiltInSubscriptionsManagement) {
-  DCHECK(browser()->profile());
-  auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
-      browser()->profile());
-  auto selected = controller->GetSelectedBuiltInSubscriptions();
-  const auto easylist = std::find_if(
-      selected.begin(), selected.end(),
-      [&](scoped_refptr<adblock::Subscription> subscription) {
-        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
-                              "easylist.txt");
-      });
-  const auto exceptions = std::find_if(
-      selected.begin(), selected.end(),
-      [&](scoped_refptr<adblock::Subscription> subscription) {
-        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
-                              "exceptionrules.txt");
-      });
-  const auto snippets = std::find_if(
-      selected.begin(), selected.end(),
-      [&](scoped_refptr<adblock::Subscription> subscription) {
-        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
-                              "abp-filters-anti-cv.txt");
-      });
-  if (easylist == selected.end() || exceptions == selected.end() ||
-      snippets == selected.end()) {
-    // Since default configuration has been changed let's skip this test
-    return;
-  }
-  const std::map<std::string, std::string> params = {
-      {"easylist", (*easylist)->GetSourceUrl().spec()},
-      {"exceptions", (*exceptions)->GetSourceUrl().spec()},
-      {"snippets", (*snippets)->GetSourceUrl().spec()}};
-  EXPECT_TRUE(RunTestWithParams("builtInSubscriptionsManagement", params))
-      << message_;
-}
-
 IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest,
                        InstalledSubscriptionsDataSchema) {
   EXPECT_TRUE(RunTest("installedSubscriptionsDataSchema")) << message_;
@@ -245,18 +185,6 @@ IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, SubscriptionsManagement) {
       {"exceptions", (*exceptions)->GetSourceUrl().spec()},
       {"snippets", (*snippets)->GetSourceUrl().spec()}};
   EXPECT_TRUE(RunTestWithParams("subscriptionsManagement", params)) << message_;
-}
-
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, CustomSubscriptionInvalidURL) {
-  EXPECT_TRUE(RunTest("addCustomSubscriptionInvalidURL")) << message_;
-}
-
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, RemoveSubscriptionInvalidURL) {
-  EXPECT_TRUE(RunTest("removeCustomSubscriptionInvalidURL")) << message_;
-}
-
-IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, CustomSubscriptionsManagement) {
-  EXPECT_TRUE(RunTest("customSubscriptionsManagement")) << message_;
 }
 
 IN_PROC_BROWSER_TEST_F(AdblockPrivateApiTest, AllowedDomainsManagement) {

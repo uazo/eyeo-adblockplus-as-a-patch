@@ -16,11 +16,12 @@
  */
 #include <fstream>
 
+#include "absl/types/variant.h"
 #include "base/at_exit.h"
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/path_service.h"
 #include "base/strings/string_piece_forward.h"
@@ -34,10 +35,11 @@
 #include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/flatbuffer_data.h"
 #include "components/adblock/core/common/sitekey.h"
-#include "components/adblock/core/converter/converter.h"
+#include "components/adblock/core/converter/flatbuffer_converter.h"
 #include "components/adblock/core/subscription/installed_subscription_impl.h"
 #include "components/adblock/core/subscription/subscription_collection_impl.h"
 #include "components/adblock/core/subscription/subscription_config.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "components/adblock_comparison/libadblockplus_reference_database.h"
 
 namespace adblock::test {
@@ -65,30 +67,40 @@ class FlatbufferAdblockVerifier {
     auto anti_cv_stream =
         GetFileStream(subscriptions_base_path.AppendASCII("anticv.txt"));
 
-    auto easylist_fb = adblock::Converter().Convert(
-        easy_stream, {adblock::DefaultSubscriptionUrl(),
-                      adblock::config::AllowPrivilegedFilters(
-                          adblock::DefaultSubscriptionUrl())});
-    auto exceptions_fb = adblock::Converter().Convert(
-        exception_stream,
-        {adblock::AcceptableAdsUrl(),
-         adblock::config::AllowPrivilegedFilters(adblock::AcceptableAdsUrl())});
-    auto anti_cv_fb = adblock::Converter().Convert(
-        anti_cv_stream,
-        {adblock::AntiCVUrl(),
-         adblock::config::AllowPrivilegedFilters(adblock::AntiCVUrl())});
+    auto easylist_fb = FlatbufferConverter::Convert(
+        easy_stream, adblock::DefaultSubscriptionUrl(),
+        adblock::config::AllowPrivilegedFilters(
+            adblock::DefaultSubscriptionUrl()));
+    DCHECK(
+        absl::holds_alternative<std::unique_ptr<FlatbufferData>>(easylist_fb));
+
+    auto exceptions_fb = FlatbufferConverter::Convert(
+        exception_stream, adblock::AcceptableAdsUrl(),
+        adblock::config::AllowPrivilegedFilters(adblock::AcceptableAdsUrl()));
+    DCHECK(absl::holds_alternative<std::unique_ptr<FlatbufferData>>(
+        exceptions_fb));
+
+    auto anti_cv_fb = FlatbufferConverter::Convert(
+        anti_cv_stream, adblock::AntiCVUrl(),
+        adblock::config::AllowPrivilegedFilters(adblock::AntiCVUrl()));
+    DCHECK(
+        absl::holds_alternative<std::unique_ptr<FlatbufferData>>(anti_cv_fb));
+
     fb_subscriptions_ = std::make_unique<adblock::SubscriptionCollectionImpl>(
         std::vector<scoped_refptr<adblock::InstalledSubscription>>{
             base::MakeRefCounted<adblock::InstalledSubscriptionImpl>(
-                std::move(easylist_fb.data),
+                std::move(
+                    absl::get<std::unique_ptr<FlatbufferData>>(easylist_fb)),
                 adblock::Subscription::InstallationState::Installed,
                 base::Time()),
             base::MakeRefCounted<adblock::InstalledSubscriptionImpl>(
-                std::move(exceptions_fb.data),
+                std::move(
+                    absl::get<std::unique_ptr<FlatbufferData>>(exceptions_fb)),
                 adblock::Subscription::InstallationState::Installed,
                 base::Time()),
             base::MakeRefCounted<adblock::InstalledSubscriptionImpl>(
-                std::move(anti_cv_fb.data),
+                std::move(
+                    absl::get<std::unique_ptr<FlatbufferData>>(anti_cv_fb)),
                 adblock::Subscription::InstallationState::Installed,
                 base::Time())});
     classifier_ = base::MakeRefCounted<ResourceClassifierImpl>();
@@ -104,8 +116,12 @@ class FlatbufferAdblockVerifier {
 
   bool FlatbufferUrlFilterImplementation(const test::Request& request) {
     std::vector<GURL> frame_hierarchy = {GURL("https://" + request.domain)};
+    SubscriptionService::Snapshot snapshot;
+    snapshot.push_back(
+        std::make_unique<SubscriptionCollectionImpl>(*fb_subscriptions_));
+
     auto result = classifier_->ClassifyRequest(
-        *fb_subscriptions_, request.url, frame_hierarchy,
+        std::move(snapshot), request.url, frame_hierarchy,
         static_cast<adblock::ContentType>(request.content_type), SiteKey());
     return result.decision ==
            ResourceClassifier::ClassificationResult::Decision::Blocked;
@@ -217,7 +233,7 @@ class FlatbufferAdblockVerifier {
 
  private:
   const base::FilePath reference_db_file_;
-  std::unique_ptr<adblock::SubscriptionCollection> fb_subscriptions_;
+  std::unique_ptr<adblock::SubscriptionCollectionImpl> fb_subscriptions_;
   scoped_refptr<ResourceClassifier> classifier_;
   base::Lock mismatches_count_lock_;
   std::map<LibadblockplusReferenceDatabase::MismatchType, int>
@@ -240,12 +256,14 @@ int main(int argc, char* argv[]) {
 
   const auto* cmd = base::CommandLine::ForCurrentProcess();
   base::FilePath subscription_dir = adblock::test::DefaultDataPath();
-  if (cmd->HasSwitch(kSubscriptionDir))
+  if (cmd->HasSwitch(kSubscriptionDir)) {
     subscription_dir = cmd->GetSwitchValuePath(kSubscriptionDir);
+  }
   base::FilePath input =
       subscription_dir.AppendASCII("random_shuf_100.tsv.sqlite");
-  if (cmd->HasSwitch(kInputSwitch))
+  if (cmd->HasSwitch(kInputSwitch)) {
     input = cmd->GetSwitchValuePath(kInputSwitch);
+  }
   CHECK(base::PathExists(input)) << "Input " << input << " does not exist";
   CHECK(base::PathExists(subscription_dir))
       << "Subscription directory " << subscription_dir << " does not exist";
@@ -257,7 +275,8 @@ int main(int argc, char* argv[]) {
 
   adblock::test::FlatbufferAdblockVerifier verifier(input, subscription_dir);
 
-  if (lines.empty())
+  if (lines.empty()) {
     return verifier.RunTest(num_threads);
+  }
   return verifier.CheckLines(lines);
 }

@@ -100,35 +100,6 @@ interface Functions {
   static void isAcceptableAdsEnabled(StateCallback callback);
   // Gets the list of built-in subscriptions.
   static void getBuiltInSubscriptions(BuiltInSubscriptionsCallback callback);
-  // Returns a list of built-in subscriptions a user is subscribed to.
-  // Deprecated, to be removed in version 111.
-  [deprecated="Use getInstalledSubscriptions() instead"]
-  static void getSelectedBuiltInSubscriptions(SubscriptionsCallback callback);
-  // Subscribes to a built-in subscription.
-  // |url| must be one from the built-in subscriptions list.
-  // Deprecated, to be removed in version 111.
-  [deprecated="Use installSubscription() instead"]
-  static void selectBuiltInSubscription(DOMString url,
-                                        optional CompletionCallback feedback);
-  // Unsubscribes from a built-in subscription.
-  // Deprecated, to be removed in version 111.
-  [deprecated="Use uninstallSubscription() instead"]
-  static void unselectBuiltInSubscription(DOMString url,
-                                          optional CompletionCallback feedback);
-  // Returns a list of custom subscriptions a user is subscribed to.
-  // Deprecated, to be removed in version 111.
-  [deprecated="Use getInstalledSubscriptions() instead"]
-  static void getCustomSubscriptions(SubscriptionsCallback callback);
-  // Subscribes to a custom subscription. |url| may point to any URL.
-  // Deprecated, to be removed in version 111.
-  [deprecated="Use installSubscription() instead"]
-  static void addCustomSubscription(DOMString url,
-                                    optional CompletionCallback feedback);
-  // Unsubscribes from a custom subscription.
-  // Deprecated, to be removed in version 111.
-  [deprecated="Use uninstallSubscription() instead"]
-  static void removeCustomSubscription(DOMString url,
-                                       optional CompletionCallback feedback);
   // Adds a domain ads should not be blocked on.
   static void addAllowedDomain(DOMString domain);
   // Removes a domain ads should not be blocked on.

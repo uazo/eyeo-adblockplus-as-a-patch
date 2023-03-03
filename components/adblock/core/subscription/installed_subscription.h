@@ -87,7 +87,7 @@ class InstalledSubscription : public Subscription {
                             const SiteKey& sitekey,
                             FilterCategory category) const = 0;
   virtual bool HasPopupFilter(const GURL& url,
-                              const GURL& opener_url,
+                              const std::string& document_domain,
                               const SiteKey& sitekey,
                               FilterCategory category) const = 0;
   virtual bool HasSpecialFilter(SpecialFilterType type,
@@ -95,13 +95,12 @@ class InstalledSubscription : public Subscription {
                                 const std::string& document_domain,
                                 const SiteKey& sitekey) const = 0;
   // CSP filters have a payload: a string that gets injected to a network
-  // response's Content-Security-Policy header.
-  // |nullopt| means no filter found. If a filter is found, the string will
-  // be non-empty.
-  virtual absl::optional<base::StringPiece> FindCspFilter(
-      const GURL& url,
-      const std::string& document_domain,
-      FilterCategory category) const = 0;
+  // response's Content-Security-Policy header. If a filters is found, it will
+  // be append to |results|.
+  virtual void FindCspFilters(const GURL& url,
+                              const std::string& document_domain,
+                              FilterCategory category,
+                              std::set<base::StringPiece>& results) const = 0;
   // Find an URL to rewrite if any for specific request
   virtual absl::optional<base::StringPiece> FindRewriteFilter(
       const GURL& url,

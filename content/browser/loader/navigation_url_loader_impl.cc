@@ -13,11 +13,11 @@
 #include <set>
 #include <utility>
 
-#include "base/bind.h"
-#include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/debug/dump_without_crashing.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/strcat.h"
@@ -137,9 +137,9 @@ class NavigationLoaderInterceptorBrowserContainer
             [](LoaderCallback callback,
                URLLoaderRequestInterceptor::RequestHandler handler) {
               if (handler) {
-                std::move(callback).Run(
-                    base::MakeRefCounted<SingleRequestURLLoaderFactory>(
-                        std::move(handler)));
+                std::move(callback).Run(base::MakeRefCounted<
+                                        network::SingleRequestURLLoaderFactory>(
+                    std::move(handler)));
               } else {
                 std::move(callback).Run({});
               }
@@ -235,6 +235,8 @@ std::unique_ptr<network::ResourceRequest> CreateResourceRequest(
       request_info.client_security_state.Clone();
   new_request->trusted_params->accept_ch_frame_observer =
       std::move(accept_ch_frame_observer);
+  new_request->trusted_params->allow_cookies_from_browser =
+      request_info.allow_cookies_from_browser;
   new_request->is_outermost_main_frame = request_info.is_outermost_main_frame;
   new_request->priority = net::HIGHEST;
   new_request->request_initiator = request_info.common_params->initiator_origin;
@@ -380,10 +382,12 @@ void CheckParsedHeadersEquals(const network::mojom::ParsedHeadersPtr& lhs,
   DCHECK(mojo::Equals(lhs->critical_ch, rhs->critical_ch));
   DCHECK_EQ(lhs->xfo, rhs->xfo);
   DCHECK(mojo::Equals(lhs->link_headers, rhs->link_headers));
+  DCHECK(mojo::Equals(lhs->supports_loading_mode, rhs->supports_loading_mode));
   DCHECK(mojo::Equals(lhs->timing_allow_origin, rhs->timing_allow_origin));
   DCHECK(mojo::Equals(lhs->reporting_endpoints, rhs->reporting_endpoints));
   DCHECK(mojo::Equals(lhs->variants_headers, rhs->variants_headers));
   DCHECK(mojo::Equals(lhs->content_language, rhs->content_language));
+  DCHECK(mojo::Equals(lhs->no_vary_search, rhs->no_vary_search));
   NOTREACHED() << "The parsed headers don't match, but we don't know which "
                   "field does not match. Please add a DCHECK before this one "
                   "checking for the missing field.";
@@ -649,14 +653,7 @@ void NavigationURLLoaderImpl::MaybeStartLoader(
   }
 
   // No interceptors wanted to handle this request.
-  uint32_t options = network::mojom::kURLLoadOptionNone;
-  scoped_refptr<network::SharedURLLoaderFactory> factory =
-      PrepareForNonInterceptedRequest(&options);
-  url_loader_ = blink::ThrottlingURLLoader::CreateLoaderAndStart(
-      std::move(factory), CreateURLLoaderThrottles(),
-      global_request_id_.request_id, options, resource_request_.get(),
-      /*client=*/this, kNavigationUrlLoaderTrafficAnnotation,
-      GetUIThreadTaskRunner({BrowserTaskType::kNavigationNetworkResponse}));
+  FallbackToNonInterceptedRequest(false);
 }
 
 void NavigationURLLoaderImpl::FallbackToNonInterceptedRequest(
@@ -664,9 +661,10 @@ void NavigationURLLoaderImpl::FallbackToNonInterceptedRequest(
   if (reset_subresource_loader_params)
     subresource_loader_params_.reset();
 
-  uint32_t options = network::mojom::kURLLoadOptionNone;
   scoped_refptr<network::SharedURLLoaderFactory> factory =
-      PrepareForNonInterceptedRequest(&options);
+      PrepareForNonInterceptedRequest();
+  uint32_t options =
+      GetURLLoaderOptions(resource_request_->is_outermost_main_frame);
   if (url_loader_) {
     // `url_loader_` is using the factory for the interceptor that decided to
     // fallback, so restart it with the non-interceptor factory.
@@ -686,8 +684,7 @@ void NavigationURLLoaderImpl::FallbackToNonInterceptedRequest(
 }
 
 scoped_refptr<network::SharedURLLoaderFactory>
-NavigationURLLoaderImpl::PrepareForNonInterceptedRequest(
-    uint32_t* out_options) {
+NavigationURLLoaderImpl::PrepareForNonInterceptedRequest() {
   // TODO(https://crbug.com/796425): We temporarily wrap raw
   // mojom::URLLoaderFactory pointers into SharedURLLoaderFactory. Need to
   // further refactor the factory getters to avoid this.
@@ -723,7 +720,7 @@ NavigationURLLoaderImpl::PrepareForNonInterceptedRequest(
         factory = base::MakeRefCounted<network::WrapperSharedURLLoaderFactory>(
             std::move(loader_factory));
       } else {
-        factory = base::MakeRefCounted<SingleRequestURLLoaderFactory>(
+        factory = base::MakeRefCounted<network::SingleRequestURLLoaderFactory>(
             base::BindOnce(UnknownSchemeCallback, handled));
       }
     } else {
@@ -772,8 +769,6 @@ NavigationURLLoaderImpl::PrepareForNonInterceptedRequest(
   }
   url_chain_.push_back(resource_request_->url);
 
-  *out_options =
-      GetURLLoaderOptions(resource_request_->is_outermost_main_frame);
   return factory;
 }
 
@@ -987,6 +982,12 @@ void NavigationURLLoaderImpl::OnUploadProgress(
   NOTREACHED();
 }
 
+void NavigationURLLoaderImpl::OnTransferSizeUpdated(
+    int32_t transfer_size_diff) {
+  network::RecordOnTransferSizeUpdatedUMA(
+      network::OnTransferSizeUpdatedFrom::kNavigationURLLoaderImpl);
+}
+
 void NavigationURLLoaderImpl::OnComplete(
     const network::URLLoaderCompletionStatus& status) {
   // Successful load must have used OnResponseStarted first. In this case, the
@@ -1035,6 +1036,15 @@ void NavigationURLLoaderImpl::OnAcceptCHFrameReceived(
   FrameTreeNode* frame_tree_node =
       FrameTreeNode::GloballyFindByID(frame_tree_node_id_);
   DCHECK(frame_tree_node);
+  // Log each hint requested via an ACCEPT_CH Frame whether or not this caused
+  // the connection to be restarted.
+  auto* ukm_recorder = ukm::UkmRecorder::Get();
+  for (const auto& hint : accept_ch_frame) {
+    ukm::builders::ClientHints_AcceptCHFrameUsage(ukm_source_id_)
+        .SetType(static_cast<int64_t>(hint))
+        .Record(ukm_recorder->Get());
+  }
+
   ClientHintsControllerDelegate* client_hint_delegate =
       browser_context_->GetClientHintsControllerDelegate();
 
@@ -1281,7 +1291,6 @@ NavigationURLLoaderImpl::NavigationURLLoaderImpl(
                               frame_tree_node_id_)),
       navigation_ui_data_(std::move(navigation_ui_data)),
       interceptors_(std::move(initial_interceptors)),
-      download_policy_(request_info_->common_params->download_policy),
       loader_creation_time_(base::TimeTicks::Now()),
       ukm_source_id_(FrameTreeNode::GloballyFindByID(frame_tree_node_id_)
                          ->navigation_request()
@@ -1534,9 +1543,6 @@ void NavigationURLLoaderImpl::NotifyResponseStarted(
       "navigation", "Navigation timeToResponseStarted", TRACE_ID_LOCAL(this),
       "&NavigationURLLoaderImpl", static_cast<void*>(this), "success", true);
 
-  if (is_download)
-    download_policy_.RecordHistogram();
-
   NavigationURLLoaderDelegate::EarlyHints early_hints;
   if (early_hints_manager_) {
     early_hints.was_resource_hints_received =
@@ -1554,7 +1560,6 @@ void NavigationURLLoaderImpl::NotifyResponseStarted(
   delegate_->OnResponseStarted(
       std::move(url_loader_client_endpoints), std::move(response_head),
       std::move(response_body), global_request_id, is_download,
-      download_policy_,
       resource_request_->trusted_params->isolation_info
           .network_anonymization_key(),
       std::move(subresource_loader_params_), std::move(early_hints));

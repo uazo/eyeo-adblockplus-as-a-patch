@@ -117,140 +117,6 @@ public class TestPagesTestsHelper {
         }
     }
 
-    private class TestAdBlockedObserver implements AdblockController.AdBlockedObserver {
-        @Override
-        public void onAdAllowed(AdblockCounters.ResourceInfo info) {
-            if (countDownLatch != null) {
-                countDownLatch.countDown();
-            }
-            // to be remove after DPD-961
-            if (alreadyCounted.contains(info.getRequestUrl())) {
-                return;
-            }
-            alreadyCounted.add(info.getRequestUrl());
-            allowedInfos.add(info);
-            Assert.assertTrue(info.getSubscription().equals(getExpectedSubscriptionUrl()));
-        }
-
-        @Override
-        public void onAdBlocked(AdblockCounters.ResourceInfo info) {
-            if (countDownLatch != null) {
-                countDownLatch.countDown();
-            }
-            // to be remove after DPD-961
-            if (alreadyCounted.contains(info.getRequestUrl())) {
-                return;
-            }
-            alreadyCounted.add(info.getRequestUrl());
-            blockedInfos.add(info);
-            Assert.assertTrue(info.getSubscription().equals(getExpectedSubscriptionUrl()));
-        }
-
-        @Override
-        public void onPageAllowed(AdblockCounters.ResourceInfo info) {
-            allowedPageInfos.add(info);
-            Assert.assertTrue(info.getSubscription().equals(getExpectedSubscriptionUrl()));
-        }
-
-        @Override
-        public void onPopupAllowed(AdblockCounters.ResourceInfo info) {
-            allowedPopupsInfos.add(info);
-            Assert.assertTrue(info.getSubscription().equals(getExpectedSubscriptionUrl()));
-        }
-
-        @Override
-        public void onPopupBlocked(AdblockCounters.ResourceInfo info) {
-            blockedPopupsInfos.add(info);
-            Assert.assertTrue(info.getSubscription().equals(getExpectedSubscriptionUrl()));
-        }
-
-        public boolean isBlocked(String url) {
-            for (AdblockCounters.ResourceInfo info : blockedInfos) {
-                if (info.getRequestUrl().contains(url)) return true;
-            }
-
-            return false;
-        }
-
-        public boolean isPopupBlocked(String url) {
-            for (AdblockCounters.ResourceInfo info : blockedPopupsInfos) {
-                if (info.getRequestUrl().contains(url)) return true;
-            }
-
-            return false;
-        }
-
-        public int numBlockedByType(AdblockContentType type) {
-            int result = 0;
-            for (AdblockCounters.ResourceInfo info : blockedInfos) {
-                if (info.getAdblockContentType() == type) ++result;
-            }
-            return result;
-        }
-
-        public int numBlockedPopups() {
-            int result = 0;
-            for (AdblockCounters.ResourceInfo info : blockedPopupsInfos) {
-                ++result;
-            }
-            return result;
-        }
-
-        public boolean isAllowed(String url) {
-            for (AdblockCounters.ResourceInfo info : allowedInfos) {
-                if (info.getRequestUrl().contains(url)) return true;
-            }
-
-            return false;
-        }
-
-        public boolean isPageAllowed(String url) {
-            for (AdblockCounters.ResourceInfo info : allowedPageInfos) {
-                if (info.getRequestUrl().contains(url)) return true;
-            }
-
-            return false;
-        }
-
-        public boolean isPopupAllowed(String url) {
-            for (AdblockCounters.ResourceInfo info : allowedPopupsInfos) {
-                if (info.getRequestUrl().contains(url)) return true;
-            }
-
-            return false;
-        }
-
-        public int numAllowedByType(AdblockContentType type) {
-            int result = 0;
-            for (AdblockCounters.ResourceInfo info : allowedInfos) {
-                if (info.getAdblockContentType() == type) ++result;
-            }
-            return result;
-        }
-
-        public int numAllowedPopups() {
-            int result = 0;
-            for (AdblockCounters.ResourceInfo info : allowedPopupsInfos) {
-                ++result;
-            }
-            return result;
-        }
-
-        String getExpectedSubscriptionUrl() {
-            if (mTestSubscriptionUrl != null) return mTestSubscriptionUrl.toString();
-            return "adblock:custom";
-        }
-
-        public List<AdblockCounters.ResourceInfo> blockedInfos = new CopyOnWriteArrayList<>();
-        public List<AdblockCounters.ResourceInfo> allowedInfos = new CopyOnWriteArrayList<>();
-        public List<AdblockCounters.ResourceInfo> allowedPageInfos = new CopyOnWriteArrayList<>();
-        public List<AdblockCounters.ResourceInfo> blockedPopupsInfos = new CopyOnWriteArrayList<>();
-        public List<AdblockCounters.ResourceInfo> allowedPopupsInfos = new CopyOnWriteArrayList<>();
-        public CountDownLatch countDownLatch;
-        // public remove after DPD-961
-        Set<String> alreadyCounted = new HashSet<String>();
-    };
-
     public void setUp(ChromeTabbedActivityTestRule activityRule) {
         mActivityTestRule = activityRule;
         mActivityTestRule.startMainActivityOnBlankPage();
@@ -264,6 +130,7 @@ public class TestPagesTestsHelper {
     public void addFilterList(String filterListUrl) {
         try {
             mTestSubscriptionUrl = new URL(filterListUrl);
+            mObserver.setExpectedSubscriptionUrl(mTestSubscriptionUrl);
         } catch (MalformedURLException e) {
         }
         Assert.assertNotNull("Test subscription url", mTestSubscriptionUrl);

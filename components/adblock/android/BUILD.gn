@@ -22,6 +22,8 @@ android_library("adblock_java") {
     "java/src/org/chromium/components/adblock/AdblockController.java",
     "java/src/org/chromium/components/adblock/AdblockCounters.java",
     "java/src/org/chromium/components/adblock/AdblockElement.java",
+    "java/src/org/chromium/components/adblock/FilteringConfiguration.java",
+    "java/src/org/chromium/components/adblock/ResourceClassificationNotifier.java",
     "java/src/org/chromium/components/adblock/settings/AdblockAllowedDomainsFragment.java",
     "java/src/org/chromium/components/adblock/settings/AdblockCustomFilterListsFragment.java",
     "java/src/org/chromium/components/adblock/settings/AdblockCustomFiltersFragment.java",
@@ -57,6 +59,8 @@ generate_jni("jni_headers") {
     "java/src/org/chromium/components/adblock/AdblockComposeFilterSuggestionsCallback.java",
     "java/src/org/chromium/components/adblock/AdblockController.java",
     "java/src/org/chromium/components/adblock/AdblockElement.java",
+    "java/src/org/chromium/components/adblock/FilteringConfiguration.java",
+    "java/src/org/chromium/components/adblock/ResourceClassificationNotifier.java",
   ]
 }
 
@@ -97,6 +101,9 @@ android_library("adblock_java_tests") {
     "javatests/src/org/chromium/components/adblock/AdblockFilterFragmentTest.java",
     "javatests/src/org/chromium/components/adblock/AdblockPopupInfoBarTest.java",
     "javatests/src/org/chromium/components/adblock/AdblockPopupMessageTest.java",
+    "javatests/src/org/chromium/components/adblock/FilteringConfigurationTest.java",
+    "javatests/src/org/chromium/components/adblock/ResourceClassificationNotifierTest.java",
+    "javatests/src/org/chromium/components/adblock/TestAdBlockedObserver.java",
     "javatests/src/org/chromium/components/adblock/TestPagesCircumventionTest.java",
     "javatests/src/org/chromium/components/adblock/TestPagesCspTest.java",
     "javatests/src/org/chromium/components/adblock/TestPagesElemhideEmuInvTest.java",

@@ -43,6 +43,8 @@ class AdblockControllerFactory : public BrowserContextKeyedServiceFactory {
       content::BrowserContext* context) const override;
   void RegisterProfilePrefs(
       user_prefs::PrefRegistrySyncable* registry) override;
+  bool ServiceIsNULLWhileTesting() const override;
+  bool ServiceIsCreatedWithBrowserContext() const override;
 };
 
 }  // namespace adblock

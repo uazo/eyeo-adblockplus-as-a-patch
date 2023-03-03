@@ -83,13 +83,6 @@ var availableTests = [
   },
   function setAAEnabled_isAAEnabled() {
     chrome.adblockPrivate.setAcceptableAdsEnabled(true);
-    chrome.adblockPrivate.getSelectedBuiltInSubscriptions(function(selected) {
-      if (!containsSubscription(
-              selected,
-              'https://easylist-downloads.adblockplus.org/exceptionrules.txt')) {
-        chrome.test.fail('Failed: AA subscription should be on the list');
-      }
-    });
     chrome.adblockPrivate.isAcceptableAdsEnabled(function(enabled) {
       if (enabled)
         chrome.test.succeed();
@@ -97,13 +90,6 @@ var availableTests = [
         chrome.test.fail('Failed: AA should be enabled');
     });
     chrome.adblockPrivate.setAcceptableAdsEnabled(false);
-    chrome.adblockPrivate.getSelectedBuiltInSubscriptions(function(selected) {
-      if (containsSubscription(
-              selected,
-              'https://easylist-downloads.adblockplus.org/exceptionrules.txt')) {
-        chrome.test.fail('Failed: AA subscription should NOT be on the list');
-      }
-    });
     chrome.adblockPrivate.isAcceptableAdsEnabled(function(enabled) {
       if (!enabled)
         chrome.test.succeed();
@@ -119,135 +105,6 @@ var availableTests = [
       } else {
         chrome.test.fail('Failed: invalid built-in subscriptions');
       }
-    });
-  },
-  function selectedSubscriptionsDataSchema() {
-    chrome.adblockPrivate.getSelectedBuiltInSubscriptions(function(selected) {
-      for (const subscription of selected) {
-        if (!subscription.current_version)
-          chrome.test.fail('Failed: Must contain "current_version" property');
-        if (!subscription.installation_state)
-          chrome.test.fail(
-              'Failed: Must contain "installation_state" property');
-        if (!subscription.last_installation_time)
-          chrome.test.fail(
-              'Failed: Must contain "last_installation_time" property');
-        if (!subscription.title)
-          chrome.test.fail('Failed: Must contain "title" property');
-        if (!subscription.url)
-          chrome.test.fail('Failed: Must contain "url" property');
-        chrome.test.succeed();
-      }
-    });
-  },
-  function selectBuiltInSubscriptionsInvalidURL() {
-    chrome.adblockPrivate.selectBuiltInSubscription('http://', function() {
-      if (!chrome.runtime.lastError)
-        chrome.test.fail('Failed: invalid input accepted');
-      else
-        chrome.test.succeed();
-    });
-  },
-  function selectBuiltInSubscriptionsNotBuiltIn() {
-    chrome.adblockPrivate.selectBuiltInSubscription(
-        'http://foo.bar', function() {
-          if (!chrome.runtime.lastError)
-            chrome.test.fail('Failed: invalid input accepted');
-          else
-            chrome.test.succeed();
-        });
-  },
-  function unselectBuiltInSubscriptionsInvalidURL() {
-    chrome.adblockPrivate.unselectBuiltInSubscription('http://', function() {
-      if (!chrome.runtime.lastError)
-        chrome.test.fail('Failed: invalid input accepted');
-      else
-        chrome.test.succeed();
-    });
-  },
-  function unselectBuiltInSubscriptionsNotBuiltIn() {
-    chrome.adblockPrivate.unselectBuiltInSubscription(
-        'http://foo.bar', function() {
-          if (!chrome.runtime.lastError)
-            chrome.test.fail('Failed: invalid input accepted');
-          else
-            chrome.test.succeed();
-        });
-  },
-  function builtInSubscriptionsManagement() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let kEasylist = urlParams.get('easylist');
-    let kExceptionrules = urlParams.get('exceptions');
-    let kABPFilters = urlParams.get('snippets');
-
-    function containsDefaultSubscriptions(subscriptions) {
-      return containsSubscription(subscriptions, kEasylist) &&
-          containsSubscription(subscriptions, kExceptionrules) &&
-          containsSubscription(subscriptions, kABPFilters);
-    }
-
-    chrome.adblockPrivate.isAcceptableAdsEnabled(function(enabled) {
-      if (!enabled)
-        chrome.test.fail('Failed: AA should be enabled');
-    });
-
-    chrome.adblockPrivate.getSelectedBuiltInSubscriptions(function(selected) {
-      if (selected.length) {
-        if (!containsDefaultSubscriptions(selected)) {
-          chrome.test.fail('Failed: Should contain all default subscriptions');
-        }
-        for (const subscription of selected) {
-          chrome.adblockPrivate.unselectBuiltInSubscription(subscription.url);
-        }
-      } else {
-        chrome.test.fail('Failed: Should contain default subscriptions');
-      }
-      chrome.adblockPrivate.getSelectedBuiltInSubscriptions(function(selected) {
-        if (selected.length) {
-          chrome.test.fail(
-              'Failed: There shouldn\'t be any selected subscriptions');
-        }
-
-        chrome.adblockPrivate.isAcceptableAdsEnabled(function(enabled) {
-          if (enabled)
-            chrome.test.fail('Failed: AA should NOT be enabled');
-        });
-
-        chrome.adblockPrivate.selectBuiltInSubscription(kEasylist);
-        chrome.adblockPrivate.selectBuiltInSubscription(kExceptionrules);
-        chrome.adblockPrivate.selectBuiltInSubscription(kABPFilters);
-
-        chrome.adblockPrivate.isAcceptableAdsEnabled(function(enabled) {
-          if (!enabled)
-            chrome.test.fail('Failed: AA should be enabled');
-        });
-
-        chrome.adblockPrivate.getSelectedBuiltInSubscriptions(function(
-            selected) {
-          if (selected.length) {
-            if (!containsDefaultSubscriptions(selected)) {
-              chrome.test.fail(
-                  'Failed: Should contain all default subscriptions');
-            }
-            // Confirm the same list we get from getInstalledSubscriptions
-            chrome.adblockPrivate.getInstalledSubscriptions(function(
-                installed) {
-              if (installed.length == selected.length) {
-                if (!containsDefaultSubscriptions(installed)) {
-                  chrome.test.fail(
-                      'Failed: Should contain all default subscriptions');
-                }
-                chrome.test.succeed();
-              } else {
-                chrome.test.fail(
-                    'Failed: Should contain default subscriptions');
-              }
-            });
-          } else {
-            chrome.test.fail('Failed: Should contain default subscriptions');
-          }
-        });
-      });
     });
   },
   // This test works because at the beginning getInstalledSubscriptions returns
@@ -342,77 +199,6 @@ var availableTests = [
               } else {
                 chrome.test.succeed();
               }
-            });
-          });
-        });
-      });
-    });
-  },
-  function addCustomSubscriptionInvalidURL() {
-    chrome.adblockPrivate.addCustomSubscription('http://', function() {
-      if (!chrome.runtime.lastError)
-        chrome.test.fail('Failed: invalid input accepted');
-      else
-        chrome.test.succeed();
-    });
-  },
-  function removeCustomSubscriptionInvalidURL() {
-    chrome.adblockPrivate.removeCustomSubscription('http://', function() {
-      if (!chrome.runtime.lastError)
-        chrome.test.fail('Failed: invalid input accepted');
-      else
-        chrome.test.succeed();
-    });
-  },
-  function customSubscriptionsManagement() {
-    chrome.adblockPrivate.getCustomSubscriptions(function(custom) {
-      if (custom.length) {
-        for (const subscription of custom)
-          chrome.adblockPrivate.removeCustomSubscription(subscription);
-      }
-
-      chrome.adblockPrivate.getCustomSubscriptions(function(custom) {
-        if (custom.length) {
-          chrome.test.fail(
-              'Failed: There shouldn\'t be any custom subscriptions');
-          return;
-        }
-
-        chrome.adblockPrivate.addCustomSubscription('https://foo.bar/');
-        chrome.adblockPrivate.addCustomSubscription('https://bar.baz/');
-        chrome.adblockPrivate.getCustomSubscriptions(function(custom) {
-          if (custom.length != 2) {
-            chrome.test.fail('Failed: There should be 2 custom subscriptions');
-            return;
-          }
-          if (!containsSubscription(custom, 'https://foo.bar/') ||
-              !containsSubscription(custom, 'https://bar.baz/')) {
-            chrome.test.fail(
-                'Failed: Didn\'t find expected custom subscriptions');
-            return;
-          }
-
-          // Confirm subscriptions are included in getInstalledSubscriptions
-          chrome.adblockPrivate.getInstalledSubscriptions(function(installed) {
-            if (installed.length < 2) {
-              chrome.test.fail(
-                  'Failed: There should be 2 custom subscriptions');
-              return;
-            }
-            if (!containsSubscription(installed, 'https://foo.bar/') ||
-                !containsSubscription(installed, 'https://bar.baz/')) {
-              chrome.test.fail(
-                  'Failed: Didn\'t find expected custom subscriptions');
-              return;
-            }
-            chrome.adblockPrivate.removeCustomSubscription('https://foo.bar/');
-            chrome.adblockPrivate.removeCustomSubscription('https://bar.baz/');
-
-            chrome.adblockPrivate.getCustomSubscriptions(function(custom) {
-              if (custom.length)
-                chrome.test.fail('Failed: Still have custom subscriptions');
-              else
-                chrome.test.succeed();
             });
           });
         });

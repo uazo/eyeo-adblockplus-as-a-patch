@@ -38,7 +38,6 @@ java_cpp_strings("java_pref_names_srcjar") {
     "//chrome/common/pref_names.cc",
     "//components/adblock/core/common/adblock_prefs.cc",
     "//components/autofill/core/common/autofill_prefs.cc",
-    "//components/autofill_assistant/browser/public/prefs.cc",
     "//components/commerce/core/pref_names.cc",
     "//components/dom_distiller/core/pref_names.cc",
     "//components/embedder_support/pref_names.cc",
@@ -48,8 +47,10 @@ java_cpp_strings("java_pref_names_srcjar") {
     "//components/offline_pages/core/prefetch/prefetch_prefs.cc",
     "//components/password_manager/core/common/password_manager_pref_names.cc",
     "//components/payments/core/payment_prefs.cc",
+    "//components/privacy_sandbox/privacy_sandbox_prefs.cc",
     "//components/safe_browsing/core/common/safe_browsing_prefs.cc",
     "//components/signin/public/base/signin_pref_names.cc",
+    "//components/supervised_user/core/common/pref_names.cc",
     "//components/translate/core/browser/translate_pref_names.cc",
   ]
 

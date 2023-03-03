@@ -35,7 +35,7 @@ class SubscriptionPersistentStorageImpl final
  public:
   SubscriptionPersistentStorageImpl(
       base::FilePath base_storage_dir,
-      scoped_refptr<SubscriptionValidator> validator,
+      std::unique_ptr<SubscriptionValidator> validator,
       SubscriptionPersistentMetadata* persistent_metadata);
   ~SubscriptionPersistentStorageImpl() final;
 
@@ -53,10 +53,12 @@ class SubscriptionPersistentStorageImpl final
   static LoadedBuffer WriteSubscription(
       const base::FilePath& storage_dir,
       std::unique_ptr<FlatbufferData> raw_data,
-      scoped_refptr<SubscriptionValidator> validator);
+      SubscriptionValidator::StoreTrustedSignatureThreadSafeCallback
+          store_signature);
   static std::vector<LoadedBuffer> ReadSubscriptionsFromDirectory(
       const base::FilePath& storage_dir,
-      scoped_refptr<SubscriptionValidator> validator);
+      SubscriptionValidator::IsSignatureValidThreadSafeCallback
+          is_signature_valid);
   void LoadComplete(LoadCallback on_initialized,
                     std::vector<LoadedBuffer> loaded_buffers);
   void SubscriptionStored(StoreCallback on_finished,
@@ -64,7 +66,7 @@ class SubscriptionPersistentStorageImpl final
 
   SEQUENCE_CHECKER(sequence_checker_);
   base::FilePath base_storage_dir_;
-  scoped_refptr<SubscriptionValidator> validator_;
+  std::unique_ptr<SubscriptionValidator> validator_;
   SubscriptionPersistentMetadata* persistent_metadata_;
   // Maps Subscriptions to files that they access.
   SubscriptionFileMapping backing_file_mapping_;

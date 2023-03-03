@@ -9,6 +9,7 @@
 import("//build/config/chromeos/ui_mode.gni")
 import("//build/config/features.gni")
 import("//chrome/common/features.gni")
+import("//pdf/features.gni")
 
 assert(enable_extensions)
 
@@ -97,8 +98,11 @@ if (is_chromeos) {
     "platform_keys.idl",
     "quick_unlock_private.idl",
     "shared_storage_private.idl",
+    "smart_card_provider_private.idl",
+    "system_log.idl",
     "vpn_provider.idl",
     "wallpaper.json",
+    "wm_desks_private.idl",
   ]
 
   if (use_cups) {
@@ -121,7 +125,6 @@ if (is_chromeos_ash) {
     "speech_recognition_private.idl",
     "terminal_private.json",
     "users_private.idl",
-    "wm_desks_private.idl",
   ]
 } else if (is_linux || is_chromeos || is_win) {
   schema_sources_ += [ "input_ime.json" ]
@@ -133,6 +136,10 @@ if (enable_service_discovery) {
 
 if (is_linux || is_mac || is_win) {
   schema_sources_ += [ "system_indicator.idl" ]
+}
+
+if (enable_pdf) {
+  schema_sources_ += [ "pdf_viewer_private.idl" ]
 }
 
 uncompiled_sources_ = [

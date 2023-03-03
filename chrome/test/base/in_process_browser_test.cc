@@ -12,11 +12,11 @@
 #include <utility>
 
 #include "base/auto_reset.h"
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/functional/bind.h"
 #include "base/lazy_instance.h"
 #include "base/location.h"
 #include "base/no_destructor.h"
@@ -27,7 +27,6 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/test_file_util.h"
 #include "base/test/test_switches.h"
-#include "base/threading/thread_task_runner_handle.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/after_startup_task_utils.h"
@@ -330,9 +329,7 @@ void InProcessBrowserTest::Initialize() {
 
   // In-product help can conflict with tests' expected window activation and
   // focus. Individual tests can re-enable IPH.
-  for (const base::Feature* feature : feature_engagement::GetAllFeatures()) {
-    disabled_features.push_back(*feature);
-  }
+  block_all_iph_feature_list_.InitWithNoFeaturesAllowed();
 
   scoped_feature_list_.InitWithFeatures({}, disabled_features);
 
@@ -826,7 +823,7 @@ void InProcessBrowserTest::QuitBrowsers() {
 
     // Post OnAppExiting call as a task because the code path CHECKs a RunLoop
     // runs at the current thread.
-    base::ThreadTaskRunnerHandle::Get()->PostTask(
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(&chrome::OnAppExiting));
     // Spin the message loop to ensure OnAppExitting finishes so that proper
     // clean up happens before returning.
@@ -837,7 +834,7 @@ void InProcessBrowserTest::QuitBrowsers() {
   // Invoke AttemptExit on a running message loop.
   // AttemptExit exits the message loop after everything has been
   // shut down properly.
-  base::ThreadTaskRunnerHandle::Get()->PostTask(
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(&chrome::AttemptExit));
   RunUntilBrowserProcessQuits();
 

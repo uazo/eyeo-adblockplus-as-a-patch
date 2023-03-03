@@ -14,7 +14,7 @@
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/accessibility/page_colors_factory.h"
-#include "chrome/browser/accuracy_tips/accuracy_service_factory.h"
+#include "chrome/browser/ash/app_list/app_list_syncable_service_factory.h"
 #include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/adblock/adblock_telemetry_service_factory.h"
 #include "chrome/browser/adblock/resource_classification_runner_factory.h"
@@ -93,6 +93,7 @@
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_service_factory.h"
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_settings_factory.h"
 #include "chrome/browser/profiles/renderer_updater_factory.h"
+#include "chrome/browser/reading_list/reading_list_model_factory.h"
 #include "chrome/browser/reduce_accept_language/reduce_accept_language_factory.h"
 #include "chrome/browser/safe_browsing/certificate_reporting_service_factory.h"
 #include "chrome/browser/safe_browsing/tailored_security/tailored_security_service_factory.h"
@@ -117,10 +118,8 @@
 #include "chrome/browser/sync/user_event_service_factory.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/translate/translate_ranker_factory.h"
-#include "chrome/browser/ui/app_list/app_list_syncable_service_factory.h"
 #include "chrome/browser/ui/find_bar/find_bar_state_factory.h"
 #include "chrome/browser/ui/prefs/prefs_tab_helper.h"
-#include "chrome/browser/ui/read_later/reading_list_model_factory.h"
 #include "chrome/browser/ui/tabs/pinned_tab_service_factory.h"
 #include "chrome/browser/ui/toolbar/toolbar_actions_model_factory.h"
 #include "chrome/browser/ui/ui_features.h"
@@ -152,6 +151,8 @@
 
 #if BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/android/adblock/adblock_jni_factory.h"
+#include "chrome/browser/android/adblock/filtering_configuration_bindings_factory.h"
+#include "chrome/browser/android/adblock/resource_classification_notifier_bindings_factory.h"
 #include "chrome/browser/android/explore_sites/explore_sites_service_factory.h"
 #include "chrome/browser/android/reading_list/reading_list_manager_factory.h"
 #include "chrome/browser/android/reading_list/reading_list_notification_service_factory.h"
@@ -233,7 +234,7 @@
 #include "extensions/browser/browser_context_keyed_service_factories.h"
 
 #if BUILDFLAG(IS_CHROMEOS)
-#include "chrome/browser/extensions/chromeos_browser_context_keyed_service_factories.h"
+#include "chrome/browser/extensions/api/chromeos_api_browser_context_keyed_service_factories.h"
 #endif
 #endif
 
@@ -265,6 +266,7 @@
 #endif
 
 #if BUILDFLAG(BUILD_WITH_TFLITE_LIB)
+#include "chrome/browser/autocomplete/autocomplete_scoring_model_service_factory.h"
 #include "chrome/browser/permissions/prediction_model_handler_provider_factory.h"
 #endif
 
@@ -273,7 +275,8 @@
 #include "chrome/browser/ui/cocoa/screentime/screentime_features.h"
 #endif
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/enterprise/idle/idle_service_factory.h"
 #endif
 
@@ -325,9 +328,6 @@ void ChromeBrowserMainExtraPartsProfiles::
   AccountConsistencyModeManagerFactory::GetInstance();
   AccountInvestigatorFactory::GetInstance();
   AccountReconcilorFactory::GetInstance();
-#if !BUILDFLAG(IS_ANDROID)
-  AccuracyServiceFactory::GetInstance();
-#endif
   AdaptiveQuietNotificationPermissionUiEnabler::Factory::GetInstance();
 #if BUILDFLAG(IS_CHROMEOS_ASH)
   app_list::AppListSyncableServiceFactory::GetInstance();
@@ -342,6 +342,9 @@ void ChromeBrowserMainExtraPartsProfiles::
   apps::SupportedLinksInfoBarPrefsServiceFactory::GetInstance();
 #endif
   AutocompleteClassifierFactory::GetInstance();
+#if BUILDFLAG(BUILD_WITH_TFLITE_LIB)
+  AutocompleteScoringModelServiceFactory::GetInstance();
+#endif
   autofill::AutofillImageFetcherFactory::GetInstance();
   autofill::PersonalDataManagerFactory::GetInstance();
   autofill::AutofillOfferManagerFactory::GetInstance();
@@ -404,6 +407,8 @@ void ChromeBrowserMainExtraPartsProfiles::
   adblock::SitekeyStorageFactory::GetInstance();
 #if BUILDFLAG(IS_ANDROID)
   adblock::AdblockJNIFactory::GetInstance();
+  adblock::FilteringConfigurationBindingsFactory::GetInstance();
+  adblock::ResourceClassificationNotifierBindingsFactory::GetInstance();
   explore_sites::ExploreSitesServiceFactory::GetInstance();
 #endif
   adblock::SubscriptionPersistentMetadataFactory::GetInstance();
@@ -440,7 +445,9 @@ void ChromeBrowserMainExtraPartsProfiles::
     LastTabStandingTrackerFactory::GetInstance();
   }
 #if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_CHROMEOS_LACROS)
   captions::LiveCaptionControllerFactory::GetInstance();
+#endif
   if (base::FeatureList::IsEnabled(media::kLiveTranslate))
     captions::LiveTranslateControllerFactory::GetInstance();
 #endif
@@ -472,7 +479,8 @@ void ChromeBrowserMainExtraPartsProfiles::
     (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS_LACROS))
   metrics::DesktopProfileSessionDurationsServiceFactory::GetInstance();
 #endif
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_ANDROID)
   enterprise_idle::IdleServiceFactory::GetInstance();
 #endif
   ModelTypeStoreServiceFactory::GetInstance();

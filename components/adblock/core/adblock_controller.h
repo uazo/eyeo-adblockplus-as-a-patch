@@ -65,28 +65,6 @@ class AdblockController : public KeyedService {
   virtual std::vector<std::string> GetCustomFilters() const = 0;
 
   virtual std::vector<KnownSubscriptionInfo> GetKnownSubscriptions() const = 0;
-
-  // Deprecated, SelectBuiltInSubscription will be removed in version 111
-  // Use InstallSubscription(const GURL& url) instead.
-  virtual void SelectBuiltInSubscription(const GURL& url) = 0;
-  // Deprecated, UnselectBuiltInSubscription will be removed in version 111
-  // Use UninstallSubscription(const GURL& url) instead.
-  virtual void UnselectBuiltInSubscription(const GURL& url) = 0;
-  // Deprecated, GetSelectedBuiltInSubscriptions will be removed in version 111
-  // Use GetInstalledSubscriptions() instead.
-  virtual std::vector<scoped_refptr<Subscription>>
-  GetSelectedBuiltInSubscriptions() const = 0;
-
-  // Deprecated, AddCustomSubscription will be removed in version 111
-  // Use InstallSubscription(const GURL& url) instead.
-  virtual void AddCustomSubscription(const GURL& url) = 0;
-  // Deprecated, RemoveCustomSubscription will be removed in version 111
-  // Use UninstallSubscription(const GURL& url) instead.
-  virtual void RemoveCustomSubscription(const GURL& url) = 0;
-  // Deprecated, GetCustomSubscriptions will be removed in version 111
-  // Use GetInstalledSubscriptions() instead.
-  virtual std::vector<scoped_refptr<Subscription>> GetCustomSubscriptions()
-      const = 0;
 };
 
 }  // namespace adblock

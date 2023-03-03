@@ -36,7 +36,6 @@ extern const char kChromeUIAboutURL[];
 extern const char kChromeUIActivateSafetyCheckSettingsURL[];
 extern const char kChromeUIAccessibilityHost[];
 extern const char kChromeUIAllSitesPath[];
-extern const char kChromeUIAPCInternalsHost[];
 extern const char kChromeUIAppIconHost[];
 extern const char kChromeUIAppIconURL[];
 extern const char kChromeUIAppLauncherPageHost[];
@@ -149,6 +148,8 @@ extern const char kChromeUINewTabPageThirdPartyURL[];
 extern const char kChromeUINewTabURL[];
 extern const char kChromeUIOfflineInternalsHost[];
 extern const char kChromeUIOmniboxHost[];
+extern const char kChromeUIOmniboxPopupHost[];
+extern const char kChromeUIOmniboxPopupURL[];
 extern const char kChromeUIOmniboxURL[];
 #if BUILDFLAG(IS_CHROMEOS)
 extern const char kChromeUIAppDisabledURL[];
@@ -156,7 +157,6 @@ extern const char kChromeUIOsFlagsAppURL[];
 extern const char kChromeUIOsUrlAppURL[];
 #endif
 extern const char kChromeUIPasswordManagerInternalsHost[];
-extern const char kChromeUIPasswordManagerHost[];
 extern const char kChromeUIPerformanceSettingsURL[];
 extern const char kChromeUIPolicyHost[];
 extern const char kChromeUIPolicyURL[];
@@ -165,6 +165,10 @@ extern const char kChromeUIPrefsInternalsHost[];
 extern const char kChromeUIPrintURL[];
 extern const char kChromeUIPrivacySandboxDialogHost[];
 extern const char kChromeUIPrivacySandboxDialogURL[];
+extern const char kChromeUIPrivacySandboxDialogCombinedPath[];
+extern const char kChromeUIPrivacySandboxDialogNoticePath[];
+extern const char kChromeUIPrivacySandboxFledgeURL[];
+extern const char kChromeUIPrivacySandboxTopicsURL[];
 extern const char kChromeUIProfileInternalsHost[];
 extern const char kChromeUIQuitHost[];
 extern const char kChromeUIQuitURL[];
@@ -226,7 +230,6 @@ extern const char kChromeUIWelcomeWin10Host[];
 #endif  // BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_ANDROID)
-extern const char kChromeUIExploreSitesInternalsHost[];
 extern const char kChromeUIJavaCrashURL[];
 extern const char kChromeUINativeBookmarksURL[];
 extern const char kChromeUINativeExploreURL[];
@@ -303,9 +306,8 @@ extern const char kChromeUIDeviceEmulatorHost[];
 extern const char kChromeUIDiagnosticsAppURL[];
 extern const char kChromeUIEmojiPickerURL[];
 extern const char kChromeUIEmojiPickerHost[];
-extern const char kChromeUIFirmwareUpdatesAppURL[];
-extern const char kChromeUIIntenetConfigDialogURL[];
-extern const char kChromeUIIntenetDetailDialogURL[];
+extern const char kChromeUIInternetConfigDialogURL[];
+extern const char kChromeUIInternetDetailDialogURL[];
 extern const char kChromeUIInternetConfigDialogHost[];
 extern const char kChromeUIInternetDetailDialogHost[];
 extern const char kChromeUIBorealisCreditsHost[];
@@ -363,6 +365,8 @@ extern const char kChromeUIUrgentPasswordExpiryNotificationHost[];
 extern const char kChromeUIUrgentPasswordExpiryNotificationUrl[];
 extern const char kChromeUIUserImageHost[];
 extern const char kChromeUIUserImageURL[];
+extern const char kChromeUIVcTrayTesterURL[];
+extern const char kChromeUIVcTrayTesterHost[];
 extern const char kChromeUIVmHost[];
 extern const char kChromeUIVmUrl[];
 
@@ -415,6 +419,7 @@ extern const char kOsUIFlagsURL[];
 extern const char kOsUIHelpAppURL[];
 extern const char kOsUIPrintManagementAppURL[];
 extern const char kOsUIScanningAppURL[];
+extern const char kOsUIShortcutCustomizationAppURL[];
 extern const char kOsUIVersionURL[];
 #endif
 
@@ -504,6 +509,7 @@ extern const char kCfmNetworkSettingsURL[];
 
 // Settings sub-pages.
 extern const char kAccessibilitySubPage[];
+extern const char kAdPrivacySubPage[];
 extern const char kAddressesSubPage[];
 extern const char kAppearanceSubPage[];
 extern const char kAdblockSubPage[];
@@ -536,11 +542,14 @@ extern const char kSearchEnginesSubPage[];
 extern const char kSignOutSubPage[];
 extern const char kSyncSetupSubPage[];
 extern const char kTriggeredResetProfileSettingsSubPage[];
+// TODO(crbug.com/1378703): Remove these constants after the feature is
+// launched.
 extern const char kPrivacySandboxAdPersonalizationSubPage[];
 extern const char kPrivacySandboxLearnMoreSubPage[];
 extern const char kPrivacySandboxSubPage[];
 
 #if !BUILDFLAG(IS_ANDROID)
+extern const char kAdPrivacySubPagePath[];
 extern const char kPrivacySandboxSubPagePath[];
 #endif
 

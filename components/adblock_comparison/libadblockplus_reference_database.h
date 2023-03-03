@@ -20,7 +20,7 @@
 
 #include <string>
 
-#include "base/callback_forward.h"
+#include "base/functional/callback_forward.h"
 #include "base/files/file_path.h"
 #include "base/strings/string_piece_forward.h"
 #include "components/adblock_comparison/test_request_reader.h"

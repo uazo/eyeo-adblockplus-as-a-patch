@@ -19,13 +19,15 @@
 #define CHROME_BROWSER_ADBLOCK_SUBSCRIPTION_SERVICE_FACTORY_H_
 
 #include "base/no_destructor.h"
+#include "components/adblock/core/subscription/conversion_executors.h"
 #include "components/keyed_service/content/browser_context_keyed_service_factory.h"
 #include "content/public/browser/browser_context.h"
 
 namespace adblock {
 
 class SubscriptionService;
-class SubscriptionServiceFactory : public BrowserContextKeyedServiceFactory {
+class SubscriptionServiceFactory : public BrowserContextKeyedServiceFactory,
+                                   public ConversionExecutors {
  public:
   static SubscriptionService* GetForBrowserContext(
       content::BrowserContext* context);
@@ -33,6 +35,14 @@ class SubscriptionServiceFactory : public BrowserContextKeyedServiceFactory {
   static void SetUpdateCheckAndDelayIntervalsForTesting(
       base::TimeDelta check_interval,
       base::TimeDelta initial_delay);
+
+  // ConversionExecutors:
+  scoped_refptr<InstalledSubscription> ConvertCustomFilters(
+      const std::vector<std::string>& filters) const override;
+  void ConvertFilterListFile(
+      const GURL& subscription_url,
+      const base::FilePath& path,
+      base::OnceCallback<void(ConversionResult)>) const override;
 
  private:
   friend class base::NoDestructor<SubscriptionServiceFactory>;

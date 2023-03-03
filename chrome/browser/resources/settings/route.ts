@@ -2,17 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This source code is a part of eyeo Chromium SDK.
-// Use of this source code is governed by the GPLv3 that can be found in the
-// components/adblock/LICENSE file.
-
 import {assert} from 'chrome://resources/js/assert_ts.js';
-
-import {loadTimeData} from 'chrome://resources/js/load_time_data.m.js';
-
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {pageVisibility} from './page_visibility.js';
-import {Route, Router} from './router.js';
-import {SettingsRoutes} from './settings_routes.js';
+import {Route, Router, SettingsRoutes} from './router.js';
 
 /**
  * Add all of the child routes that originate from the privacy route,
@@ -32,6 +25,17 @@ function addPrivacyChildRoutes(r: Partial<SettingsRoutes>) {
   r.COOKIES = r.PRIVACY.createChild('/cookies');
   r.SECURITY = r.PRIVACY.createChild('/security');
 
+  if (loadTimeData.getBoolean('isPrivacySandboxSettings4') &&
+      !loadTimeData.getBoolean('isPrivacySandboxRestricted')) {
+    r.PRIVACY_SANDBOX = r.PRIVACY.createChild('/adPrivacy');
+    r.PRIVACY_SANDBOX_TOPICS =
+        r.PRIVACY_SANDBOX.createChild('/adPrivacy/interests');
+    r.PRIVACY_SANDBOX_FLEDGE =
+        r.PRIVACY_SANDBOX.createChild('/adPrivacy/sites');
+    r.PRIVACY_SANDBOX_AD_MEASUREMENT =
+        r.PRIVACY_SANDBOX.createChild('/adPrivacy/measurement');
+  }
+
   // <if expr="use_nss_certs">
   r.CERTIFICATES = r.SECURITY.createChild('/certificates');
   // </if>
@@ -44,6 +48,10 @@ function addPrivacyChildRoutes(r: Partial<SettingsRoutes>) {
   } else {
     r.SECURITY_KEYS_PHONES = r.SECURITY.createChild('/securityKeys/phones');
     // </if>
+  }
+
+  if (loadTimeData.getBoolean('showPreloadingSubPage')) {
+    r.PRELOADING = r.COOKIES.createChild('/preloading');
   }
 
   r.SITE_SETTINGS_ALL = r.SITE_SETTINGS.createChild('all');
@@ -92,6 +100,9 @@ function addPrivacyChildRoutes(r: Partial<SettingsRoutes>) {
     r.SITE_SETTINGS_FEDERATED_IDENTITY_API =
         r.SITE_SETTINGS.createChild('federatedIdentityApi');
   }
+  if (loadTimeData.getBoolean('isPrivacySandboxSettings4')) {
+    r.SITE_SETTINGS_SITE_DATA = r.SITE_SETTINGS.createChild('siteData');
+  }
   r.SITE_SETTINGS_VR = r.SITE_SETTINGS.createChild('vr');
   if (loadTimeData.getBoolean('enableExperimentalWebPlatformFeatures')) {
     r.SITE_SETTINGS_BLUETOOTH_SCANNING =
@@ -107,7 +118,7 @@ function addPrivacyChildRoutes(r: Partial<SettingsRoutes>) {
 /**
  * Adds Route objects for each path.
  */
-function createBrowserSettingsRoutes(): Partial<SettingsRoutes> {
+function createBrowserSettingsRoutes(): SettingsRoutes {
   const r: Partial<SettingsRoutes> = {};
 
   // Root pages.
@@ -116,6 +127,7 @@ function createBrowserSettingsRoutes(): Partial<SettingsRoutes> {
 
   r.SEARCH = r.BASIC.createSection(
       '/search', 'search', loadTimeData.getString('searchPageTitle'));
+
   if (!loadTimeData.getBoolean('isGuest')) {
     r.PEOPLE = r.BASIC.createSection(
         '/people', 'people', loadTimeData.getString('peoplePageTitle'));
@@ -144,10 +156,6 @@ function createBrowserSettingsRoutes(): Partial<SettingsRoutes> {
         '/appearance', 'appearance',
         loadTimeData.getString('appearancePageTitle'));
     r.FONTS = r.APPEARANCE.createChild('/fonts');
-  }
-
-  if (visibility.adblock !== false) {
-    r.ADBLOCK = r.BASIC.createSection('/adblock', 'adblock');
   }
 
   if (visibility.autofill !== false) {
@@ -251,18 +259,14 @@ function createBrowserSettingsRoutes(): Partial<SettingsRoutes> {
           loadTimeData.getString('performancePageTitle'));
     }
   }
-  return r;
+  return r as unknown as SettingsRoutes;
 }
 
 /**
  * @return A router with the browser settings routes.
  */
 export function buildRouter(): Router {
-  return new Router(createBrowserSettingsRoutes() as {
-    BASIC: Route,
-    ADVANCED: Route,
-    ABOUT: Route,
-  });
+  return new Router(createBrowserSettingsRoutes());
 }
 
 Router.setInstance(buildRouter());
