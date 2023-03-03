@@ -35,8 +35,8 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.settings.SettingsActivityTestRule;
-import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.components.adblock.settings.AdblockFilterListsFragment;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
@@ -49,21 +49,21 @@ import java.util.concurrent.TimeoutException;
 public class AdblockFilterFragmentTest {
     @Rule
     public final ChromeTabbedActivityTestRule mActivityTestRule =
-          new ChromeTabbedActivityTestRule();
+            new ChromeTabbedActivityTestRule();
     @Rule
     public SettingsActivityTestRule<AdblockFilterListsFragment> mTestRule =
             new SettingsActivityTestRule<>(AdblockFilterListsFragment.class);
 
     @Before
     public void setUp() throws Exception {
-      mActivityTestRule.startMainActivityOnBlankPage();
-      mTestRule.startSettingsActivity();
-      ApplicationTestUtils.finishActivity(mTestRule.getActivity());
+        mActivityTestRule.startMainActivityOnBlankPage();
+        mTestRule.startSettingsActivity();
+        ApplicationTestUtils.finishActivity(mTestRule.getActivity());
     }
 
     @Test
     @SmallTest
-    @Feature({"Adblock"})
+    @Feature({"adblock"})
     public void testLanguageFiltersNotEmpty() {
         mTestRule.startSettingsActivity();
         AdblockFilterListsFragment fragment = mTestRule.getFragment();

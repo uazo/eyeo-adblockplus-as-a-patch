@@ -13,6 +13,7 @@ import("//components/nacl/features.gni")
 import("//components/optimization_guide/features.gni")
 import("//components/safe_browsing/buildflags.gni")
 import("//components/services/screen_ai/buildflags/features.gni")
+import("//components/supervised_user/buildflags.gni")
 import("//extensions/buildflags/buildflags.gni")
 import("//media/media_options.gni")
 import("//pdf/features.gni")
@@ -25,7 +26,6 @@ import("//tools/grit/repack.gni")
 if (is_android) {
   import("//build/config/android/rules.gni")
   import("//build/config/compiler/compiler.gni")
-  import("//tools/v8_context_snapshot/v8_context_snapshot.gni")
 }
 
 if (is_ios) {
@@ -114,13 +114,15 @@ test("components_unittests") {
 
   deps = [
     "//base",
-    "//components/adblock/content/browser:unit_tests",
     "//components/adblock/core:unit_tests",
     "//components/adblock/core/classifier:unit_tests",
     "//components/adblock/core/common:unit_tests",
     "//components/adblock/core/configuration:unit_tests",
+    "//components/adblock/core/converter/parser:unit_tests",
+    "//components/adblock/core/converter/serializer:unit_tests",
     "//components/adblock/core/converter:unit_tests",
     "//components/adblock/core/subscription:unit_tests",
+    "//components/aggregation_service:unit_tests",
     "//components/apdu:unit_tests",
     "//components/assist_ranker:unit_tests",
     "//components/attribution_reporting:unit_tests",
@@ -146,6 +148,7 @@ test("components_unittests") {
     "//components/content_capture/common:unit_tests",
     "//components/content_settings/core/browser:unit_tests",
     "//components/content_settings/core/common:unit_tests",
+    "//components/country_codes:unit_tests",
     "//components/crash/core/common:unit_tests",
     "//components/crx_file:unit_tests",
     "//components/device_event_log:unit_tests",
@@ -158,7 +161,6 @@ test("components_unittests") {
     "//components/favicon/core:unit_tests",
     "//components/favicon_base:unit_tests",
     "//components/feature_engagement:unit_tests",
-    "//components/file_access:unit_tests",
     "//components/filename_generation:unit_tests",
     "//components/flags_ui:unit_tests",
     "//components/gcm_driver:unit_tests",
@@ -167,7 +169,6 @@ test("components_unittests") {
     "//components/grpc_support/test:unit_tests",
     "//components/heap_profiling/in_process:unit_tests",
     "//components/history/core/browser:unit_tests",
-    "//components/history/core/common:unit_tests",
     "//components/history/metrics:unit_tests",
     "//components/image_fetcher/core:unit_tests",
     "//components/keyed_service/core:unit_tests",
@@ -213,7 +214,6 @@ test("components_unittests") {
     "//components/reporting/metrics:unit_tests",
     "//components/reporting/storage:unit_tests",
     "//components/reporting/util:unit_tests",
-    "//components/reputation/core:unit_tests",
     "//components/safe_browsing/core/browser:safe_browsing_metrics_collector_unittest",
     "//components/safe_search_api:unit_tests",
     "//components/saved_tab_groups:unit_tests",
@@ -239,6 +239,7 @@ test("components_unittests") {
     "//components/subresource_filter/core/browser:unit_tests",
     "//components/subresource_filter/core/common:unit_tests",
     "//components/subresource_filter/tools:unit_tests",
+    "//components/supervised_user/core/common:unit_tests",
     "//components/sync:unit_tests",
     "//components/sync_bookmarks:unit_tests",
     "//components/sync_device_info:unit_tests",
@@ -252,6 +253,7 @@ test("components_unittests") {
     "//components/translate/core/language_detection:unit_tests",
     "//components/ukm:unit_tests",
     "//components/undo:unit_tests",
+    "//components/unexportable_keys:unit_tests",
     "//components/unified_consent:unit_tests",
     "//components/upload_list:unit_tests",
     "//components/url_formatter:unit_tests",
@@ -266,6 +268,14 @@ test("components_unittests") {
     "//components/webdata/common:unit_tests",
     "//components/webdata_services:unit_tests",
   ]
+
+  if (enable_supervised_users) {
+    deps += [ "//components/supervised_user/core/browser:unit_tests" ]
+  }
+
+  if (!is_ios) {
+    deps += [ "//components/file_access:unit_tests" ]
+  }
 
   if (enable_screen_ai_service) {
     deps += [ "//components/services/screen_ai:unit_tests" ]
@@ -335,15 +345,10 @@ test("components_unittests") {
     ]
   } else {  #!is_ios
     deps += [
-      "//components/accuracy_tips:unit_tests",
       "//components/adblock/content/browser:unit_tests",
       "//components/autofill/content/browser:unit_tests",
       "//components/autofill/content/renderer:unit_tests",
       "//components/autofill/core/common/mojom:unit_tests",
-      "//components/autofill_assistant/browser:unit_tests",
-      "//components/autofill_assistant/browser/public:unit_tests",
-      "//components/autofill_assistant/content/browser:unit_tests",
-      "//components/autofill_assistant/content/renderer:unit_tests",
       "//components/background_sync:unit_tests",
       "//components/blocked_content:unit_tests",
       "//components/browsing_data/content:unit_tests",
@@ -384,6 +389,7 @@ test("components_unittests") {
       "//components/media_router/browser:unit_tests",
       "//components/media_router/common:unit_tests",
       "//components/media_router/common/providers/cast/channel:unit_tests",
+      "//components/mirroring:mirroring_tests",
       "//components/navigation_interception:unit_tests",
       "//components/network_hints/renderer:unit_tests",
       "//components/no_state_prefetch/browser:unit_tests",
@@ -420,8 +426,10 @@ test("components_unittests") {
       "//components/safe_browsing/content/browser/triggers:unit_tests",
       "//components/safe_browsing/content/browser/web_ui:unit_tests",
       "//components/safe_browsing/core/browser:token_fetcher_unit_tests",
+      "//components/safe_browsing/core/browser/hashprefix_realtime:unit_tests",
       "//components/safe_browsing/core/browser/realtime:unit_tests",
       "//components/safe_browsing/core/browser/tailored_security_service:unit_tests",
+      "//components/safe_browsing/core/browser/utils:unit_tests",
       "//components/safe_browsing/core/common:unit_tests",
       "//components/safety_check:unit_tests",
       "//components/security_interstitials/content:unit_tests",
@@ -486,6 +494,8 @@ test("components_unittests") {
     deps += [
       "//base:base_java_unittest_support",
       "//components/android_autofill/browser:unit_tests",
+      "//components/browser_ui/accessibility/android:unit_tests",
+      "//components/browser_ui/site_settings/android:unit_tests",
       "//components/browser_ui/sms/android:unit_tests",
       "//components/cdm/browser:unit_tests",
       "//components/component_updater/android:embedded_component_loader_java",
@@ -523,17 +533,13 @@ test("components_unittests") {
       "//components/webapps/browser/android:unit_tests",
       "//content/public/android:content_java",
       "//content/public/browser",
+      "//gin:v8_snapshot_assets",
       "//net",
       "//services/data_decoder/public/cpp/android:safe_json_java",
       "//ui/android:ui_java",
       "//ui/base",
       "//ui/gfx",
     ]
-    if (use_v8_context_snapshot) {
-      deps += [ "//tools/v8_context_snapshot:v8_context_snapshot_assets" ]
-    } else {
-      deps += [ "//v8:v8_external_startup_data_assets" ]
-    }
 
     if (enable_chrome_android_internal) {
       data_deps += [ "//clank/build/bot/filters:components_unittests_filters" ]
@@ -564,6 +570,7 @@ test("components_unittests") {
 
   if (!is_android) {
     deps += [
+      "//components/commerce/core:account_checker_unittests",
       "//components/commerce/core:commerce_heuristics_data_unittests",
       "//components/commerce/core:feature_list_unittests",
       "//components/commerce/core:heuristics_provider_unittests",
@@ -585,10 +592,12 @@ test("components_unittests") {
       "//components/arc:unit_tests",
       "//components/desks_storage:unit_tests",
       "//components/guest_os:unit_tests",
+      "//components/live_caption:unit_tests",
       "//components/metrics/structured:unit_tests",
       "//components/metrics/structured/mojom:unit_tests",
       "//components/ownership:unit_tests",
       "//components/user_manager:unit_tests",
+      "//components/variations/cros:unit_tests",
     ]
   }
 
@@ -611,6 +620,7 @@ test("components_unittests") {
   if (is_win) {
     deps += [
       "//components/browser_watcher:unit_tests",
+      "//components/stability_report:unit_tests",
       "//components/winhttp:unit_tests",
     ]
   }
@@ -647,6 +657,7 @@ test("components_unittests") {
     deps += [
       "//components/safe_browsing/content/renderer:throttles_unittest",
       "//components/safe_browsing/core/browser:ping_manager_unittest",
+      "//components/safe_browsing/core/browser:safe_browsing_lookup_mechanism_experimenter_unittest",
       "//components/safe_browsing/core/browser:safe_browsing_url_checker_unittest",
       "//components/safe_browsing/core/browser:user_population_unittest",
       "//components/safe_browsing/core/browser:verdict_cache_manager_unittest",
@@ -746,13 +757,9 @@ if (is_android) {
     deps = [
       ":components_tests_pak",
       "//content/shell:pak",
+      "//gin:v8_snapshot_assets",
       "//third_party/icu:icu_assets",
     ]
-    if (use_v8_context_snapshot) {
-      deps += [ "//tools/v8_context_snapshot:v8_context_snapshot_assets" ]
-    } else {
-      deps += [ "//v8:v8_external_startup_data_assets" ]
-    }
   }
 
   android_library("components_browsertests_java") {
@@ -802,11 +809,6 @@ if (!is_ios) {
       "autofill/content/renderer/form_cache_browsertest.cc",
       "autofill/content/renderer/html_based_username_detector_browsertest.cc",
       "autofill/content/renderer/password_form_conversion_utils_browsertest.cc",
-      "autofill_assistant/browser/js_flow_executor_impl_browsertest.cc",
-      "autofill_assistant/browser/script_executor_browsertest.cc",
-      "autofill_assistant/browser/web/batch_element_checker_browsertest.cc",
-      "autofill_assistant/browser/web/semantic_element_finder_browsertest.cc",
-      "autofill_assistant/browser/web/web_controller_browsertest.cc",
       "browsing_data/content/browsing_data_helper_browsertest.h",
       "browsing_data/content/cache_storage_helper_browsertest.cc",
       "browsing_data/content/database_helper_browsertest.cc",
@@ -846,10 +848,6 @@ if (!is_ios) {
       "//components/autofill/content/renderer",
       "//components/autofill/content/renderer:test_support",
       "//components/autofill/core/browser",
-      "//components/autofill_assistant/browser",
-      "//components/autofill_assistant/browser:browser_test_support",
-      "//components/autofill_assistant/browser:test_support",
-      "//components/autofill_assistant/content/renderer:browser_tests",
       "//components/browsing_data/content",
       "//components/content_capture/browser:browser_tests",
       "//components/content_settings/core/common",
@@ -1053,12 +1051,10 @@ if (!is_ios) {
     ]
 
     if (is_android) {
-      deps += [ "//ui/android:ui_java" ]
-      if (use_v8_context_snapshot) {
-        deps += [ "//tools/v8_context_snapshot:v8_context_snapshot_assets" ]
-      } else {
-        deps += [ "//v8:v8_external_startup_data_assets" ]
-      }
+      deps += [
+        "//gin:v8_snapshot_assets",
+        "//ui/android:ui_java",
+      ]
     }
 
     if (!is_android) {
@@ -1076,12 +1072,12 @@ if (is_android) {
   robolectric_binary("components_junit_tests") {
     deps = [
       "//components/android_autofill/browser/junit:components_autofill_junit_tests",
-      "//components/autofill_assistant/android:junit",
       "//components/background_task_scheduler:components_background_task_scheduler_junit_tests",
       "//components/browser_ui/bottomsheet/android/internal:junit_tests",
       "//components/browser_ui/client_certificate/android:junit",
       "//components/browser_ui/media/android:junit",
       "//components/browser_ui/photo_picker/android:junit",
+      "//components/browser_ui/settings/android:junit",
       "//components/browser_ui/util/android:junit",
       "//components/browser_ui/webshare/android:junit",
       "//components/browser_ui/widget/android:junit",

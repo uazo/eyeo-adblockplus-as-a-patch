@@ -29,20 +29,22 @@ class MockResourceClassifier : public ResourceClassifier {
   MockResourceClassifier();
   MOCK_METHOD(ClassificationResult,
               ClassifyRequest,
-              (const SubscriptionCollection&,
+              (const SubscriptionService::Snapshot,
                const GURL&,
                const std::vector<GURL>&,
                ContentType,
                const SiteKey&),
               (override, const));
-  MOCK_METHOD(
-      ClassificationResult,
-      ClassifyPopup,
-      (const SubscriptionCollection&, const GURL&, const GURL&, const SiteKey&),
-      (override, const));
+  MOCK_METHOD(ClassificationResult,
+              ClassifyPopup,
+              (const SubscriptionService::Snapshot&,
+               const GURL&,
+               const std::vector<GURL>&,
+               const SiteKey&),
+              (override, const));
   MOCK_METHOD(ClassificationResult,
               ClassifyResponse,
-              (const SubscriptionCollection&,
+              (const SubscriptionService::Snapshot,
                const GURL&,
                const std::vector<GURL>&,
                ContentType,

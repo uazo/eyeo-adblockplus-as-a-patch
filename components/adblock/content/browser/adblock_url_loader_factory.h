@@ -20,6 +20,7 @@
 
 #include "base/containers/unique_ptr_adapters.h"
 #include "components/adblock/content/browser/adblock_filter_match.h"
+#include "content/public/browser/global_routing_id.h"
 #include "mojo/public/cpp/bindings/receiver_set.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "services/network/public/mojom/url_loader_factory.mojom.h"
@@ -47,8 +48,7 @@ class AdblockURLLoaderFactory : public network::mojom::URLLoaderFactory {
 
   AdblockURLLoaderFactory(
       AdblockURLLoaderFactoryConfig config,
-      int32_t render_process_id,
-      int frame_tree_node_id,
+      content::GlobalRenderFrameHostId host_id,
       mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
       mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
       std::string user_agent_string,
@@ -65,8 +65,7 @@ class AdblockURLLoaderFactory : public network::mojom::URLLoaderFactory {
       override;
   void Clone(::mojo::PendingReceiver<URLLoaderFactory> factory) override;
 
-  virtual bool CheckRenderProcessValid() const;
-  virtual bool CheckRenderProcessAndFrameValid(int32_t render_frame_id) const;
+  virtual bool CheckHostValid() const;
 
  private:
   class InProgressRequest;
@@ -78,8 +77,7 @@ class AdblockURLLoaderFactory : public network::mojom::URLLoaderFactory {
   void MaybeDestroySelf();
 
   AdblockURLLoaderFactoryConfig config_;
-  int frame_tree_node_id_;
-  int32_t render_process_id_;
+  content::GlobalRenderFrameHostId host_id_;
   mojo::ReceiverSet<network::mojom::URLLoaderFactory> proxy_receivers_;
   std::set<std::unique_ptr<InProgressRequest>, base::UniquePtrComparator>
       requests_;

@@ -21,7 +21,7 @@
 #include <memory>
 #include <vector>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/observer_list_types.h"
 #include "components/adblock/core/configuration/filtering_configuration.h"
@@ -33,21 +33,8 @@
 
 namespace adblock {
 
-enum class FilteringStatus {
-  // There is no FilteringConfiguration installed that demands resource or
-  // content filtering. Every resource is allowed to load.
-  Inactive,
-  // There is at least one FilteringConfiguration installed that might demand
-  // filtering, but it is still initializing. Cannot say yet which resources are
-  // allowed to load, register with RunWhenInitialized() to try again later.
-  Initializing,
-  // Filtering is demanded and available. Consult GetCurrentSnapshot() to
-  // establish which resources are allowed to load.
-  Active,
-};
-
-// Maintains a state of available Subscriptions on the UI thread and
-// synchronizes it with disk-based storage.
+// Maintains a state of available Subscriptions needed for all installed
+// FilteringConfigurations.
 class SubscriptionService : public KeyedService {
  public:
   using Snapshot = std::vector<std::unique_ptr<SubscriptionCollection>>;
@@ -57,14 +44,8 @@ class SubscriptionService : public KeyedService {
     // TODO(mpawlowski) add error reporting.
     virtual void OnSubscriptionInstalled(const GURL& subscription_url) {}
   };
-  // See FilteringStatus for interpretation of the service's status.
-  virtual FilteringStatus GetStatus() const = 0;
-  // Lets callers execute |task| shortly after the service becomes initialized.
-  // The tasks are executed in FIFO order.
-  virtual void RunWhenInitialized(base::OnceClosure task) = 0;
   // Returns currently available subscriptions installed for |configuration|.
-  // Includes subscriptions that are still being downloaded. FilteringStatus
-  // must be Active.
+  // Includes subscriptions that are still being downloaded.
   virtual std::vector<scoped_refptr<Subscription>> GetCurrentSubscriptions(
       FilteringConfiguration* configuration) const = 0;
   // Subscriptions and filters demanded by |configuration| will be installed and
@@ -73,11 +54,15 @@ class SubscriptionService : public KeyedService {
   // lists as needed.
   virtual void InstallFilteringConfiguration(
       std::unique_ptr<FilteringConfiguration> configuration) = 0;
+  // Returns a list of FilteringConfigurations previously installed via
+  // InstallFilteringConfiguration.
+  virtual std::vector<FilteringConfiguration*>
+  GetInstalledFilteringConfigurations() = 0;
   // Returns a snapshot of subscriptions as present at the time of calling the
   // function that can be used to query filters.
   // The result may be passed between threads, even called
   // concurrently, and future changes to the installed subscriptions will not
-  // impact it. FilteringStatus must be Active.
+  // impact it.
   virtual Snapshot GetCurrentSnapshot() const = 0;
 
   virtual void AddObserver(SubscriptionObserver*) = 0;

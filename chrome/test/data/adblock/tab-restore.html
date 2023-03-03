@@ -1,27 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
+<script>
+ function onLoaded() {
+  if (window.domAutomationController) {
+   domAutomationController.send("READY");
+  }
+ }
+</script>
 </head>
-<body>
-  <img id='subresource' src='blocked.png' />
-  <iframe id="rewrite-frame-id" src="/empty.html"></iframe>
-  <script>
-    "use strict";
-    function writeIframe() {
-      document.getElementById("rewrite-frame-id").contentWindow.document.open("text/html");
-      document.getElementById("rewrite-frame-id").contentWindow.document.write(`
-        <html>
-         <body>
-          <img src="/expected.png"/>
-         </body>
-        </html>`);
-      document.getElementById("rewrite-frame-id").contentWindow.document.close();
-      if (window.domAutomationController) {
-        domAutomationController.send("READY");
-      }
-    }
-    document.getElementById("rewrite-frame-id").addEventListener("load", writeIframe);
-  </script>
+<body onload="onLoaded()">
+  <img id="blocked" src="blocked.png" />
+  <img id="allowed" src="allowed.png" />
 </body>
 </html>
 

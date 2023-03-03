@@ -181,8 +181,10 @@ TEST_F(AdblockSubscriptionCollectionImplTest, GenerateSnippetsJson) {
 
   SubscriptionCollectionImpl collection(
       std::vector<scoped_refptr<InstalledSubscription>>{subscription});
-  auto json = collection.GenerateSnippetsJson(kParentAddress, {});
-  EXPECT_EQ("[[\"say\",\"Hello\"]]", json);
+  auto snippets = collection.GenerateSnippets(kParentAddress, {});
+  EXPECT_EQ("say", snippets.front().GetList().front().GetString());
+  EXPECT_EQ("Hello", snippets.front().GetList().back().GetString());
+  EXPECT_EQ("[ [ \"say\", \"Hello\" ] ]\n", snippets.DebugString());
 }
 
 TEST_F(AdblockSubscriptionCollectionImplTest, OneHasAllowingDocumentFilter) {
@@ -333,44 +335,41 @@ TEST_F(AdblockSubscriptionCollectionImplTest, CspBlockingFilterNotFound) {
   auto sub2 = base::MakeRefCounted<MockInstalledSubscription>();
 
   // There are no blocking filters found.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .WillOnce(Return(absl::nullopt));
-  EXPECT_CALL(*sub2, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _));
 
   // Since there are no blocking CSP filters, no need to check allow filters.
   EXPECT_CALL(*sub1, HasSpecialFilter(_, _, _, _)).Times(0);
   EXPECT_CALL(*sub2, HasSpecialFilter(_, _, _, _)).Times(0);
-  EXPECT_CALL(*sub1, FindCspFilter(_, _, FilterCategory::Allowing)).Times(0);
-  EXPECT_CALL(*sub2, FindCspFilter(_, _, FilterCategory::Allowing)).Times(0);
+  EXPECT_CALL(*sub1, FindCspFilters(_, _, FilterCategory::Allowing, _))
+      .Times(0);
+  EXPECT_CALL(*sub2, FindCspFilters(_, _, FilterCategory::Allowing, _))
+      .Times(0);
 
   SubscriptionCollectionImpl collection(
       std::vector<scoped_refptr<InstalledSubscription>>{sub1, sub2});
 
   // Empty result means no CSP injection necessary.
-  EXPECT_EQ(collection.GetCspInjection(kImageAddress, {kParentAddress}), "");
+  EXPECT_TRUE(
+      collection.GetCspInjections(kImageAddress, {kParentAddress}).empty());
 }
 
 TEST_F(AdblockSubscriptionCollectionImplTest, CspBlockingFilterFound) {
   auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
   auto sub2 = base::MakeRefCounted<MockInstalledSubscription>();
 
-  // First subscription contains a blocking CSP filter. Second is not queried
-  // because we only return the first found blocking filter (may change in
-  // DPD-1145).
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .WillOnce(Return("block"));
-  EXPECT_CALL(*sub2, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .Times(0);
+  // First subscription contains a blocking CSP filter.
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("block"); })));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _));
 
   // Since a blocking filter is found, implementation will try to find allowing
   // rules.
-
-  // Neither subscription contains a document-wide allowing rule.
   EXPECT_CALL(*sub1,
               HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
                                kParentAddress.host(), SiteKey()))
@@ -379,6 +378,9 @@ TEST_F(AdblockSubscriptionCollectionImplTest, CspBlockingFilterFound) {
               HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
                                kParentAddress.host(), SiteKey()))
       .WillOnce(Return(false));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _));
+
   EXPECT_CALL(*sub2,
               HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
                                kParentAddress.host(), SiteKey()))
@@ -387,17 +389,10 @@ TEST_F(AdblockSubscriptionCollectionImplTest, CspBlockingFilterFound) {
               HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
                                kParentAddress.host(), SiteKey()))
       .WillOnce(Return(false));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _));
 
-  // Neither subscription contains an allowing CSP rule.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Allowing))
-      .WillOnce(Return(absl::nullopt));
-  EXPECT_CALL(*sub2, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Allowing))
-      .WillOnce(Return(absl::nullopt));
-
-  // Neither subscription contains a GenericBlock rule that would require
-  // searching for domain-specific-only blocking CSP filters.
+  // Check for Genericblock filter.
   EXPECT_CALL(*sub1,
               HasSpecialFilter(SpecialFilterType::Genericblock, kImageAddress,
                                kParentAddress.host(), SiteKey()))
@@ -415,12 +410,150 @@ TEST_F(AdblockSubscriptionCollectionImplTest, CspBlockingFilterFound) {
                                kParentAddress.host(), SiteKey()))
       .WillOnce(Return(false));
 
-  // In presence of a blocking CSP filters and absence of any allowing filters,
-  // the string returned by first subscription becomes the CSP injection.
+  // In presence of a blocking CSP filters and absence of any allowing
+  // filters, the string returned by first subscription becomes the CSP
+  // injection.
   SubscriptionCollectionImpl collection(
       std::vector<scoped_refptr<InstalledSubscription>>{sub1, sub2});
-  EXPECT_EQ(collection.GetCspInjection(kImageAddress, {kParentAddress}),
-            "block");
+
+  std::set<base::StringPiece> filters =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_THAT(filters, testing::UnorderedElementsAre("block"));
+}
+
+TEST_F(AdblockSubscriptionCollectionImplTest, MultipleCspBlockingFilterFound) {
+  auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
+  auto sub2 = base::MakeRefCounted<MockInstalledSubscription>();
+
+  // First subscription contains a blocking CSP filter.
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("first"); })));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("second"); })));
+
+  // Since a blocking filter is found, implementation will try to find allowing
+  // rules.
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _));
+
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _));
+
+  // Check for Genericblock filter.
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+
+  // In presence of a blocking CSP filters and absence of any allowing
+  // filters, the string returned by first subscription becomes the CSP
+  // injection.
+  SubscriptionCollectionImpl collection(
+      std::vector<scoped_refptr<InstalledSubscription>>{sub1, sub2});
+
+  std::set<base::StringPiece> filters =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_THAT(filters, testing::UnorderedElementsAre("first", "second"));
+}
+
+TEST_F(AdblockSubscriptionCollectionImplTest,
+       SameCspBlockingFilterFoundInMultipleSubs) {
+  auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
+  auto sub2 = base::MakeRefCounted<MockInstalledSubscription>();
+
+  // First subscription contains a blocking CSP filter.
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("block"); })));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("block"); })));
+
+  // Since a blocking filter is found, implementation will try to find allowing
+  // rules.
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _));
+
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _));
+
+  // Check for Genericblock filter.
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+
+  // In presence of a blocking CSP filters and absence of any allowing
+  // filters, the string returned by first subscription becomes the CSP
+  // injection.
+  SubscriptionCollectionImpl collection(
+      std::vector<scoped_refptr<InstalledSubscription>>{sub1, sub2});
+
+  std::set<base::StringPiece> filters =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_THAT(filters, testing::UnorderedElementsAre("block"));
 }
 
 TEST_F(AdblockSubscriptionCollectionImplTest,
@@ -428,15 +561,12 @@ TEST_F(AdblockSubscriptionCollectionImplTest,
   auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
 
   // Subscription contains a blocking CSP filter.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .WillOnce(Return("script-src 'none'"));
-
-  // Since a blocking filter is found, implementation will try to find allowing
-  // rules.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Allowing))
-      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("script-src 'none'");
+          })));
 
   // A document-wide allowing rule exists.
   EXPECT_CALL(*sub1,
@@ -452,7 +582,10 @@ TEST_F(AdblockSubscriptionCollectionImplTest,
   // The allowing Document filter overrules the blocking CSP filter.
   SubscriptionCollectionImpl collection(
       std::vector<scoped_refptr<InstalledSubscription>>{sub1});
-  EXPECT_EQ(collection.GetCspInjection(kImageAddress, {kParentAddress}), "");
+
+  std::set<base::StringPiece> results =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_TRUE(results.empty());
 }
 
 TEST_F(AdblockSubscriptionCollectionImplTest,
@@ -460,22 +593,34 @@ TEST_F(AdblockSubscriptionCollectionImplTest,
   auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
 
   // Subscription contains a blocking CSP filter.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .WillOnce(Return("script-src 'none'"));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("script-src 'none'");
+          })));
 
   // Since a blocking filter is found, implementation will try to find allowing
   // rules.
 
   // Document-wide allowing filters may or may not be consulted, but if they
   // are, there are no matches.
-  ON_CALL(*sub1, HasSpecialFilter(SpecialFilterType::Document, _, _, SiteKey()))
-      .WillByDefault(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
 
   // An allowing CSP rule, with specific payload, is found for parent.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Allowing))
-      .WillOnce(Return("script-src 'none'"));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("script-src 'none'");
+          })));
 
   // No need to query GenericBlock rules since the blocking CSP filter was
   // overruled already.
@@ -485,7 +630,118 @@ TEST_F(AdblockSubscriptionCollectionImplTest,
   // The allowing CSP filter overrules the blocking CSP filter.
   SubscriptionCollectionImpl collection(
       std::vector<scoped_refptr<InstalledSubscription>>{sub1});
-  EXPECT_EQ(collection.GetCspInjection(kImageAddress, {kParentAddress}), "");
+  std::set<base::StringPiece> results =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_TRUE(results.empty());
+}
+
+TEST_F(AdblockSubscriptionCollectionImplTest,
+       TwoCspBlockingFilterWithOneOverruledViaMatchingAllowingCspFilter) {
+  auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
+
+  // Subscription contains a blocking CSP filter.
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("first");
+            res.insert("second");
+          })));
+
+  // Since a blocking filter is found, implementation will try to find allowing
+  // rules.
+
+  // Document-wide allowing filters may or may not be consulted, but if they
+  // are, there are no matches.
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+
+  // An allowing CSP rule, with specific payload, is found for parent.
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("second"); })));
+
+  // Check for Genericblock filter.
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+
+  // The allowing CSP filter overrules the blocking CSP filter.
+  SubscriptionCollectionImpl collection(
+      std::vector<scoped_refptr<InstalledSubscription>>{sub1});
+  std::set<base::StringPiece> results =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_THAT(results, testing::UnorderedElementsAre("first"));
+}
+
+TEST_F(AdblockSubscriptionCollectionImplTest,
+       TwoCspBlockingFilterOverruledViaMatchingAllowingCspFilter) {
+  auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
+  auto sub2 = base::MakeRefCounted<MockInstalledSubscription>();
+
+  // Subscription contains a blocking CSP filter.
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("first"); })));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("second"); })));
+
+  // Since a blocking filter is found, implementation will try to find allowing
+  // rules.
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("second"); })));
+
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("first"); })));
+
+  // No need to query GenericBlock rules since the blocking CSP filter was
+  // overruled already.
+  EXPECT_CALL(*sub1, HasSpecialFilter(SpecialFilterType::Genericblock, _, _, _))
+      .Times(0);
+  EXPECT_CALL(*sub2, HasSpecialFilter(SpecialFilterType::Genericblock, _, _, _))
+      .Times(0);
+
+  // The allowing CSP filter overrules the blocking CSP filter.
+  SubscriptionCollectionImpl collection(
+      std::vector<scoped_refptr<InstalledSubscription>>{sub1, sub2});
+  std::set<base::StringPiece> results =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_TRUE(results.empty());
 }
 
 TEST_F(AdblockSubscriptionCollectionImplTest,
@@ -493,23 +749,33 @@ TEST_F(AdblockSubscriptionCollectionImplTest,
   auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
 
   // Subscription contains a blocking CSP filter.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .WillOnce(Return("script-src 'none'"));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("script-src 'none'");
+          })));
 
   // Since a blocking filter is found, implementation will try to find allowing
   // rules.
 
   // Document-wide allowing filters may or may not be consulted, but if they
   // are, there are no matches.
-  ON_CALL(*sub1, HasSpecialFilter(SpecialFilterType::Document, _, _, SiteKey()))
-      .WillByDefault(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
 
   // An allowing CSP rule, with no payload, is found for request. A CSP allowing
   // filter with no payload overrules any blocking CSP filter.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Allowing))
-      .WillOnce(Return(""));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert(""); })));
 
   // No need to query GenericBlock rules since the blocking CSP filter was
   // overruled already.
@@ -519,7 +785,9 @@ TEST_F(AdblockSubscriptionCollectionImplTest,
   // The allowing CSP filter overrules the blocking CSP filter.
   SubscriptionCollectionImpl collection(
       std::vector<scoped_refptr<InstalledSubscription>>{sub1});
-  EXPECT_EQ(collection.GetCspInjection(kImageAddress, {kParentAddress}), "");
+  std::set<base::StringPiece> results =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_TRUE(results.empty());
 }
 
 TEST_F(AdblockSubscriptionCollectionImplTest,
@@ -527,9 +795,12 @@ TEST_F(AdblockSubscriptionCollectionImplTest,
   auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
 
   // Subscription contains a blocking CSP filter.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .WillOnce(Return("script-src 'none'"));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("script-src 'none'");
+          })));
 
   // No document-wide allowing filters present.
   EXPECT_CALL(*sub1,
@@ -543,9 +814,12 @@ TEST_F(AdblockSubscriptionCollectionImplTest,
 
   // Allowing CSP rules with different payloads do NOT match the blocking
   // CSP filter.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Allowing))
-      .WillOnce(Return("script-src *"));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("script-src *");
+          })));
 
   // The blocking filter is not overruled yet, will now check generic block
   // rules.
@@ -562,8 +836,10 @@ TEST_F(AdblockSubscriptionCollectionImplTest,
   // the payloads did not match.
   SubscriptionCollectionImpl collection(
       std::vector<scoped_refptr<InstalledSubscription>>{sub1});
-  EXPECT_EQ(collection.GetCspInjection(kImageAddress, {kParentAddress}),
-            "script-src 'none'");
+
+  std::set<base::StringPiece> results =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_THAT(results, testing::UnorderedElementsAre("script-src 'none'"));
 }
 
 TEST_F(AdblockSubscriptionCollectionImplTest, GenericBlockCspFilter) {
@@ -573,14 +849,14 @@ TEST_F(AdblockSubscriptionCollectionImplTest, GenericBlockCspFilter) {
   // First subscription contains a blocking CSP filter. Second does not.
   // Both are consulted, because the first subscription's blocking CSP filter
   // gets overruled as not domain-specific.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .WillOnce(Return("block"));
-  EXPECT_CALL(*sub2, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Blocking))
-      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("block"); })));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _));
 
-  // Neither subscription contains a document-wide allowing rule.
+  // Neither subscription contains allowing rule.
   EXPECT_CALL(*sub1,
               HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
                                kParentAddress.host(), SiteKey()))
@@ -589,6 +865,9 @@ TEST_F(AdblockSubscriptionCollectionImplTest, GenericBlockCspFilter) {
               HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
                                kParentAddress.host(), SiteKey()))
       .WillOnce(Return(false));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _));
+
   EXPECT_CALL(*sub2,
               HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
                                kParentAddress.host(), SiteKey()))
@@ -597,14 +876,8 @@ TEST_F(AdblockSubscriptionCollectionImplTest, GenericBlockCspFilter) {
               HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
                                kParentAddress.host(), SiteKey()))
       .WillOnce(Return(false));
-
-  // Neither subscription contains an allowing CSP rule.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Allowing))
-      .WillOnce(Return(absl::nullopt));
-  EXPECT_CALL(*sub2, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::Allowing))
-      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _));
 
   // Second subscription contains a genericblock rule.
   EXPECT_CALL(*sub1,
@@ -625,14 +898,76 @@ TEST_F(AdblockSubscriptionCollectionImplTest, GenericBlockCspFilter) {
       .WillOnce(Return(true));
 
   // Search is retried but now for domain-specific CSP filters only. No matches.
-  EXPECT_CALL(*sub1, FindCspFilter(kImageAddress, kParentAddress.host(),
-                                   FilterCategory::DomainSpecificBlocking))
-      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::DomainSpecificBlocking, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("domain-block");
+          })));
+
+  EXPECT_CALL(*sub2, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::DomainSpecificBlocking, _));
 
   // Finally, no CSP filter found.
   SubscriptionCollectionImpl collection(
       std::vector<scoped_refptr<InstalledSubscription>>{sub1, sub2});
-  EXPECT_EQ(collection.GetCspInjection(kImageAddress, {kParentAddress}), "");
+  std::set<base::StringPiece> results =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_THAT(results, testing::UnorderedElementsAre("domain-block"));
+}
+
+TEST_F(AdblockSubscriptionCollectionImplTest,
+       GenericBlockCspFilterWithDomainAllowingFilter) {
+  auto sub1 = base::MakeRefCounted<MockInstalledSubscription>();
+
+  // First subscription contains a blocking CSP filter. Second does not.
+  // Both are consulted, because the first subscription's blocking CSP filter
+  // gets overruled as not domain-specific.
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Blocking, _))
+      .WillOnce(testing::WithArgs<3>(testing::Invoke(
+          [](std::set<base::StringPiece>& res) { res.insert("block"); })));
+
+  // Neither subscription contains allowing rule.
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Document, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::Allowing, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("domain-block");
+          })));
+
+  // Second subscription contains a genericblock rule.
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kImageAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*sub1,
+              HasSpecialFilter(SpecialFilterType::Genericblock, kParentAddress,
+                               kParentAddress.host(), SiteKey()))
+      .WillOnce(Return(true));
+
+  // Search is retried but now for domain-specific CSP filters only. No matches.
+  EXPECT_CALL(*sub1, FindCspFilters(kImageAddress, kParentAddress.host(),
+                                    FilterCategory::DomainSpecificBlocking, _))
+      .WillOnce(testing::WithArgs<3>(
+          testing::Invoke([](std::set<base::StringPiece>& res) {
+            res.insert("domain-block");
+          })));
+
+  // Finally, no CSP filter found.
+  SubscriptionCollectionImpl collection(
+      std::vector<scoped_refptr<InstalledSubscription>>{sub1});
+  std::set<base::StringPiece> results =
+      collection.GetCspInjections(kImageAddress, {kParentAddress});
+  EXPECT_TRUE(results.empty());
 }
 
 TEST_F(AdblockSubscriptionCollectionImplTest, RewriteBlockingFilterNotFound) {

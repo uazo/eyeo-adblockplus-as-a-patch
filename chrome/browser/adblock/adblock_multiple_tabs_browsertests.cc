@@ -45,8 +45,7 @@ class AdblockMultipleTabsBrowserTest
     ResourceClassificationRunnerFactory::GetForBrowserContext(
         browser()->profile())
         ->AddObserver(this);
-    // expected.png is allowlisted by allowlisted parent empty.html iframe
-    SetFilters({"blocked.png", "expected.png", "@@/empty.html^$document"});
+    SetFilters({"blocked.png", "allowed.png", "@@allowed.png"});
   }
 
   void TearDownInProcessBrowserTestFixture() override {
@@ -88,7 +87,7 @@ class AdblockMultipleTabsBrowserTest
       tabs_with_blocked_resource_.insert(
           sessions::SessionTabHelper::IdForTab(wc).id());
     } else if (match_result == FilterMatchResult::kAllowRule &&
-               url.path() == "/expected.png") {
+               url.path() == "/allowed.png") {
       tabs_with_allowed_resource_.insert(
           sessions::SessionTabHelper::IdForTab(wc).id());
     }

@@ -88,16 +88,14 @@ const std::string AdblockURLLoaderFactoryForTest::kAdblockDebugDataHostName =
 
 AdblockURLLoaderFactoryForTest::AdblockURLLoaderFactoryForTest(
     AdblockURLLoaderFactoryConfig config,
-    int32_t render_process_id,
-    int frame_tree_node_id,
+    content::GlobalRenderFrameHostId host_id,
     mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
     mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
     std::string user_agent_string,
     DisconnectCallback on_disconnect,
     AdblockController* adblock_controller)
     : AdblockURLLoaderFactory(std::move(config),
-                              render_process_id,
-                              frame_tree_node_id,
+                              host_id,
                               std::move(receiver),
                               std::move(target_factory),
                               user_agent_string,

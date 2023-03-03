@@ -41,8 +41,7 @@ class AdblockURLLoaderFactoryForTest final : public AdblockURLLoaderFactory {
  public:
   AdblockURLLoaderFactoryForTest(
       AdblockURLLoaderFactoryConfig config,
-      int32_t render_process_id,
-      int frame_tree_node_id,
+      content::GlobalRenderFrameHostId host_id,
       mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
       mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
       std::string user_agent_string,

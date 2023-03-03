@@ -14,14 +14,15 @@
 #include <utility>
 #include <vector>
 
-#include "base/bind.h"
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
 #include "base/files/file_path.h"
+#include "base/functional/bind.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/path_service.h"
-#include "base/threading/thread_task_runner_handle.h"
+#include "base/task/sequenced_task_runner.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
 #include "build/branding_buildflags.h"
@@ -443,9 +444,8 @@ void DisableDomainCheckForTesting() {
 #endif  // BUILDFLAG(IS_WIN)
 }
 
-bool InitializePrefsFromMasterPrefs(
-    const base::FilePath& profile_path,
-    std::unique_ptr<base::DictionaryValue> master_prefs) {
+bool InitializePrefsFromMasterPrefs(const base::FilePath& profile_path,
+                                    base::Value::Dict master_prefs) {
   return CreateProfilePrefStoreManager(profile_path)
       ->InitializePrefsFromMasterPrefs(GetTrackingConfiguration(),
                                        kTrackedPrefsReportingIDsCount,
@@ -491,10 +491,11 @@ void HandlePersistentPrefStoreReadError(
     }
 
     if (message_id) {
-      // Note: ThreadTaskRunnerHandle() is usually BrowserThread::UI but during
-      // early startup it can be ChromeBrowserMainParts::DeferringTaskRunner
-      // which will forward to BrowserThread::UI when it's initialized.
-      base::ThreadTaskRunnerHandle::Get()->PostTask(
+      // Note: SingleThreadTaskRunner::CurrentDefaultHandle is usually
+      // BrowserThread::UI but during early startup it can be
+      // ChromeBrowserMainParts::DeferringTaskRunner which will forward to
+      // BrowserThread::UI when it's initialized.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
           FROM_HERE,
           base::BindOnce(&ShowProfileErrorDialog, ProfileErrorType::PREFERENCES,
                          message_id,

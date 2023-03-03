@@ -27,9 +27,10 @@
 #include "base/timer/elapsed_timer.h"
 #include "components/adblock/core/classifier/resource_classifier_impl.h"
 #include "components/adblock/core/common/adblock_constants.h"
-#include "components/adblock/core/converter/converter.h"
+#include "components/adblock/core/converter/flatbuffer_converter.h"
 #include "components/adblock/core/subscription/installed_subscription_impl.h"
 #include "components/adblock/core/subscription/subscription_collection_impl.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace adblock {
@@ -39,18 +40,22 @@ class ResourceClassifierPerfTest : public testing::Test {
   void SetUp() override {
     classifier_ = base::MakeRefCounted<ResourceClassifierImpl>();
   }
-  SubscriptionCollectionImpl CreateSubscriptionCollection(
+  std::unique_ptr<SubscriptionCollectionImpl> CreateSubscriptionCollection(
       std::initializer_list<std::string> filenames) {
     std::vector<scoped_refptr<InstalledSubscription>> state;
     for (const auto& cur : filenames) {
       const std::string content = ReadFromTestData(cur);
       std::stringstream input(std::move(content));
-      auto buffer = Converter().Convert(input, {CustomFiltersUrl()});
+      auto converter_result =
+          FlatbufferConverter::Convert(input, CustomFiltersUrl(), false);
+      DCHECK(absl::holds_alternative<std::unique_ptr<FlatbufferData>>(
+          converter_result));
       state.push_back(base::MakeRefCounted<InstalledSubscriptionImpl>(
-          std::move(buffer.data), Subscription::InstallationState::Installed,
-          base::Time()));
+          std::move(
+              absl::get<std::unique_ptr<FlatbufferData>>(converter_result)),
+          Subscription::InstallationState::Installed, base::Time()));
     }
-    return SubscriptionCollectionImpl(state);
+    return std::make_unique<SubscriptionCollectionImpl>(state);
   }
 
   static std::string ReadFromTestData(const std::string& file_name) {
@@ -77,16 +82,19 @@ class ResourceClassifierPerfTest : public testing::Test {
 #endif
   }
 
-  void MeasureUrlMatchingTime(GURL url,
-                              ContentType content_type,
-                              SubscriptionCollectionImpl sub_collection,
-                              int cycles = BenchmarkRepetitions()) {
+  void MeasureUrlMatchingTime(
+      GURL url,
+      ContentType content_type,
+      std::unique_ptr<SubscriptionCollectionImpl> sub_collection,
+      int cycles = BenchmarkRepetitions()) {
+    SubscriptionService::Snapshot snapshot;
+    snapshot.push_back(std::move(sub_collection));
     ResourceClassifier::ClassificationResult classification_result;
     base::ElapsedTimer timer;
     // Call matching many times to make sure perf woke up for measurement.
     for (int i = 0; i < cycles; ++i) {
       classification_result = classifier_->ClassifyRequest(
-          sub_collection, url, DefautFrameHeirarchy(), content_type,
+          std::move(snapshot), url, DefautFrameHeirarchy(), content_type,
           DefaultSitekey());
     }
     LOG(INFO) << "URL matching time: " << timer.Elapsed() / cycles;
@@ -94,27 +102,31 @@ class ResourceClassifierPerfTest : public testing::Test {
               << ClassificationResultToString(classification_result);
   }
 
-  void MeasureCSPMatchingTime(GURL url,
-                              ContentType content_type,
-                              SubscriptionCollectionImpl sub_collection,
-                              int cycles = BenchmarkRepetitions()) {
-    base::StringPiece csp_injection;
+  void MeasureCSPMatchingTime(
+      GURL url,
+      ContentType content_type,
+      std::unique_ptr<SubscriptionCollectionImpl> sub_collection,
+      int cycles = BenchmarkRepetitions()) {
+    std::set<base::StringPiece> csp_injections;
     base::ElapsedTimer timer;
     // Call matching many times to make sure perf woke up for measurement.
     for (int i = 0; i < cycles; ++i) {
-      csp_injection =
-          sub_collection.GetCspInjection(url, DefautFrameHeirarchy());
+      csp_injections =
+          sub_collection->GetCspInjections(url, DefautFrameHeirarchy());
     }
-    LOG(INFO) << "CSP filter search time: " << timer.Elapsed() / cycles;
-    LOG(INFO) << "CSP injection found: " << csp_injection;
+    VLOG(1) << "CSP filter search time: " << timer.Elapsed() / cycles;
+    for (const auto& csp_i : csp_injections) {
+      VLOG(1) << "CSP injection found: " << csp_i;
+    }
   }
 
-  void MeasureElemhideGeneretionTime(GURL url,
-                                     SubscriptionCollectionImpl collection) {
+  void MeasureElemhideGeneretionTime(
+      GURL url,
+      std::unique_ptr<SubscriptionCollectionImpl> collection) {
     // Call generation many times to make sure perf woke up for measurement.
     for (int i = 0; i < BenchmarkRepetitions(); ++i) {
-      collection.GetElementHideSelectors(url, DefautFrameHeirarchy(),
-                                         DefaultSitekey());
+      collection->GetElementHideSelectors(url, DefautFrameHeirarchy(),
+                                          DefaultSitekey());
     }
   }
 
@@ -162,19 +174,21 @@ class ResourceClassifierPerfTest : public testing::Test {
 TEST_F(ResourceClassifierPerfTest, UrlNoMatch) {
   auto sub_collection =
       CreateSubscriptionCollection({"easylist.txt", "exceptionrules.txt"});
-  MeasureUrlMatchingTime(UnknownAddress(), ContentType::Image, sub_collection);
+  MeasureUrlMatchingTime(UnknownAddress(), ContentType::Image,
+                         std::move(sub_collection));
 }
 
 TEST_F(ResourceClassifierPerfTest, UrlBlocked) {
   auto sub_collection =
       CreateSubscriptionCollection({"easylist.txt", "exceptionrules.txt"});
-  MeasureUrlMatchingTime(BlockedAddress(), ContentType::Image, sub_collection);
+  MeasureUrlMatchingTime(BlockedAddress(), ContentType::Image,
+                         std::move(sub_collection));
 }
 
 TEST_F(ResourceClassifierPerfTest, ElemhideNoMatch) {
   auto sub_collection =
       CreateSubscriptionCollection({"easylist.txt", "exceptionrules.txt"});
-  MeasureElemhideGeneretionTime(UnknownAddress(), sub_collection);
+  MeasureElemhideGeneretionTime(UnknownAddress(), std::move(sub_collection));
 }
 
 TEST_F(ResourceClassifierPerfTest, ElemhideMatch) {
@@ -184,7 +198,7 @@ TEST_F(ResourceClassifierPerfTest, ElemhideMatch) {
       GURL{"https://www.heise.de/news/"
            "Privacy-Shield-2-0-Viele-offene-Fragen-zum-Datenverkehr-mit-den-"
            "USA-6658370.html"},
-      sub_collection);
+      std::move(sub_collection));
 }
 
 TEST_F(ResourceClassifierPerfTest, LongUrlMatch) {
@@ -199,8 +213,8 @@ TEST_F(ResourceClassifierPerfTest, LongUrlMatch) {
   const int kRepCount = 50;
 #endif
   const GURL long_url(ReadFromTestData("longurl.txt"));
-  MeasureUrlMatchingTime(long_url, ContentType::Subdocument, sub_collection,
-                         kRepCount);
+  MeasureUrlMatchingTime(long_url, ContentType::Subdocument,
+                         std::move(sub_collection), kRepCount);
 }
 
 TEST_F(ResourceClassifierPerfTest, LongUrlFindCsp) {
@@ -212,8 +226,8 @@ TEST_F(ResourceClassifierPerfTest, LongUrlFindCsp) {
   const int kRepCount = 5;
 #endif
   const GURL long_url(ReadFromTestData("longurl.txt"));
-  MeasureCSPMatchingTime(long_url, ContentType::Subdocument, sub_collection,
-                         kRepCount);
+  MeasureCSPMatchingTime(long_url, ContentType::Subdocument,
+                         std::move(sub_collection), kRepCount);
 }
 
 }  // namespace adblock

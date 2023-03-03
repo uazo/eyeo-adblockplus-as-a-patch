@@ -8,6 +8,7 @@
 
 import("//build/config/android/config.gni")
 import("//components/safe_browsing/buildflags.gni")
+import("//components/supervised_user/buildflags.gni")
 import("//printing/buildflags/buildflags.gni")
 import("//tools/grit/grit_rule.gni")
 
@@ -46,6 +47,7 @@ grit("components_resources") {
   defines = [
     "enable_printing=$enable_printing",
     "enable_print_preview=$enable_print_preview",
+    "enable_supervised_users=$enable_supervised_users",
     "safe_browsing_mode=$safe_browsing_mode",
     "is_fuchsia=$is_fuchsia",
   ]
@@ -54,6 +56,7 @@ grit("components_resources") {
     ":about_credits",
     "//components/flags_ui/resources:build_ts",
     "//components/security_interstitials/content/resources:build_ts",
+    "//components/version_ui/resources:build_ts",
   ]
 
   if (!is_ios) {
@@ -64,6 +67,10 @@ grit("components_resources") {
     deps += [
       "//components/safe_browsing/content/resources:make_file_types_protobuf",
     ]
+  }
+
+  if (is_android && safe_browsing_mode == 2) {
+    deps += [ "//components/safe_browsing/content/resources/real_time_url_checks_allowlist:make_real_time_url_allowlist_protobuf" ]
   }
 
   deps += [
@@ -81,8 +88,8 @@ grit("dev_ui_components_resources") {
   ]
 
   deps = [
+    "//components/crash/core/browser/resources:build_ts",
     "//components/local_state:build",
-    "//components/policy/resources/webui:html_wrapper_files",
   ]
   output_dir = "$root_gen_dir/components"
 }
@@ -102,7 +109,7 @@ grit("components_scaled_resources") {
 }
 
 action("about_credits") {
-  script = "//tools/licenses.py"
+  script = "//tools/licenses/licenses.py"
   depfile = "$target_gen_dir/$target_name.d"
 
   inputs = [

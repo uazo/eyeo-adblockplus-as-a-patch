@@ -20,11 +20,9 @@ from telemetry import story
 from telemetry.page import cache_temperature as cache_temperature_module
 from telemetry.page import page as page_module
 
-def GetWprArchivesPath(minified = False, is_desktop = False):
-  if (is_desktop and minified):
-    raise ValueError('Desktop tests support only full filter list')
+def GetWprArchivesPath(is_desktop = False):
   return ('../eyeo_data/desktop/' if is_desktop else '../eyeo_data/mobile/') + \
-    ('eyeo_misc_min.json' if minified else 'eyeo_misc_full.json')
+    'eyeo_misc_full.json'
 
 class EyeoStorySet(loading_stories._LoadingStory):
 
@@ -176,9 +174,9 @@ class Load_lacote_chStory2021(EyeoStorySet):
   TAGS = [story_tags.YEAR_2021]
 
 
-class Load_goodhouse_ruStory2021(EyeoStorySet):
-  NAME = 'load:media:_goodhouse_ru:2021'
-  URL = 'https://www.goodhouse.ru/home/pets/dva-goda-nazad-devushka-dala-shans-lysomu-naydenyshu-vot-v-kogo-on-vyros/'
+class Load_novochag_ruStory2021(EyeoStorySet):
+  NAME = 'load:media:_novochag_ru:2021'
+  URL = 'https://www.novochag.ru/home/pets/dva-goda-nazad-devushka-dala-shans-lysomu-naydenyshu-vot-v-kogo-on-vyros/'
   TAGS = [story_tags.YEAR_2021]
   load_count = 0
 
@@ -783,9 +781,9 @@ class Load_petfarmfamily_Story2021(EyeoStorySet):
 
 
 class EyeoExtendedPageSet(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoExtendedPageSet, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
     self.AddStory(Load_195sports_Story2021(self, take_memory_measurement, is_desktop))
@@ -795,7 +793,7 @@ class EyeoExtendedPageSet(story.StorySet):
     self.AddStory(Load_ellitoral_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_euronews_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_genpi_coStory2021(self, take_memory_measurement, is_desktop))
-    self.AddStory(Load_goodhouse_ruStory2021(self, take_memory_measurement, is_desktop))
+    self.AddStory(Load_novochag_ruStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_healthline_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_howstuffworks_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_idealista_Story2021(self, take_memory_measurement, is_desktop))
@@ -823,14 +821,14 @@ class EyeoExtendedPageSet(story.StorySet):
     self.AddStory(Load_Riau24_comStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_vegan_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_yandex_ruStory2021(self, take_memory_measurement, is_desktop))
-    self.AddStory(Load_techradar_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_npr_orgStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_stackoverflow_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Loaden_wikipedia_orgStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_amazon_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_google_Story2021(self, take_memory_measurement, is_desktop))
-    self.AddStory(Load_youtube_Story2021(self, take_memory_measurement, is_desktop))
     if not is_desktop:
+      self.AddStory(Load_techradar_Story2021(self, take_memory_measurement, is_desktop))
+      self.AddStory(Load_youtube_Story2021(self, take_memory_measurement, is_desktop))
       self.AddStory(Load_extreme_down_tvStory2021(self, take_memory_measurement, is_desktop))
       self.AddStory(Load_merriam_webster_Story2021(self, take_memory_measurement, is_desktop))
       self.AddStory(Load_poder360__brStory2021(self, take_memory_measurement, is_desktop))
@@ -843,12 +841,12 @@ class EyeoExtendedPageSet(story.StorySet):
       self.AddStory(Load_buzzfeed_Story2021(self, take_memory_measurement, is_desktop))
 
 class EyeoAdHeavyPageSet(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoAdHeavyPageSet, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
-    self.AddStory(Load_goodhouse_ruStory2021(self, take_memory_measurement, is_desktop))
+    self.AddStory(Load_novochag_ruStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_idnes_czStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_lacote_chStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_meteocity_Story2021(self, take_memory_measurement, is_desktop))
@@ -858,15 +856,15 @@ class EyeoAdHeavyPageSet(story.StorySet):
     self.AddStory(Load_lenta_ruStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_fishki_netStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_Riau24_comStory2021(self, take_memory_measurement, is_desktop))
-    self.AddStory(Load_techradar_Story2021(self, take_memory_measurement, is_desktop))
     if not is_desktop:
+      self.AddStory(Load_techradar_Story2021(self, take_memory_measurement, is_desktop))
       self.AddStory(Load_merriam_webster_Story2021(self, take_memory_measurement, is_desktop))
       self.AddStory(Load_extreme_down_tvStory2021(self, take_memory_measurement, is_desktop))
 
 class EyeoExtendedPageSetPt1(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoExtendedPageSetPt1, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
     self.AddStory(Load_195sports_Story2021(self, take_memory_measurement, is_desktop))
@@ -881,13 +879,13 @@ class EyeoExtendedPageSetPt1(story.StorySet):
       self.AddStory(Load_buzzfeed_Story2021(self, take_memory_measurement, is_desktop))
 
 class EyeoExtendedPageSetPt2(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoExtendedPageSetPt2, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
     self.AddStory(Load_genpi_coStory2021(self, take_memory_measurement, is_desktop))
-    self.AddStory(Load_goodhouse_ruStory2021(self, take_memory_measurement, is_desktop))
+    self.AddStory(Load_novochag_ruStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_healthline_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_howstuffworks_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_idealista_Story2021(self, take_memory_measurement, is_desktop))
@@ -896,9 +894,9 @@ class EyeoExtendedPageSetPt2(story.StorySet):
     self.AddStory(Load_lacote_chStory2021(self, take_memory_measurement, is_desktop))
 
 class EyeoExtendedPageSetPt3(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoExtendedPageSetPt3, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
     self.AddStory(Load_meteocity_Story2021(self, take_memory_measurement, is_desktop))
@@ -912,9 +910,9 @@ class EyeoExtendedPageSetPt3(story.StorySet):
       self.AddStory(Load_pucrs_brStory2021(self, take_memory_measurement, is_desktop))
 
 class EyeoExtendedPageSetPt4(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoExtendedPageSetPt4, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
     self.AddStory(Load_speedtest_netStory2021(self, take_memory_measurement, is_desktop))
@@ -928,9 +926,9 @@ class EyeoExtendedPageSetPt4(story.StorySet):
       self.AddStory(Load_forums_macrumors_Story2021(self, take_memory_measurement, is_desktop))
 
 class EyeoExtendedPageSetPt5(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoExtendedPageSetPt5, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
     self.AddStory(Load_jooble_orgStory2021(self, take_memory_measurement, is_desktop))
@@ -944,9 +942,9 @@ class EyeoExtendedPageSetPt5(story.StorySet):
       self.AddStory(Load_scotch_ioStory2021(self, take_memory_measurement, is_desktop))
 
 class EyeoExtendedPageSetPt6(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoExtendedPageSetPt6, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
     self.AddStory(Load_tweakers_netStory2021(self, take_memory_measurement, is_desktop))
@@ -955,24 +953,28 @@ class EyeoExtendedPageSetPt6(story.StorySet):
     self.AddStory(Load_yandex_ruStory2021(self, take_memory_measurement, is_desktop))
 
 class EyeoSmallPageSet(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoSmallPageSet, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
-    self.AddStory(Load_techradar_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_npr_orgStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_stackoverflow_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Loaden_wikipedia_orgStory2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_amazon_Story2021(self, take_memory_measurement, is_desktop))
     self.AddStory(Load_google_Story2021(self, take_memory_measurement, is_desktop))
-    self.AddStory(Load_youtube_Story2021(self, take_memory_measurement, is_desktop))
+    if not is_desktop:
+      self.AddStory(Load_techradar_Story2021(self, take_memory_measurement, is_desktop))
+      self.AddStory(Load_youtube_Story2021(self, take_memory_measurement, is_desktop))
+    else:
+      self.AddStory(Load_lacote_chStory2021(self, take_memory_measurement, is_desktop))
+      self.AddStory(Load_jooble_orgStory2021(self, take_memory_measurement, is_desktop))
 
 
 class EyeoSinglePageSet(story.StorySet):
-  def __init__(self, minified, is_desktop, take_memory_measurement = False):
+  def __init__(self, is_desktop, take_memory_measurement = False):
     super(EyeoSinglePageSet, self).__init__(
-      archive_data_file=GetWprArchivesPath(minified, is_desktop),
+      archive_data_file=GetWprArchivesPath(is_desktop),
       cloud_storage_bucket=None)
 
     self.AddStory(Load_fishki_netStory2021(self, take_memory_measurement, is_desktop))

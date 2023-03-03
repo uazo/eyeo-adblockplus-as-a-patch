@@ -61,16 +61,6 @@ class AdblockControllerImpl : public AdblockController,
   void SetAcceptableAdsEnabled(bool enabled) override;
   bool IsAcceptableAdsEnabled() const override;
 
-  void SelectBuiltInSubscription(const GURL& url) override;
-  void UnselectBuiltInSubscription(const GURL& url) override;
-  std::vector<scoped_refptr<Subscription>> GetSelectedBuiltInSubscriptions()
-      const override;
-
-  void AddCustomSubscription(const GURL& url) override;
-  void RemoveCustomSubscription(const GURL& url) override;
-  std::vector<scoped_refptr<Subscription>> GetCustomSubscriptions()
-      const override;
-
   void InstallSubscription(const GURL& url) override;
   void UninstallSubscription(const GURL& url) override;
   std::vector<scoped_refptr<Subscription>> GetInstalledSubscriptions()

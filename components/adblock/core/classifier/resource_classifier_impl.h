@@ -29,20 +29,20 @@ class ResourceClassifierImpl final : public ResourceClassifier {
   ResourceClassifierImpl() = default;
 
   ClassificationResult ClassifyRequest(
-      const SubscriptionCollection& subscription_collection,
+      const SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
       const std::vector<GURL>& frame_hierarchy,
       ContentType content_type,
       const SiteKey& sitekey) const final;
 
   ClassificationResult ClassifyPopup(
-      const SubscriptionCollection& subscription_collection,
+      const SubscriptionService::Snapshot& subscription_collections,
       const GURL& popup_url,
-      const GURL& opener_url,
+      const std::vector<GURL>& opener_frame_hierarchy,
       const SiteKey& sitekey) const final;
 
   ClassificationResult ClassifyResponse(
-      const SubscriptionCollection& subscription_collection,
+      const SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
       const std::vector<GURL>& frame_hierarchy,
       ContentType content_type,
@@ -52,14 +52,6 @@ class ResourceClassifierImpl final : public ResourceClassifier {
  protected:
   friend class base::RefCountedThreadSafe<ResourceClassifierImpl>;
   ~ResourceClassifierImpl() override;
-
- private:
-  ClassificationResult CheckHeaderFiltersMatchResponseHeaders(
-      const GURL request_url,
-      const std::vector<GURL> frame_hierarchy,
-      const scoped_refptr<net::HttpResponseHeaders>& headers,
-      std::set<HeaderFilterData> blocking_filters,
-      std::set<HeaderFilterData> allowing_filters) const;
 };
 
 }  // namespace adblock

@@ -25,7 +25,6 @@
 #include "chrome/browser/profiles/incognito_helpers.h"
 #include "chrome/browser/profiles/profile.h"
 #include "components/adblock/core/adblock_controller_impl.h"
-#include "components/adblock/core/adblock_controller_legacy_impl.h"
 #include "components/adblock/core/adblock_switches.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/configuration/persistent_filtering_configuration.h"
@@ -75,26 +74,12 @@ KeyedService* AdblockControllerFactory::BuildServiceInstanceFor(
 
   auto* subscription_service =
       SubscriptionServiceFactory::GetForBrowserContext(context);
-  std::unique_ptr<AdblockController> controller;
-  if (version_info::GetMajorVersionNumberAsInt() >= 111 ||
-      base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kDisableWebUiCompatibility)) {
-    auto new_controller = std::make_unique<AdblockControllerImpl>(
-        adblock_filtering_configuration.get(), subscription_service,
-        g_browser_process->GetApplicationLocale(),
-        config::GetKnownSubscriptions());
-    new_controller->RunFirstRunLogic(prefs);
-    new_controller->MigrateLegacyPrefs(prefs);
-    controller = std::move(new_controller);
-  } else {
-    auto legacy_controller = std::make_unique<AdblockControllerLegacyImpl>(
-        prefs, adblock_filtering_configuration.get(), subscription_service,
-        g_browser_process->GetApplicationLocale(),
-        config::GetKnownSubscriptions());
-    legacy_controller->ReadStateFromPrefs();
-    legacy_controller->RunFirstRunLogic(prefs);
-    controller = std::move(legacy_controller);
-  }
+  auto controller = std::make_unique<AdblockControllerImpl>(
+      adblock_filtering_configuration.get(), subscription_service,
+      g_browser_process->GetApplicationLocale(),
+      config::GetKnownSubscriptions());
+  controller->RunFirstRunLogic(prefs);
+  controller->MigrateLegacyPrefs(prefs);
 
   subscription_service->InstallFilteringConfiguration(
       std::move(adblock_filtering_configuration));
@@ -110,6 +95,14 @@ content::BrowserContext* AdblockControllerFactory::GetBrowserContextToUse(
 void AdblockControllerFactory::RegisterProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
   adblock::prefs::RegisterProfilePrefs(registry);
+}
+
+bool AdblockControllerFactory::ServiceIsNULLWhileTesting() const {
+  return true;
+}
+
+bool AdblockControllerFactory::ServiceIsCreatedWithBrowserContext() const {
+  return true;
 }
 
 }  // namespace adblock

@@ -15,7 +15,7 @@
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
 namespace adblock.flat;
-file_identifier "ABP1";
+file_identifier "ABP2";
 
 // Filter types
 // ============
@@ -67,7 +67,7 @@ enum ResourceType: uint32 {
 // it's stored in a 'block' or 'allow' list.
 table UrlFilter {
   filter_text: string;
-  pattern: string (required); // this pattern has been pre-processed into regexp notation
+  pattern: string (required);
   match_case: bool;
   resource_type: uint32; // this is a bitset mask of ResourceTypes
   third_party: ThirdParty = Ignore;

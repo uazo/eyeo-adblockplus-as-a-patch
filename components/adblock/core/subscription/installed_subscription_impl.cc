@@ -23,6 +23,7 @@
 
 #include "absl/types/optional.h"
 #include "base/logging.h"
+#include "base/ranges/algorithm.h"
 #include "base/strings/string_piece.h"
 #include "base/strings/string_piece_forward.h"
 #include "base/strings/string_util.h"
@@ -30,9 +31,11 @@
 #include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_utils.h"
 #include "components/adblock/core/common/flatbuffer_data.h"
+#include "components/adblock/core/common/regex_filter_pattern.h"
 #include "components/adblock/core/common/sitekey.h"
-#include "components/adblock/core/schema/filter_list_schema_generated.h"
 #include "components/adblock/core/subscription/domain_splitter.h"
+#include "components/adblock/core/subscription/pattern_matcher.h"
+#include "components/adblock/core/subscription/regex_matcher.h"
 #include "components/adblock/core/subscription/subscription.h"
 #include "components/adblock/core/subscription/url_keyword_extractor.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
@@ -41,23 +44,41 @@
 namespace adblock {
 namespace {
 
+bool NeedsLowercasing(const std::string& input) {
+  return base::ranges::any_of(
+      input, [](const char c) { return base::IsAsciiUpper(c); });
+}
+
 bool IsThirdParty(const GURL& url, const std::string& domain) {
   return !net::registry_controlled_domains::SameDomainOrHost(
       url, GURL(url.scheme() + "://" + domain),
       net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
 }
 
-bool DomainMatches(const std::string& filter_domain,
+bool DomainMatches(base::StringPiece filter_domain,
                    base::StringPiece document_domain) {
-  return document_domain.compare(filter_domain) == 0 ||
-         base::EndsWith(document_domain, "." + filter_domain);
+  // document_domain is same as filter_domain:
+  // - document: subdomain.example.com
+  // - filter: subdomain.example.com
+  // Or document_domain ends with ".filter_domain":
+  // - document: subdomain.example.com
+  // - filter: example.com
+  // (document ends with ".example.com")
+
+  return document_domain == filter_domain ||
+         (base::EndsWith(document_domain, filter_domain) &&
+          base::EndsWith(document_domain.substr(
+                             0, document_domain.size() - filter_domain.size()),
+                         "."));
 }
 
 bool DomainOnList(
     base::StringPiece document_domain,
     const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>* list) {
   return std::any_of(list->begin(), list->end(), [&](auto* filter_domain) {
-    return DomainMatches(filter_domain->str(), document_domain);
+    return DomainMatches(
+        base::StringPiece(filter_domain->c_str(), filter_domain->size()),
+        document_domain);
   });
 }
 
@@ -69,9 +90,11 @@ InstalledSubscriptionImpl::InstalledSubscriptionImpl(
     base::Time installation_time)
     : buffer_(std::move(data)),
       installation_state_(installation_state),
-      installation_time_(installation_time) {
+      installation_time_(installation_time),
+      regex_matcher_(std::make_unique<RegexMatcher>()) {
   DCHECK(buffer_);
   index_ = flat::GetSubscription(buffer_->data());
+  regex_matcher_->PreBuildRegexPatternsWithNoKeyword(index_);
 }
 
 InstalledSubscriptionImpl::~InstalledSubscriptionImpl() = default;
@@ -108,49 +131,59 @@ bool InstalledSubscriptionImpl::HasUrlFilter(const GURL& url,
                                              ContentType content_type,
                                              const SiteKey& sitekey,
                                              FilterCategory category) const {
-  return MatchesInternal(
-      category != FilterCategory::Allowing ? index_->url_subresource_block()
-                                           : index_->url_subresource_allow(),
-      url, content_type, document_domain, sitekey.value(), category);
+  return !FindInternal(category != FilterCategory::Allowing
+                           ? index_->url_subresource_block()
+                           : index_->url_subresource_allow(),
+                       url, content_type, document_domain, sitekey.value(),
+                       category, FindStrategy::FindFirst)
+              .empty();
 }
 
-bool InstalledSubscriptionImpl::HasPopupFilter(const GURL& url,
-                                               const GURL& opener_url,
-                                               const SiteKey& sitekey,
-                                               FilterCategory category) const {
-  return MatchesInternal(
-      category != FilterCategory::Allowing ? index_->url_popup_block()
-                                           : index_->url_popup_allow(),
-      url, absl::nullopt, opener_url.host(), sitekey.value(), category);
-}
-
-absl::optional<base::StringPiece> InstalledSubscriptionImpl::FindCspFilter(
+bool InstalledSubscriptionImpl::HasPopupFilter(
     const GURL& url,
     const std::string& document_domain,
+    const SiteKey& sitekey,
     FilterCategory category) const {
-  auto* filter = FindInternal(
-      category != FilterCategory::Allowing ? index_->url_csp_block()
-                                           : index_->url_csp_allow(),
-      url, absl::nullopt, document_domain, "", category);
-  if (!filter)
-    return absl::nullopt;
-  DCHECK(category == FilterCategory::Allowing || filter->csp_filter())
-      << "Blocking CSP filter must contain payload";
-  return filter->csp_filter() ? base::StringPiece(filter->csp_filter()->c_str(),
-                                                  filter->csp_filter()->size())
-                              : base::StringPiece();
+  return !FindInternal(category != FilterCategory::Allowing
+                           ? index_->url_popup_block()
+                           : index_->url_popup_allow(),
+                       url, absl::nullopt, document_domain, sitekey.value(),
+                       category, FindStrategy::FindFirst)
+              .empty();
+}
+
+void InstalledSubscriptionImpl::FindCspFilters(
+    const GURL& url,
+    const std::string& document_domain,
+    FilterCategory category,
+    std::set<base::StringPiece>& results) const {
+  for (auto* filter : FindInternal(category != FilterCategory::Allowing
+                                       ? index_->url_csp_block()
+                                       : index_->url_csp_allow(),
+                                   url, absl::nullopt, document_domain, "",
+                                   category, FindStrategy::FindAll)) {
+    DCHECK(category == FilterCategory::Allowing || filter->csp_filter())
+        << "Blocking CSP filter must contain payload";
+    results.insert(filter->csp_filter()
+                       ? base::StringPiece(filter->csp_filter()->c_str(),
+                                           filter->csp_filter()->size())
+                       : base::StringPiece());
+  }
 }
 
 absl::optional<base::StringPiece> InstalledSubscriptionImpl::FindRewriteFilter(
     const GURL& url,
     const std::string& document_domain,
     FilterCategory category) const {
-  auto* filter = FindInternal(
-      category != FilterCategory::Allowing ? index_->url_rewrite_block()
-                                           : index_->url_rewrite_allow(),
-      url, absl::nullopt, document_domain, "", category);
-  if (!filter)
+  auto filters = FindInternal(category != FilterCategory::Allowing
+                                  ? index_->url_rewrite_block()
+                                  : index_->url_rewrite_allow(),
+                              url, absl::nullopt, document_domain, "", category,
+                              FindStrategy::FindFirst);
+  if (filters.empty()) {
     return absl::nullopt;
+  }
+  const auto* filter = filters[0];
   DCHECK(category == FilterCategory::Allowing || filter->rewrite())
       << "Blocking rewrite filter must contain payload";
   if (filter->rewrite()) {
@@ -167,10 +200,11 @@ void InstalledSubscriptionImpl::FindHeaderFilters(
     const std::string& document_domain,
     FilterCategory category,
     std::set<HeaderFilterData>& results) const {
-  for (auto* filter : FindAllInternal(
-           category != FilterCategory::Allowing ? index_->url_header_block()
-                                                : index_->url_header_allow(),
-           url, content_type, document_domain, "", category)) {
+  for (auto* filter : FindInternal(category != FilterCategory::Allowing
+                                       ? index_->url_header_block()
+                                       : index_->url_header_allow(),
+                                   url, content_type, document_domain, "",
+                                   category, FindStrategy::FindAll)) {
     DCHECK(category == FilterCategory::Allowing || filter->header_filter())
         << "Blocking header filter must contain header_filter() payload";
     results.insert({base::StringPiece(filter->header_filter()->c_str(),
@@ -199,8 +233,10 @@ bool InstalledSubscriptionImpl::HasSpecialFilter(
       index = index_->url_generichide_allow();
       break;
   }
-  return MatchesInternal(index, url, absl::nullopt, document_domain,
-                         sitekey.value(), FilterCategory::Allowing);
+  return !FindInternal(index, url, absl::nullopt, document_domain,
+                       sitekey.value(), FilterCategory::Allowing,
+                       FindStrategy::FindFirst)
+              .empty();
 }
 
 std::vector<base::StringPiece> InstalledSubscriptionImpl::GetSelectorsForDomain(
@@ -221,15 +257,17 @@ std::vector<base::StringPiece> InstalledSubscriptionImpl::GetSelectorsForDomain(
         filter->include_domains()->size() == 0 ||
         // Or include domains contain |domain| or one of its subdomains:
         DomainOnList(domain, filter->include_domains());
-    if (!filter_allowed_by_includes)
+    if (!filter_allowed_by_includes) {
       continue;
+    }
     const bool filter_disallowed_by_excludes =
         // Some exclusions apply on this domain:
         filter->exclude_domains()->size() > 0 &&
         // And those exclusions contain |domain| or one of its subdomains:
         DomainOnList(domain, filter->exclude_domains());
-    if (filter_disallowed_by_excludes)
+    if (filter_disallowed_by_excludes) {
       continue;
+    }
     selectors.push_back(filter->selector()->c_str());
   }
 
@@ -282,214 +320,96 @@ InstalledSubscriptionImpl::GetElemhideEmulationSelectors(
   return result;
 }
 
-bool InstalledSubscriptionImpl::MatchesInternal(
+std::vector<const flat::UrlFilter*> InstalledSubscriptionImpl::FindInternal(
     const UrlFilterIndex* index,
     const GURL& url,
     absl::optional<ContentType> content_type,
     const std::string& document_domain,
     const std::string& sitekey,
-    FilterCategory category) const {
+    FilterCategory category,
+    FindStrategy strategy) const {
   if (!index) {
     // No filters of this type were parsed.
-    return false;
-  }
-  const std::string normalized_domain = base::ToLowerASCII(document_domain);
-  const std::string normalized_sitekey = base::ToUpperASCII(sitekey);
-  const bool is_third_party_request = IsThirdParty(url, document_domain);
-
-  UrlKeywordExtractor keyword_extractor(url.spec());
-  while (auto current_keyword = keyword_extractor.GetNextKeyword()) {
-    if (FilterPresentForKeyword(index, *current_keyword, url, content_type,
-                                normalized_domain, normalized_sitekey, category,
-                                is_third_party_request)) {
-      return true;
-    }
-  }
-
-  return FilterPresentForKeyword(index, "", url, content_type,
-                                 normalized_domain, normalized_sitekey,
-                                 category, is_third_party_request);
-}
-
-const flat::UrlFilter* InstalledSubscriptionImpl::FindInternal(
-    const UrlFilterIndex* index,
-    const GURL& url,
-    absl::optional<ContentType> content_type,
-    const std::string& document_domain,
-    const std::string& sitekey,
-    FilterCategory category) const {
-  if (!index) {
-    // No filters of this type were parsed.
-    return nullptr;
-  }
-  const std::string normalized_domain = base::ToLowerASCII(document_domain);
-  const std::string normalized_sitekey = base::ToUpperASCII(sitekey);
-  const bool is_third_party_request = IsThirdParty(url, document_domain);
-
-  UrlKeywordExtractor keyword_extractor(url.spec());
-  while (auto current_keyword = keyword_extractor.GetNextKeyword()) {
-    const flat::UrlFilter* candidate = FindFilterForKeyword(
-        index, *current_keyword, url, content_type, normalized_domain,
-        normalized_sitekey, category, is_third_party_request);
-    if (candidate) {
-      return candidate;
-    }
-  }
-
-  return FindFilterForKeyword(index, "", url, content_type, normalized_domain,
-                              normalized_sitekey, category,
-                              is_third_party_request);
-}
-
-std::vector<const flat::UrlFilter*> InstalledSubscriptionImpl::FindAllInternal(
-    const UrlFilterIndex* index,
-    const GURL& url,
-    absl::optional<ContentType> content_type,
-    const std::string& document_domain,
-    const std::string& sitekey,
-    FilterCategory category) const {
-  if (!index) {
-    // No filters of this category were parsed.
     return {};
   }
-  std::vector<const flat::UrlFilter*> results;
-  const std::string normalized_domain = base::ToLowerASCII(document_domain);
+  const std::string& normalized_domain =
+      NeedsLowercasing(document_domain) ? base::ToLowerASCII(document_domain)
+                                        : document_domain;
   const std::string normalized_sitekey = base::ToUpperASCII(sitekey);
+  const GURL& lowercase_url =
+      NeedsLowercasing(url.spec()) ? GURL(base::ToLowerASCII(url.spec())) : url;
   const bool is_third_party_request = IsThirdParty(url, document_domain);
-  UrlKeywordExtractor keyword_extractor(url.spec());
+  std::vector<const flat::UrlFilter*> results;
 
+  UrlKeywordExtractor keyword_extractor(lowercase_url.spec());
   while (auto current_keyword = keyword_extractor.GetNextKeyword()) {
-    for (const auto* candidate : FindAllFiltersForKeyword(
-             index, *current_keyword, url, content_type, normalized_domain,
-             normalized_sitekey, category, is_third_party_request)) {
-      results.push_back(candidate);
+    FindFiltersForKeyword(index, *current_keyword, url, lowercase_url,
+                          content_type, normalized_domain, normalized_sitekey,
+                          category, is_third_party_request, strategy, results);
+    if (strategy == FindStrategy::FindFirst && !results.empty()) {
+      return results;
     }
   }
 
-  for (const auto* no_keyword_candidate : FindAllFiltersForKeyword(
-           index, "", url, content_type, normalized_domain, normalized_sitekey,
-           category, is_third_party_request)) {
-    results.push_back(no_keyword_candidate);
-  }
+  FindFiltersForKeyword(index, "", url, lowercase_url, content_type,
+                        normalized_domain, normalized_sitekey, category,
+                        is_third_party_request, strategy, results);
   return results;
 }
 
-bool InstalledSubscriptionImpl::FilterPresentForKeyword(
+void InstalledSubscriptionImpl::FindFiltersForKeyword(
     const UrlFilterIndex* index,
-    const std::string& keyword,
+    base::StringPiece keyword,
     const GURL& url,
+    const GURL& lowercase_url,
     absl::optional<ContentType> content_type,
     const std::string& document_domain,
     const std::string& sitekey,
     FilterCategory category,
-    bool is_third_party_request) const {
-  const auto* idx = index->LookupByKey(keyword.c_str());
+    bool is_third_party_request,
+    FindStrategy strategy,
+    std::vector<const flat::UrlFilter*>& out_results) const {
+  const auto* idx = index->LookupByKey(keyword.data());
 
-  if (!idx)
-    return false;
-
-  std::string case_sensitive_combined_regexp;
-  std::string case_insensitive_combined_regexp;
+  if (!idx) {
+    return;
+  }
 
   for (const auto* filter : *(idx->filter())) {
     if (!CandidateFilterViable(filter, content_type, document_domain, sitekey,
                                category, is_third_party_request)) {
       continue;
     }
+
     if (filter->pattern()->size() == 0u) {
       // This filter applies to all URLs, assuming prior checks passed.
-      return true;
+      out_results.push_back(filter);
+      if (strategy == FindStrategy::FindFirst) {
+        return;
+      }
     }
-    if (filter->match_case()) {
-      if (!case_sensitive_combined_regexp.empty())
-        case_sensitive_combined_regexp += "|" + filter->pattern()->str();
-      else
-        case_sensitive_combined_regexp = filter->pattern()->str();
+    // During flatbuffer conversion, the pattern is lowercased for
+    // case-insensitive filters, and left in original form for case-sensitive
+    // filters.
+    const base::StringPiece pattern(filter->pattern()->c_str(),
+                                    filter->pattern()->size());
+    if (ExtractRegexFilterFromPattern(pattern)) {
+      if (regex_matcher_->MatchesRegex(pattern, url, filter->match_case())) {
+        out_results.push_back(filter);
+        if (strategy == FindStrategy::FindFirst) {
+          return;
+        }
+      }
     } else {
-      if (!case_insensitive_combined_regexp.empty())
-        case_insensitive_combined_regexp += "|" + filter->pattern()->str();
-      else
-        case_insensitive_combined_regexp = filter->pattern()->str();
+      const auto& normalized_url = filter->match_case() ? url : lowercase_url;
+      if (DoesPatternMatchUrl(pattern, normalized_url)) {
+        out_results.push_back(filter);
+        if (strategy == FindStrategy::FindFirst) {
+          return;
+        }
+      }
     }
   }
-
-  bool case_insensitive_match =
-      !case_insensitive_combined_regexp.empty() &&
-      utils::RegexMatches(case_insensitive_combined_regexp, url.spec(), false);
-
-  bool case_sensitive_match =
-      !case_sensitive_combined_regexp.empty() &&
-      utils::RegexMatches(case_sensitive_combined_regexp, url.spec(), true);
-
-  return case_insensitive_match || case_sensitive_match;
-}
-
-const flat::UrlFilter* InstalledSubscriptionImpl::FindFilterForKeyword(
-    const UrlFilterIndex* index,
-    const std::string& keyword,
-    const GURL& url,
-    absl::optional<ContentType> content_type,
-    const std::string& document_domain,
-    const std::string& sitekey,
-    FilterCategory category,
-    bool is_third_party_request) const {
-  const auto* idx = index->LookupByKey(keyword.c_str());
-
-  if (!idx)
-    return nullptr;
-
-  for (const auto* filter : *(idx->filter())) {
-    if (!CandidateFilterViable(filter, content_type, document_domain, sitekey,
-                               category, is_third_party_request)) {
-      continue;
-    }
-
-    if (filter->pattern()->size() == 0u) {
-      // This filter applies to all URLs, assuming prior checks passed.
-      return filter;
-    }
-
-    if (utils::RegexMatches(filter->pattern()->str(), url.spec(),
-                            filter->match_case()))
-      return filter;
-  }
-
-  return nullptr;
-}
-
-std::vector<const flat::UrlFilter*>
-InstalledSubscriptionImpl::FindAllFiltersForKeyword(
-    const UrlFilterIndex* index,
-    const std::string& keyword,
-    const GURL& url,
-    absl::optional<ContentType> content_type,
-    const std::string& document_domain,
-    const std::string& sitekey,
-    FilterCategory category,
-    bool is_third_party_request) const {
-  const auto* idx = index->LookupByKey(keyword.c_str());
-
-  if (!idx)
-    return {};
-
-  std::vector<const flat::UrlFilter*> res{};
-  for (const auto* filter : *(idx->filter())) {
-    if (!CandidateFilterViable(filter, content_type, document_domain, sitekey,
-                               category, is_third_party_request)) {
-      continue;
-    }
-
-    if (filter->pattern()->size() == 0u) {
-      // This filter applies to all URLs, assuming prior checks passed.
-      res.push_back(filter);
-    }
-
-    if (utils::RegexMatches(filter->pattern()->str(), url.spec(),
-                            filter->match_case()))
-      res.push_back(filter);
-  }
-
-  return res;
 }
 
 bool InstalledSubscriptionImpl::CandidateFilterViable(
@@ -536,8 +456,9 @@ bool InstalledSubscriptionImpl::IsGenericFilter(
   const auto* sitekeys = filter->sitekeys();
   DCHECK(sitekeys);
 
-  if (sitekeys->size())
+  if (sitekeys->size()) {
     return false;
+  }
 
   return IsEmptyDomainAllowed(filter->include_domains(),
                               filter->exclude_domains());
@@ -568,13 +489,15 @@ bool InstalledSubscriptionImpl::IsActiveOnDomain(
     const std::string& document_domain,
     const Domains* include_domains,
     const Domains* exclude_domains) const {
-  if (IsEmptyDomainAllowed(include_domains, exclude_domains))
+  if (IsEmptyDomainAllowed(include_domains, exclude_domains)) {
     return true;
+  }
 
   // If |document_domain| matches any exclusion-type mapping for this filter,
   // the filter may not be applied to this domain.
-  if (exclude_domains && DomainOnList(document_domain, exclude_domains))
+  if (exclude_domains && DomainOnList(document_domain, exclude_domains)) {
     return false;
+  }
 
   if (include_domains && include_domains->size()) {
     if (DomainOnList(document_domain, include_domains)) {
@@ -604,15 +527,17 @@ std::vector<InstalledSubscription::Snippet>
 InstalledSubscriptionImpl::MatchSnippets(
     const std::string& document_domain) const {
   std::vector<InstalledSubscription::Snippet> result;
-  if (!index_->snippet())
+  if (!index_->snippet()) {
     return result;
+  }
 
   DomainSplitter domain_splitter(document_domain);
   while (auto subdomain = domain_splitter.FindNextSubdomain()) {
     const auto* idx = index_->snippet()->LookupByKey(subdomain->data());
 
-    if (!idx)
+    if (!idx) {
       continue;
+    }
 
     for (const auto* cur : (*idx->filter())) {
       if (IsActiveOnDomain(document_domain, cur->include_domains(),

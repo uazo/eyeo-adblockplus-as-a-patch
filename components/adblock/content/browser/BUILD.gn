@@ -31,8 +31,6 @@ source_set("browser_impl") {
     "//components/adblock/content:*",
   ]
   sources = [
-    "adblock_content_utils.cc",
-    "adblock_content_utils.h",
     "adblock_filter_match.h",
     "adblock_url_loader_factory.cc",
     "adblock_url_loader_factory.h",
@@ -62,6 +60,7 @@ source_set("browser_impl") {
 
   deps = [
     "//base",
+    "//components/resources:components_resources_grit",
     "//url:url",
   ]
 
@@ -97,7 +96,6 @@ source_set("test_support") {
 source_set("unit_tests") {
   testonly = true
   sources = [
-    "test/adblock_content_utils_test.cc",
     "test/adblock_url_loader_factory_test.cc",
     "test/adblock_webcontents_observer_test.cc",
     "test/content_security_policy_injector_impl_test.cc",
@@ -108,16 +106,18 @@ source_set("unit_tests") {
   ]
 
   deps = [
-    ":test_support",
     "//base/test:test_support",
-    "//components/adblock/core:test_support",
-    "//components/adblock/core:test_support",
     "//components/adblock/core/classifier:test_support",
     "//components/adblock/core/subscription:test_support",
+    "//components/adblock/core:test_support",
+    "//components/adblock/core:test_support",
     "//components/prefs:test_support",
+    "//components/resources:components_resources_grit",
     "//components/sync_preferences:test_support",
     "//content/test:test_support",
     "//net:test_support",
     "//services/network:test_support",
+    "//ui/base:test_support",
+    ":test_support",
   ]
 }

@@ -22,7 +22,6 @@
 #include "base/strings/string_piece_forward.h"
 #include "base/task/thread_pool.h"
 #include "base/trace_event/trace_event.h"
-#include "components/adblock/core/common/adblock_prefs.h"
 #include "net/http/http_request_headers.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
@@ -49,31 +48,24 @@ const net::NetworkTrafficAnnotationTag kTrafficAnnotation =
         policy {
           cookies_allowed: NO
           setting:
-            "You enable or disable this feature via 'Adblock Enable' pref."
+            "You enable or disable this feature via 'Ad blocking' setting."
           policy_exception_justification: "Not implemented."
-          }
         })");
 
 }
 
 OngoingSubscriptionRequestImpl::OngoingSubscriptionRequestImpl(
-    PrefService* prefs,
     const net::BackoffEntry::Policy* backoff_policy,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory)
     : backoff_entry_(std::make_unique<net::BackoffEntry>(backoff_policy)),
       url_loader_factory_(url_loader_factory),
       retry_timer_(std::make_unique<base::OneShotTimer>()),
-      number_of_redirects_(0) {
-  adblocking_enabled_.Init(
-      prefs::kEnableAdblockLegacy, prefs,
-      base::BindRepeating(
-          &OngoingSubscriptionRequestImpl::CheckConnectionAllowed,
-          // Unretained is safe because destruction of |this| will abort the
-          // callback.
-          base::Unretained(this)));
-}
+      number_of_redirects_(0) {}
 
-OngoingSubscriptionRequestImpl::~OngoingSubscriptionRequestImpl() = default;
+OngoingSubscriptionRequestImpl::~OngoingSubscriptionRequestImpl() {
+  if (!url_.is_empty())
+    VLOG(1) << "[eyeo] Cancelling download of " << url_;
+}
 
 void OngoingSubscriptionRequestImpl::Start(GURL url,
                                            Method method,
@@ -83,12 +75,7 @@ void OngoingSubscriptionRequestImpl::Start(GURL url,
   url_ = std::move(url);
   method_ = method;
   response_callback_ = std::move(response_callback);
-  if (IsConnectionAllowed()) {
-    StartInternal();
-  } else {
-    DLOG(INFO) << "[eyeo] Deferring download of " << url_
-               << " due to current download policy.";
-  }
+  StartInternal();
 }
 
 void OngoingSubscriptionRequestImpl::Retry() {
@@ -99,8 +86,8 @@ void OngoingSubscriptionRequestImpl::Retry() {
     return;
   }
   backoff_entry_->InformOfRequest(false);
-  DLOG(INFO) << "[eyeo] Will retry downloading " << url_ << " in "
-             << backoff_entry_->GetTimeUntilRelease();
+  VLOG(1) << "[eyeo] Will retry downloading " << url_ << " in "
+          << backoff_entry_->GetTimeUntilRelease();
   retry_timer_->Start(
       FROM_HERE, backoff_entry_->GetTimeUntilRelease(),
       base::BindOnce(&OngoingSubscriptionRequestImpl::StartInternal,
@@ -113,7 +100,7 @@ void OngoingSubscriptionRequestImpl::Redirect(GURL redirect_url) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(!url_.is_empty()) << "Redirect() called before Start()";
   DCHECK(url_ != redirect_url) << "Invalid redirect. Same URL";
-  DLOG(INFO) << "[eyeo] Will redirect " << url_ << " to " << redirect_url;
+  VLOG(1) << "[eyeo] Will redirect " << url_ << " to " << redirect_url;
   ++number_of_redirects_;
   url_ = std::move(redirect_url);
   StartInternal();
@@ -121,28 +108,6 @@ void OngoingSubscriptionRequestImpl::Redirect(GURL redirect_url) {
 
 size_t OngoingSubscriptionRequestImpl::GetNumberOfRedirects() const {
   return number_of_redirects_;
-}
-
-bool OngoingSubscriptionRequestImpl::IsStarted() const {
-  return loader_ != nullptr || retry_timer_->IsRunning();
-}
-
-bool OngoingSubscriptionRequestImpl::IsConnectionAllowed() const {
-  // Connection is allowed if (and only if) adblocking is enabled. When the
-  // user switches off adblocking, we want to stop all adblocking-related
-  // download.
-  return adblocking_enabled_.GetValue();
-}
-
-void OngoingSubscriptionRequestImpl::CheckConnectionAllowed() {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (IsConnectionAllowed() && !IsStarted()) {
-    StartInternal();
-    DCHECK(IsStarted());
-  } else if (!IsConnectionAllowed() && IsStarted()) {
-    StopInternal();
-    DCHECK(!IsStarted());
-  }
 }
 
 void OngoingSubscriptionRequestImpl::StartInternal() {
@@ -155,7 +120,7 @@ void OngoingSubscriptionRequestImpl::StartInternal() {
     // indefinitely.
     return;
   }
-  DVLOG(1) << "[eyeo] Downloading " << url_;
+  VLOG(1) << "[eyeo] Downloading " << url_;
   auto request = std::make_unique<network::ResourceRequest>();
   request->url = url_;
   request->method = MethodToString();
@@ -175,13 +140,6 @@ void OngoingSubscriptionRequestImpl::StartInternal() {
         base::BindOnce(&OngoingSubscriptionRequestImpl::OnHeadersReceived,
                        base::Unretained(this)));
   }
-}
-
-void OngoingSubscriptionRequestImpl::StopInternal() {
-  DLOG(INFO) << "[eyeo] Stopped downloading " << url_
-             << " due to current download policy.";
-  loader_.reset();
-  retry_timer_->Stop();
 }
 
 void OngoingSubscriptionRequestImpl::OnDownloadFinished(

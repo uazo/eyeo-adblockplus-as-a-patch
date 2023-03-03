@@ -43,10 +43,11 @@ class SubscriptionCollectionImpl final : public SubscriptionCollection {
       const SiteKey& sitekey,
       FilterCategory category) const final;
 
-  absl::optional<GURL> FindByPopupFilter(const GURL& popup_url,
-                                         const GURL& opener_url,
-                                         const SiteKey& sitekey,
-                                         FilterCategory category) const final;
+  absl::optional<GURL> FindByPopupFilter(
+      const GURL& popup_url,
+      const std::vector<GURL>& frame_hierarchy,
+      const SiteKey& sitekey,
+      FilterCategory category) const final;
 
   absl::optional<GURL> FindByAllowFilter(
       const GURL& request_url,
@@ -66,10 +67,10 @@ class SubscriptionCollectionImpl final : public SubscriptionCollection {
       const SiteKey& sitekey) const final;
   std::vector<base::StringPiece> GetElementHideEmulationSelectors(
       const GURL& frame_url) const final;
-  std::string GenerateSnippetsJson(
+  base::Value::List GenerateSnippets(
       const GURL& frame_url,
       const std::vector<GURL>& frame_hierarchy) const final;
-  base::StringPiece GetCspInjection(
+  std::set<base::StringPiece> GetCspInjections(
       const GURL& request_url,
       const std::vector<GURL>& frame_hierarchy) const final;
   absl::optional<GURL> GetRewriteUrl(

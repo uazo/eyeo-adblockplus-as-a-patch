@@ -24,7 +24,7 @@
 #include "base/observer_list.h"
 #include "components/adblock/content/browser/adblock_filter_match.h"
 #include "components/adblock/core/common/content_type.h"
-#include "components/adblock/core/subscription/subscription_collection.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "services/network/public/mojom/network_param.mojom.h"
 
@@ -67,30 +67,34 @@ class ResourceClassificationRunner : public KeyedService {
 
   // Performs a *synchronous* check, this can block the UI for a while!
   virtual FilterMatchResult ShouldBlockPopup(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
-      const GURL& opener,
+      const SubscriptionService::Snapshot& subscription_collections,
       const GURL& popup_url,
       content::RenderFrameHost* render_frame_host) = 0;
-
   virtual void CheckRequestFilterMatch(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
-      int32_t resource_type,
+      ContentType adblock_resource_type,
       content::GlobalRenderFrameHostId render_frame_host_id,
       CheckFilterMatchCallback callback) = 0;
   virtual void CheckRequestFilterMatchForWebSocket(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
       content::GlobalRenderFrameHostId render_frame_host_id,
       CheckFilterMatchCallback callback) = 0;
+  // No callback, just notify observers
+  virtual void CheckDocumentAllowlisted(
+      SubscriptionService::Snapshot subscription_collection,
+      const GURL& request_url,
+      content::GlobalRenderFrameHostId render_frame_host_id) = 0;
   virtual void CheckResponseFilterMatch(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL& response_url,
+      ContentType adblock_resource_type,
       content::GlobalRenderFrameHostId render_frame_host_id,
       const scoped_refptr<net::HttpResponseHeaders>& headers,
       CheckFilterMatchCallback callback) = 0;
   virtual void CheckRewriteFilterMatch(
-      std::unique_ptr<SubscriptionCollection> subscription_collection,
+      SubscriptionService::Snapshot subscription_collections,
       const GURL& request_url,
       content::GlobalRenderFrameHostId render_frame_host_id,
       base::OnceCallback<void(const absl::optional<GURL>&)> result) = 0;

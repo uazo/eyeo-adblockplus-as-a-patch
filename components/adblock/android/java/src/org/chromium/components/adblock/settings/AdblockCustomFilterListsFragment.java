@@ -64,7 +64,7 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment 
 
     @Override
     protected String getCustomItemTextViewText() {
-        return getString(R.string.fragment_adblock_more_options_custom_filter_lists_list);
+        return getString(R.string.fragment_adblock_settings_filter_lists_title);
     }
 
     @Override

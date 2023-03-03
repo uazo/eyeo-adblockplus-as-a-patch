@@ -22,10 +22,7 @@
 #include <string>
 #include <vector>
 
-#include "base/json/json_string_value_serializer.h"
 #include "base/ranges/algorithm.h"
-#include "base/strings/string_piece.h"
-#include "base/values.h"
 #include "components/adblock/core/common/adblock_utils.h"
 
 namespace adblock {
@@ -68,8 +65,9 @@ bool IsFilterOverruled(base::StringPiece blocking,
                        GenericGetter getter) {
   auto allowing = (subscription.*getter)(request_url, request_domain,
                                          FilterCategory::Allowing);
-  if (!allowing)
+  if (!allowing) {
     return false;
+  }
   return allowing->empty() || *allowing == blocking;
 }
 
@@ -150,11 +148,8 @@ bool HasSpecialFilter(
           DocumentDomain(request_url, frame_hierarchy), sitekey)) {
     return true;
   }
-  if (SubscriptionContainsSpecialFilter(subscription, filter_type,
-                                        frame_hierarchy, sitekey)) {
-    return true;
-  }
-  return false;
+  return SubscriptionContainsSpecialFilter(subscription, filter_type,
+                                           frame_hierarchy, sitekey);
 }
 
 absl::optional<base::StringPiece> GenericFindFilter(
@@ -243,14 +238,15 @@ absl::optional<GURL> SubscriptionCollectionImpl::FindBySubresourceFilter(
 
 absl::optional<GURL> SubscriptionCollectionImpl::FindByPopupFilter(
     const GURL& popup_url,
-    const GURL& opener_url,
+    const std::vector<GURL>& frame_hierarchy,
     const SiteKey& sitekey,
     FilterCategory category) const {
   const auto subscription =
       std::find_if(subscriptions_.begin(), subscriptions_.end(),
                    [&](const auto& subscription) {
-                     return subscription->HasPopupFilter(popup_url, opener_url,
-                                                         sitekey, category);
+                     return subscription->HasPopupFilter(
+                         popup_url, DocumentDomain(popup_url, frame_hierarchy),
+                         sitekey, category);
                    });
   if (subscription != subscriptions_.end()) {
     return (*subscription)->GetSourceUrl();
@@ -324,7 +320,7 @@ SubscriptionCollectionImpl::GetElementHideEmulationSelectors(
   return ReduceSelectors(combined_selectors);
 }
 
-std::string SubscriptionCollectionImpl::GenerateSnippetsJson(
+base::Value::List SubscriptionCollectionImpl::GenerateSnippets(
     const GURL& frame_url,
     const std::vector<GURL>& frame_hierarchy) const {
   base::Value::List snippets;
@@ -335,28 +331,85 @@ std::string SubscriptionCollectionImpl::GenerateSnippetsJson(
     for (const auto& snippet : matched) {
       base::Value::List call;
       call.Append(base::Value(snippet.command));
-      for (const auto& arg : snippet.arguments)
+      for (const auto& arg : snippet.arguments) {
         call.Append(base::Value(arg));
+      }
       snippets.Append(std::move(call));
     }
   }
 
-  if (snippets.size() == 0)
-    return "";
-
-  std::string serialized;
-  JSONStringValueSerializer serializer(&serialized);
-  serializer.Serialize(std::move(snippets));
-
-  return serialized;
+  return snippets;
 }
 
-base::StringPiece SubscriptionCollectionImpl::GetCspInjection(
+std::set<base::StringPiece> SubscriptionCollectionImpl::GetCspInjections(
     const GURL& request_url,
     const std::vector<GURL>& frame_hierarchy) const {
-  auto result = GenericFindFilter(subscriptions_, request_url, frame_hierarchy,
-                                  &InstalledSubscription::FindCspFilter);
-  return result ? *result : "";
+  std::set<base::StringPiece> blocking_filters{};
+  std::set<base::StringPiece> allowing_filters{};
+  for (const auto& subscription : subscriptions_) {
+    subscription->FindCspFilters(request_url,
+                                 DocumentDomain(request_url, frame_hierarchy),
+                                 FilterCategory::Blocking, blocking_filters);
+  }
+  if (blocking_filters.empty()) {
+    return {};
+  }
+
+  // If blocking filters found, check if can be overuled by allowing filters.
+  for (const auto& subscription : subscriptions_) {
+    // There may exist an allowing rule for this request and its immediate
+    // parent frame. We also check for document-wide allowing filters.
+    if (HasSpecialFilter(subscription, SpecialFilterType::Document, request_url,
+                         frame_hierarchy, SiteKey())) {
+      return {};
+    }
+    subscription->FindCspFilters(request_url,
+                                 DocumentDomain(request_url, frame_hierarchy),
+                                 FilterCategory::Allowing, allowing_filters);
+  }
+
+  // Remove overrulled filters
+  for (const auto& a_f : allowing_filters) {
+    if (a_f.empty()) {
+      return {};
+    }
+    blocking_filters.erase(a_f);
+  }
+  if (blocking_filters.empty()) {
+    return {};
+  }
+
+  // Last chance to avoid blocking: maybe there is a Genericblock filter and
+  // we should re-search for domain-specific filters only?
+  if (base::ranges::any_of(subscriptions_, [&](const auto& sub) {
+        return HasSpecialFilter(sub, SpecialFilterType::Genericblock,
+                                request_url, frame_hierarchy, SiteKey());
+      })) {
+    // This is a relatively rare case - we should have searched for
+    // domain-specific filters only.
+    std::set<base::StringPiece> domain_specific_blocking{};
+    for (const auto& subscription : subscriptions_) {
+      subscription->FindCspFilters(
+          request_url, DocumentDomain(request_url, frame_hierarchy),
+          FilterCategory::DomainSpecificBlocking, domain_specific_blocking);
+      // There is a domain-specific blocking filter. No point in
+      // searching for a domain-specific allowing filter, since the
+      // previous search for non-specific allowing filters would have found
+      // it.
+    }
+    if (!domain_specific_blocking.empty()) {
+      for (const auto& a_f : allowing_filters) {
+        if (a_f.empty()) {
+          return {};
+        }
+        domain_specific_blocking.erase(a_f);
+      }
+    }
+
+    return domain_specific_blocking;
+  }
+
+  return blocking_filters;
 }
 
 absl::optional<GURL> SubscriptionCollectionImpl::GetRewriteUrl(
