@@ -43,7 +43,6 @@ namespace adblock {
 
 class AdblockSubscriptionServiceBrowserTest
     : public InProcessBrowserTest,
-      public AdblockController::Observer,
       public SubscriptionService::SubscriptionObserver {
  public:
   AdblockSubscriptionServiceBrowserTest() {
@@ -90,7 +89,9 @@ class AdblockSubscriptionServiceBrowserTest
         "! Last modified: 06 Feb 2022 19:35 UTC\n"
         "! Expires: 1 days (update frequency)\n\n";
     if (base::StartsWith(request.relative_url, kSubscription,
-                         base::CompareCase::SENSITIVE)) {
+                         base::CompareCase::SENSITIVE) &&
+        !request_already_handled_) {
+      request_already_handled_ = true;
       EXPECT_TRUE(RequestHeadersContainAcceptLanguage(request));
       EXPECT_TRUE(RequestHeadersContainAcceptEncodingBrotli(request));
       std::string os;
@@ -126,8 +127,8 @@ class AdblockSubscriptionServiceBrowserTest
     ASSERT_TRUE(https_server_->Start(kPort));
   }
 
-  // adblock::AdblockController::Observer:
-  void OnSubscriptionUpdated(const GURL& url) override {
+  // adblock::SubscriptionService::SubscriptionObserver
+  void OnSubscriptionInstalled(const GURL& url) override {
     if (base::StartsWith(url.spec(),
                          https_server_->GetURL(kSubscription).spec())) {
       // In order to ensure next run requests an update, mark the subscription
@@ -140,6 +141,7 @@ class AdblockSubscriptionServiceBrowserTest
   }
 
   std::unique_ptr<net::EmbeddedTestServer> https_server_;
+  bool request_already_handled_ = false;
   static const std::string kSubscription;
   // Port is hardcoded so the server url is the same across tests
   static const int kPort = 65432;
@@ -153,12 +155,14 @@ IN_PROC_BROWSER_TEST_F(AdblockSubscriptionServiceBrowserTest, PRE_LastVersion) {
   // Downloading a filter list and setting its expiry time to almost zero, so
   // the next run will have to update it ASAP.
 
+  auto* subscription_service =
+      SubscriptionServiceFactory::GetForBrowserContext(browser()->profile());
+  subscription_service->AddObserver(this);
   // Using a custom subscription URL here because before test sets
   // up the server then SubscriptionService already started fetching default
   // subscriptions.
   auto* controller =
       AdblockControllerFactory::GetForBrowserContext(browser()->profile());
-  controller->AddObserver(this);
   controller->InstallSubscription(https_server_->GetURL(kSubscription));
   // Wait until subscription is downloaded and stored.
   RunUntilBrowserProcessQuits();
@@ -166,9 +170,9 @@ IN_PROC_BROWSER_TEST_F(AdblockSubscriptionServiceBrowserTest, PRE_LastVersion) {
 
 IN_PROC_BROWSER_TEST_F(AdblockSubscriptionServiceBrowserTest, LastVersion) {
   ExpectFilterListRequestMadeWithLastVersion("&lastVersion=202202061935&");
-  auto* controller =
-      AdblockControllerFactory::GetForBrowserContext(browser()->profile());
-  controller->AddObserver(this);
+  auto* subscription_service =
+      SubscriptionServiceFactory::GetForBrowserContext(browser()->profile());
+  subscription_service->AddObserver(this);
   // Wait for subscription update to trigger a network request.
   RunUntilBrowserProcessQuits();
 }

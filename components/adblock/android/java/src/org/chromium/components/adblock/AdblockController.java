@@ -57,7 +57,6 @@ public final class AdblockController extends FilteringConfiguration {
     private static AdblockController sInstance;
 
     private URL mAcceptableAds;
-    private final Set<SubscriptionUpdateObserver> mSubscriptionUpdateObservers;
 
     private AdblockController() {
         super("adblock");
@@ -67,7 +66,6 @@ public final class AdblockController extends FilteringConfiguration {
         } catch (java.net.MalformedURLException e) {
             mAcceptableAds = null;
         }
-        mSubscriptionUpdateObservers = new CopyOnWriteArraySet<>();
     }
 
     /**
@@ -82,26 +80,24 @@ public final class AdblockController extends FilteringConfiguration {
         return sInstance;
     }
 
-    // TODO(mpawlowski) move to FilteringConfiguration: DPD-1754
-    public interface SubscriptionUpdateObserver {
-        @UiThread
-        void onSubscriptionDownloaded(final URL url);
-    }
-
     public static class Subscription {
         private URL mUrl;
         private String mTitle;
+        private String mVersion = "";
         private String[] mLanguages = {};
 
-        public Subscription(final URL url, final String title) {
+        public Subscription(final URL url, final String title, final String version) {
             this.mUrl = url;
             this.mTitle = title;
+            this.mVersion = version;
         }
 
         @CalledByNative("Subscription")
-        public Subscription(final URL url, final String title, final String[] languages) {
+        public Subscription(
+                final URL url, final String title, final String version, final String[] languages) {
             this.mUrl = url;
             this.mTitle = title;
+            this.mVersion = version;
             this.mLanguages = languages;
         }
 
@@ -111,6 +107,10 @@ public final class AdblockController extends FilteringConfiguration {
 
         public URL url() {
             return mUrl;
+        }
+
+        public String version() {
+            return mVersion;
         }
 
         public String[] languages() {
@@ -164,7 +164,7 @@ public final class AdblockController extends FilteringConfiguration {
                 if (title != null && !title.isEmpty()) {
                     recommendedSubscriptions.set(i,
                             new Subscription(recommendedSubscriptions.get(i).url(), title,
-                                    recommendedSubscriptions.get(i).languages()));
+                                    "" /*version*/, recommendedSubscriptions.get(i).languages()));
                     break;
                 }
             }
@@ -172,8 +172,8 @@ public final class AdblockController extends FilteringConfiguration {
         return recommendedSubscriptions;
     }
 
-    // TODO(kolam) deprecate and move to FilteringConfiguration or add version
-    // field to Subscription: DPD-1794
+    // Deprecated, to be removed in version 115
+    // [deprecated="Use Subscription.version() instead"]
     @UiThread
     public String getSelectedSubscriptionVersion(final Subscription subscription) {
         return AdblockControllerJni.get().getSelectedSubscriptionVersion(
@@ -210,16 +210,6 @@ public final class AdblockController extends FilteringConfiguration {
     public void removeOnAdBlockedObserver(
             final ResourceClassificationNotifier.AdBlockedObserver observer) {
         ResourceClassificationNotifier.getInstance().removeOnAdBlockedObserver(observer);
-    }
-
-    @UiThread
-    public void addSubscriptionUpdateObserver(final SubscriptionUpdateObserver observer) {
-        mSubscriptionUpdateObservers.add(observer);
-    }
-
-    @UiThread
-    public void removeSubscriptionUpdateObserver(final SubscriptionUpdateObserver observer) {
-        mSubscriptionUpdateObservers.remove(observer);
     }
 
     @UiThread

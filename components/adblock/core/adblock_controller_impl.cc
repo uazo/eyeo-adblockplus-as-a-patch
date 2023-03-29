@@ -23,8 +23,8 @@
 #include <vector>
 
 #include "absl/types/optional.h"
-#include "base/functional/bind.h"
 #include "base/command_line.h"
+#include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/string_util.h"
@@ -47,15 +47,26 @@ namespace adblock {
 
 namespace {
 
+bool IsKnownSubscription(
+    const std::vector<KnownSubscriptionInfo>& known_subscriptions,
+    const GURL& url) {
+  return base::ranges::any_of(known_subscriptions,
+                              [&](const auto& known_subscription) {
+                                return known_subscription.url == url;
+                              });
+}
+
 template <typename T>
 std::vector<T> MigrateItemsFromList(PrefService* pref_service,
                                     const std::string& pref_name) {
   std::vector<T> results;
   if (pref_service->FindPreference(pref_name)->HasUserSetting()) {
     const auto& list = pref_service->GetList(pref_name);
-    for (const auto& item : list)
-      if (item.is_string())
+    for (const auto& item : list) {
+      if (item.is_string()) {
         results.emplace_back(item.GetString());
+      }
+    }
     pref_service->ClearPref(pref_name);
   }
   return results;
@@ -86,8 +97,9 @@ AdblockControllerImpl::AdblockControllerImpl(
   // language::ExtractBaseLanguage is pretty basic, if it doesn't return
   // something that looks like a valid language, fallback to English and use the
   // default EasyList.
-  if (language_.size() != 2u)
+  if (language_.size() != 2u) {
     language_ = "en";
+  }
 }
 
 AdblockControllerImpl::~AdblockControllerImpl() {
@@ -107,8 +119,9 @@ void AdblockControllerImpl::RemoveObserver(
 
 void AdblockControllerImpl::SetAdblockEnabled(bool enabled) {
   adblock_filtering_configuration_->SetEnabled(enabled);
-  for (auto& observer : observers_)
+  for (auto& observer : observers_) {
     observer.OnEnabledStateChanged();
+  }
 }
 
 bool AdblockControllerImpl::IsAdblockEnabled() const {
@@ -137,9 +150,53 @@ void AdblockControllerImpl::UninstallSubscription(const GURL& url) {
   adblock_filtering_configuration_->RemoveFilterList(url);
 }
 
+void AdblockControllerImpl::SelectBuiltInSubscription(const GURL& url) {
+  InstallSubscription(url);
+}
+
+void AdblockControllerImpl::UnselectBuiltInSubscription(const GURL& url) {
+  UninstallSubscription(url);
+}
+
+void AdblockControllerImpl::AddCustomSubscription(const GURL& url) {
+  InstallSubscription(url);
+}
+
+void AdblockControllerImpl::RemoveCustomSubscription(const GURL& url) {
+  UninstallSubscription(url);
+}
+
 std::vector<scoped_refptr<Subscription>>
 AdblockControllerImpl::GetInstalledSubscriptions() const {
   return GetSubscriptionsThatMatchConfiguration();
+}
+
+std::vector<scoped_refptr<Subscription>>
+AdblockControllerImpl::GetSelectedBuiltInSubscriptions() const {
+  auto selected = GetInstalledSubscriptions();
+  std::vector<KnownSubscriptionInfo> known = GetKnownSubscriptions();
+  selected.erase(base::ranges::remove_if(selected,
+                                         [&](const auto& subscription) {
+                                           return !IsKnownSubscription(
+                                               known,
+                                               subscription->GetSourceUrl());
+                                         }),
+                 selected.end());
+  return selected;
+}
+
+std::vector<scoped_refptr<Subscription>>
+AdblockControllerImpl::GetCustomSubscriptions() const {
+  auto selected = GetInstalledSubscriptions();
+  std::vector<KnownSubscriptionInfo> known = GetKnownSubscriptions();
+  selected.erase(base::ranges::remove_if(selected,
+                                         [&](const auto& subscription) {
+                                           return IsKnownSubscription(
+                                               known,
+                                               subscription->GetSourceUrl());
+                                         }),
+                 selected.end());
+  return selected;
 }
 
 void AdblockControllerImpl::AddAllowedDomain(const std::string& domain) {
@@ -173,8 +230,9 @@ AdblockControllerImpl::GetKnownSubscriptions() const {
 
 void AdblockControllerImpl::OnSubscriptionInstalled(
     const GURL& subscription_url) {
-  for (auto& observer : observers_)
+  for (auto& observer : observers_) {
     observer.OnSubscriptionUpdated(subscription_url);
+  }
 }
 
 void AdblockControllerImpl::RunFirstRunLogic(PrefService* pref_service) {
@@ -255,8 +313,9 @@ void AdblockControllerImpl::InstallLanguageBasedRecommendedSubscriptions() {
       InstallSubscription(subscription.url);
     }
   }
-  if (language_specific_subscription_installed)
+  if (language_specific_subscription_installed) {
     return;
+  }
 
   // If there's no language-specific recommended subscription, see if we may
   // install the default subscription..

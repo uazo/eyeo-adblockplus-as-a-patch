@@ -117,7 +117,7 @@ std::string ActivepingTelemetryTopicProvider::GetAuthToken() const {
 }
 
 void ActivepingTelemetryTopicProvider::GetPayload(PayloadCallback callback) {
-  base::Value payload(base::Value::Type::DICTIONARY);
+  base::Value payload(base::Value::Type::DICT);
   payload.SetStringKey("addon_name", "eyeo-chromium-sdk");
   payload.SetStringKey("addon_version", "2.0.0");
   payload.SetStringKey("application", app_info_.name);
@@ -138,7 +138,7 @@ void ActivepingTelemetryTopicProvider::GetPayload(PayloadCallback callback) {
   AppendStringIfPresent(pref_service_, prefs::kTelemetryPreviousLastPingTime,
                         "previous_last_ping", payload);
 
-  base::Value root(base::Value::Type::DICTIONARY);
+  base::Value root(base::Value::Type::DICT);
   root.SetKey("payload", std::move(payload));
   std::string serialized;
   // The only way JSONWriter::Write() can return fail is then the Value

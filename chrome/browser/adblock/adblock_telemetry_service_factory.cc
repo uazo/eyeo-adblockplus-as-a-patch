@@ -21,12 +21,14 @@
 
 #include "base/no_destructor.h"
 #include "chrome/browser/adblock/adblock_controller_factory.h"
+#include "chrome/browser/adblock/subscription_service_factory.h"
 #include "chrome/browser/profiles/incognito_helpers.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/pref_names.h"
 #include "components/adblock/core/activeping_telemetry_topic_provider.h"
 #include "components/adblock/core/adblock_telemetry_service.h"
 #include "components/adblock/core/common/adblock_utils.h"
+#include "components/adblock/core/configuration/filtering_configuration.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "content/public/browser/storage_partition.h"
 
@@ -34,6 +36,7 @@ namespace adblock {
 namespace {
 std::optional<base::TimeDelta> g_check_interval_for_testing;
 std::optional<base::TimeDelta> g_initial_delay_for_testing;
+constexpr base::StringPiece kAdblockFilteringConfigurationName = "adblock";
 
 base::TimeDelta GetInitialDelay() {
   static base::TimeDelta kInitialDelay =
@@ -47,6 +50,18 @@ base::TimeDelta GetCheckInterval() {
       g_check_interval_for_testing ? g_check_interval_for_testing.value()
                                    : base::Minutes(5);
   return kCheckInterval;
+}
+
+FilteringConfiguration* GetAdblockFilteringConfiguration(
+    content::BrowserContext* context) {
+  auto filtering_configurations =
+      SubscriptionServiceFactory::GetForBrowserContext(context)
+          ->GetInstalledFilteringConfigurations();
+  const auto it = base::ranges::find(filtering_configurations,
+                                     kAdblockFilteringConfigurationName,
+                                     &FilteringConfiguration::GetName);
+  DCHECK(it != filtering_configurations.end());
+  return *it;
 }
 }  // namespace
 
@@ -66,6 +81,8 @@ AdblockTelemetryServiceFactory::AdblockTelemetryServiceFactory()
     : BrowserContextKeyedServiceFactory(
           "AdblockTelemetryService",
           BrowserContextDependencyManager::GetInstance()) {
+  // AdblockController creates Adblock Filtering Configuration required by
+  // AdblockTelemetryService
   DependsOn(AdblockControllerFactory::GetInstance());
 }
 
@@ -82,16 +99,17 @@ KeyedService* AdblockTelemetryServiceFactory::BuildServiceInstanceFor(
           ->GetURLLoaderFactoryForBrowserProcess();
   auto* prefs = Profile::FromBrowserContext(context)->GetPrefs();
   auto service = std::make_unique<AdblockTelemetryService>(
-      AdblockControllerFactory::GetForBrowserContext(context),
-      url_loader_factory, GetInitialDelay(), GetCheckInterval());
+      GetAdblockFilteringConfiguration(context), url_loader_factory,
+      GetInitialDelay(), GetCheckInterval());
   service->AddTopicProvider(std::make_unique<ActivepingTelemetryTopicProvider>(
       utils::GetAppInfo(), prefs,
       AdblockControllerFactory::GetForBrowserContext(context),
       ActivepingTelemetryTopicProvider::DefaultBaseUrl(),
       ActivepingTelemetryTopicProvider::DefaultAuthToken()));
 
-  if (url_loader_factory)
+  if (url_loader_factory) {
     service->Start();
+  }
 
   return service.release();
 }

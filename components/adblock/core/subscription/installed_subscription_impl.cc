@@ -393,8 +393,9 @@ void InstalledSubscriptionImpl::FindFiltersForKeyword(
     // filters.
     const base::StringPiece pattern(filter->pattern()->c_str(),
                                     filter->pattern()->size());
-    if (ExtractRegexFilterFromPattern(pattern)) {
-      if (regex_matcher_->MatchesRegex(pattern, url, filter->match_case())) {
+    if (const auto regex_pattern = ExtractRegexFilterFromPattern(pattern)) {
+      if (regex_matcher_->MatchesRegex(*regex_pattern, url,
+                                       filter->match_case())) {
         out_results.push_back(filter);
         if (strategy == FindStrategy::FindFirst) {
           return;

@@ -53,6 +53,7 @@ public class FilteringConfiguration {
     private static final String TAG = FilteringConfiguration.class.getSimpleName();
 
     private final Set<ConfigurationChangeObserver> mConfigurationChangeObservers = new HashSet<>();
+    protected final Set<SubscriptionUpdateObserver> mSubscriptionUpdateObservers = new HashSet<>();
     private final String mName;
 
     public interface ConfigurationChangeObserver {
@@ -81,6 +82,11 @@ public class FilteringConfiguration {
         void onCustomFiltersChanged();
     }
 
+    public interface SubscriptionUpdateObserver {
+        @UiThread
+        void onSubscriptionDownloaded(final URL url);
+    }
+
     public FilteringConfiguration(String configuration_name) {
         mName = configuration_name;
         FilteringConfigurationJni.get().bind(mName, this);
@@ -94,6 +100,16 @@ public class FilteringConfiguration {
     @UiThread
     public void removeObserver(final ConfigurationChangeObserver observer) {
         mConfigurationChangeObservers.remove(observer);
+    }
+
+    @UiThread
+    public void addSubscriptionUpdateObserver(final SubscriptionUpdateObserver observer) {
+        mSubscriptionUpdateObservers.add(observer);
+    }
+
+    @UiThread
+    public void removeSubscriptionUpdateObserver(final SubscriptionUpdateObserver observer) {
+        mSubscriptionUpdateObservers.remove(observer);
     }
 
     @UiThread

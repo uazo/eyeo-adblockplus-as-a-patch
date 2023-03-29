@@ -23,6 +23,7 @@
 #include "chrome/browser/adblock/adblock_controller_factory.h"
 #include "chrome/browser/adblock/resource_classification_runner_factory.h"
 #include "chrome/browser/adblock/session_stats_factory.h"
+#include "chrome/browser/adblock/subscription_service_factory.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/common/extensions/api/tabs.h"
 #include "components/adblock/content/browser/resource_classification_runner.h"
@@ -38,13 +39,73 @@ namespace extensions {
 
 namespace {
 
+enum class BuiltInSubscriptionAction { kSelect, kUnselect };
+
+std::string RunBuiltInSubscriptionAction(
+    BuiltInSubscriptionAction action,
+    content::BrowserContext* browser_context,
+    const GURL& url) {
+  if (!url.is_valid())
+    return "Invalid URL";
+  auto* controller =
+      adblock::AdblockControllerFactory::GetForBrowserContext(browser_context);
+  auto recommended = controller->GetKnownSubscriptions();
+  if (!recommended.empty()) {
+    auto item =
+        std::find_if(recommended.begin(), recommended.end(),
+                     [&url](const adblock::KnownSubscriptionInfo& recommended) {
+                       return recommended.url == url;
+                     });
+    if (item == recommended.end())
+      return "Not a built-in subscription";
+  }
+
+  switch (action) {
+    case BuiltInSubscriptionAction::kSelect:
+      controller->SelectBuiltInSubscription(url);
+      break;
+    case BuiltInSubscriptionAction::kUnselect:
+      controller->UnselectBuiltInSubscription(url);
+      break;
+    default:
+      NOTREACHED();
+  }
+
+  return {};
+}
+
+enum class CustomSubscriptionAction { kAdd, kRemove };
+
+std::string RunCustomSubscriptionAction(
+    CustomSubscriptionAction action,
+    content::BrowserContext* browser_context,
+    const GURL& url) {
+  if (!url.is_valid())
+    return "Invalid URL";
+  auto* controller =
+      adblock::AdblockControllerFactory::GetForBrowserContext(browser_context);
+  switch (action) {
+    case CustomSubscriptionAction::kAdd:
+      controller->AddCustomSubscription(url);
+      break;
+    case CustomSubscriptionAction::kRemove:
+      controller->RemoveCustomSubscription(url);
+      break;
+    default:
+      NOTREACHED();
+  }
+
+  return {};
+}
+
 enum class SubscriptionAction { kInstall, kUninstall };
 
 std::string RunSubscriptionAction(SubscriptionAction action,
                                   content::BrowserContext* browser_context,
                                   const GURL& url) {
-  if (!url.is_valid())
+  if (!url.is_valid()) {
     return "Invalid URL";
+  }
   auto* controller =
       adblock::AdblockControllerFactory::GetForBrowserContext(browser_context);
   switch (action) {
@@ -111,7 +172,7 @@ std::vector<api::adblock_private::Subscription> CopySubscriptions(
 template <>
 void BrowserContextKeyedAPIFactory<
     AdblockPrivateAPI>::DeclareFactoryDependencies() {
-  DependsOn(adblock::AdblockControllerFactory::GetInstance());
+  DependsOn(adblock::SubscriptionServiceFactory::GetInstance());
   DependsOn(adblock::ResourceClassificationRunnerFactory::GetInstance());
   DependsOn(adblock::SessionStatsFactory::GetInstance());
 }
@@ -126,20 +187,20 @@ AdblockPrivateAPI::GetFactoryInstance() {
 
 class AdblockPrivateAPI::AdblockAPIEventRouter
     : public adblock::ResourceClassificationRunner::Observer,
-      public adblock::AdblockController::Observer {
+      public adblock::SubscriptionService::SubscriptionObserver {
  public:
   explicit AdblockAPIEventRouter(content::BrowserContext* context)
       : context_(context) {
     adblock::ResourceClassificationRunnerFactory::GetForBrowserContext(context)
         ->AddObserver(this);
-    adblock::AdblockControllerFactory::GetForBrowserContext(context)
+    adblock::SubscriptionServiceFactory::GetForBrowserContext(context)
         ->AddObserver(this);
   }
 
   ~AdblockAPIEventRouter() override {
     adblock::ResourceClassificationRunnerFactory::GetForBrowserContext(context_)
         ->RemoveObserver(this);
-    adblock::AdblockControllerFactory::GetForBrowserContext(context_)
+    adblock::SubscriptionServiceFactory::GetForBrowserContext(context_)
         ->RemoveObserver(this);
   }
 
@@ -160,13 +221,13 @@ class AdblockPrivateAPI::AdblockAPIEventRouter
       event = std::make_unique<Event>(
           events::ADBLOCK_PRIVATE_AD_BLOCKED,
           api::adblock_private::OnAdBlocked::kEventName,
-          api::adblock_private::OnAdBlocked::Create(info), context_);
+          api::adblock_private::OnAdBlocked::Create(info));
     } else {
       DCHECK(match_result == adblock::FilterMatchResult::kAllowRule);
       event = std::make_unique<Event>(
           events::ADBLOCK_PRIVATE_AD_ALLOWED,
           api::adblock_private::OnAdAllowed::kEventName,
-          api::adblock_private::OnAdAllowed::Create(info), context_);
+          api::adblock_private::OnAdAllowed::Create(info));
     }
 
     extensions::EventRouter::Get(context_)->BroadcastEvent(std::move(event));
@@ -183,7 +244,7 @@ class AdblockPrivateAPI::AdblockAPIEventRouter
     std::unique_ptr<Event> event = std::make_unique<Event>(
         events::ADBLOCK_PRIVATE_PAGE_ALLOWED,
         api::adblock_private::OnPageAllowed::kEventName,
-        api::adblock_private::OnPageAllowed::Create(info), context_);
+        api::adblock_private::OnPageAllowed::Create(info));
 
     extensions::EventRouter::Get(context_)->BroadcastEvent(std::move(event));
   }
@@ -203,25 +264,24 @@ class AdblockPrivateAPI::AdblockAPIEventRouter
       event = std::make_unique<Event>(
           events::ADBLOCK_PRIVATE_POPUP_BLOCKED,
           api::adblock_private::OnPopupBlocked::kEventName,
-          api::adblock_private::OnPopupBlocked::Create(info), context_);
+          api::adblock_private::OnPopupBlocked::Create(info));
     } else {
       DCHECK(match_result == adblock::FilterMatchResult::kAllowRule);
       event = std::make_unique<Event>(
           events::ADBLOCK_PRIVATE_POPUP_ALLOWED,
           api::adblock_private::OnPopupAllowed::kEventName,
-          api::adblock_private::OnPopupAllowed::Create(info), context_);
+          api::adblock_private::OnPopupAllowed::Create(info));
     }
 
     extensions::EventRouter::Get(context_)->BroadcastEvent(std::move(event));
   }
 
-  // adblock::AdblockController::Observer:
-  void OnSubscriptionUpdated(const GURL& url) override {
+  // adblock::SubscriptionService::SubscriptionObserver
+  void OnSubscriptionInstalled(const GURL& url) override {
     std::unique_ptr<Event> event = std::make_unique<Event>(
         events::ADBLOCK_PRIVATE_SUBSCRIPTION_UPDATED,
         api::adblock_private::OnSubscriptionUpdated::kEventName,
-        api::adblock_private::OnSubscriptionUpdated::Create(url.spec()),
-        context_);
+        api::adblock_private::OnSubscriptionUpdated::Create(url.spec()));
     extensions::EventRouter::Get(context_)->BroadcastEvent(std::move(event));
   }
 
@@ -380,6 +440,120 @@ AdblockPrivateGetBuiltInSubscriptionsFunction::Run() {
       api::adblock_private::GetBuiltInSubscriptions::Results::Create(result)));
 }
 
+AdblockPrivateSelectBuiltInSubscriptionFunction::
+    AdblockPrivateSelectBuiltInSubscriptionFunction() {}
+
+AdblockPrivateSelectBuiltInSubscriptionFunction::
+    ~AdblockPrivateSelectBuiltInSubscriptionFunction() {}
+
+ExtensionFunction::ResponseAction
+AdblockPrivateSelectBuiltInSubscriptionFunction::Run() {
+  std::unique_ptr<api::adblock_private::SelectBuiltInSubscription::Params>
+      params(api::adblock_private::SelectBuiltInSubscription::Params::Create(
+          args()));
+  EXTENSION_FUNCTION_VALIDATE(params);
+  auto url = GURL{params->url};
+  auto status = RunBuiltInSubscriptionAction(BuiltInSubscriptionAction::kSelect,
+                                             browser_context(), url);
+  if (!status.empty())
+    return RespondNow(Error(status));
+
+  return RespondNow(NoArguments());
+}
+
+AdblockPrivateUnselectBuiltInSubscriptionFunction::
+    AdblockPrivateUnselectBuiltInSubscriptionFunction() {}
+
+AdblockPrivateUnselectBuiltInSubscriptionFunction::
+    ~AdblockPrivateUnselectBuiltInSubscriptionFunction() {}
+
+ExtensionFunction::ResponseAction
+AdblockPrivateUnselectBuiltInSubscriptionFunction::Run() {
+  std::unique_ptr<api::adblock_private::UnselectBuiltInSubscription::Params>
+      params(api::adblock_private::UnselectBuiltInSubscription::Params::Create(
+          args()));
+  EXTENSION_FUNCTION_VALIDATE(params);
+  auto url = GURL{params->url};
+  auto status = RunBuiltInSubscriptionAction(
+      BuiltInSubscriptionAction::kUnselect, browser_context(), url);
+  if (!status.empty())
+    return RespondNow(Error(status));
+
+  return RespondNow(NoArguments());
+}
+
+AdblockPrivateGetSelectedBuiltInSubscriptionsFunction::
+    AdblockPrivateGetSelectedBuiltInSubscriptionsFunction() {}
+
+AdblockPrivateGetSelectedBuiltInSubscriptionsFunction::
+    ~AdblockPrivateGetSelectedBuiltInSubscriptionsFunction() {}
+
+ExtensionFunction::ResponseAction
+AdblockPrivateGetSelectedBuiltInSubscriptionsFunction::Run() {
+  auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
+      browser_context());
+
+  return RespondNow(ArgumentList(
+      api::adblock_private::GetSelectedBuiltInSubscriptions::Results::Create(
+          CopySubscriptions(controller->GetSelectedBuiltInSubscriptions()))));
+}
+
+AdblockPrivateAddCustomSubscriptionFunction::
+    AdblockPrivateAddCustomSubscriptionFunction() {}
+
+AdblockPrivateAddCustomSubscriptionFunction::
+    ~AdblockPrivateAddCustomSubscriptionFunction() {}
+
+ExtensionFunction::ResponseAction
+AdblockPrivateAddCustomSubscriptionFunction::Run() {
+  std::unique_ptr<api::adblock_private::AddCustomSubscription::Params> params(
+      api::adblock_private::AddCustomSubscription::Params::Create(args()));
+  EXTENSION_FUNCTION_VALIDATE(params);
+  auto url = GURL{params->url};
+  auto status = RunCustomSubscriptionAction(CustomSubscriptionAction::kAdd,
+                                            browser_context(), url);
+  if (!status.empty())
+    return RespondNow(Error(status));
+
+  return RespondNow(NoArguments());
+}
+
+AdblockPrivateRemoveCustomSubscriptionFunction::
+    AdblockPrivateRemoveCustomSubscriptionFunction() {}
+
+AdblockPrivateRemoveCustomSubscriptionFunction::
+    ~AdblockPrivateRemoveCustomSubscriptionFunction() {}
+
+ExtensionFunction::ResponseAction
+AdblockPrivateRemoveCustomSubscriptionFunction::Run() {
+  std::unique_ptr<api::adblock_private::RemoveCustomSubscription::Params>
+      params(api::adblock_private::RemoveCustomSubscription::Params::Create(
+          args()));
+  EXTENSION_FUNCTION_VALIDATE(params);
+  auto url = GURL{params->url};
+  auto status = RunCustomSubscriptionAction(CustomSubscriptionAction::kRemove,
+                                            browser_context(), url);
+  if (!status.empty())
+    return RespondNow(Error(status));
+
+  return RespondNow(NoArguments());
+}
+
+AdblockPrivateGetCustomSubscriptionsFunction::
+    AdblockPrivateGetCustomSubscriptionsFunction() {}
+
+AdblockPrivateGetCustomSubscriptionsFunction::
+    ~AdblockPrivateGetCustomSubscriptionsFunction() {}
+
+ExtensionFunction::ResponseAction
+AdblockPrivateGetCustomSubscriptionsFunction::Run() {
+  auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
+      browser_context());
+  return RespondNow(ArgumentList(
+      api::adblock_private::GetCustomSubscriptions::Results::Create(
+          CopySubscriptions(controller->GetCustomSubscriptions()))));
+}
+
 AdblockPrivateInstallSubscriptionFunction::
     AdblockPrivateInstallSubscriptionFunction() {}
 
@@ -394,8 +568,9 @@ AdblockPrivateInstallSubscriptionFunction::Run() {
   auto url = GURL{params->url};
   auto status = RunSubscriptionAction(SubscriptionAction::kInstall,
                                       browser_context(), url);
-  if (!status.empty())
+  if (!status.empty()) {
     return RespondNow(Error(status));
+  }
 
   return RespondNow(NoArguments());
 }
@@ -414,8 +589,9 @@ AdblockPrivateUninstallSubscriptionFunction::Run() {
   auto url = GURL{params->url};
   auto status = RunSubscriptionAction(SubscriptionAction::kUninstall,
                                       browser_context(), url);
-  if (!status.empty())
+  if (!status.empty()) {
     return RespondNow(Error(status));
+  }
 
   return RespondNow(NoArguments());
 }

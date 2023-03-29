@@ -1637,4 +1637,9 @@ void WebRequestProxyingURLLoaderFactory::MaybeRemoveProxy() {
   proxies_->RemoveProxy(this);
 }
 
+// static
+void WebRequestProxyingURLLoaderFactory::EnsureAssociatedFactoryBuilt() {
+  ShutdownNotifierFactory::GetInstance();
+}
+
 }  // namespace extensions

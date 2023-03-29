@@ -180,6 +180,7 @@ source_set("unit_tests") {
   ]
 }
 
+### CI & Testing patch start
 # This group is for referencing standalone executables that would otherwise be
 # ignored by GN as not required by the dependency tree and thus un-buildable.
 group("unreferenced_standalone_executables") {
@@ -187,3 +188,4 @@ group("unreferenced_standalone_executables") {
 
   deps = [ "//components/adblock_comparison:verify_flatbuffer_adblocking" ]
 }
+### CI & Testing patch end

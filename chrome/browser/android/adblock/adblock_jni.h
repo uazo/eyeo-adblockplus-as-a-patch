@@ -22,6 +22,7 @@
 
 #include "base/android/jni_weak_ref.h"
 #include "components/adblock/core/adblock_controller.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "components/keyed_service/core/keyed_service.h"
 
 namespace content {
@@ -30,18 +31,19 @@ class BrowserContext;
 
 namespace adblock {
 
-class AdblockJNI : public AdblockController::Observer, public KeyedService {
+class AdblockJNI : public SubscriptionService::SubscriptionObserver,
+                   public KeyedService {
  public:
-  explicit AdblockJNI(AdblockController* controller);
+  explicit AdblockJNI(SubscriptionService* subscription_service);
   ~AdblockJNI() override;
 
   void Bind(JavaObjectWeakGlobalRef weak_java_controller);
-  // AdblockController::Observer:
-  void OnSubscriptionUpdated(const GURL& url) override;
+  // SubscriptionService::SubscriptionObserver
+  void OnSubscriptionInstalled(const GURL& subscription_url) override;
 
  private:
   SEQUENCE_CHECKER(sequence_checker_);
-  AdblockController* controller_;
+  SubscriptionService* subscription_service_;
   JavaObjectWeakGlobalRef weak_java_controller_;
 };
 

@@ -54,13 +54,31 @@ void RegexMatcher::PreBuildRegexPatternsWithNoKeyword(
           << timer.Elapsed();
 }
 
-bool RegexMatcher::MatchesRegex(base::StringPiece filter_pattern,
+void RegexMatcher::PreBuildRegexPattern(base::StringPiece regular_expression,
+                                        bool case_sensitive) {
+  auto re2_pattern = BuildRe2Expression(regular_expression, case_sensitive);
+  if (re2_pattern) {
+    re2_cache_[std::make_pair(regular_expression, case_sensitive)] =
+        std::move(re2_pattern);
+  } else {
+    auto icu_pattern = BuildIcuExpression(regular_expression, case_sensitive);
+    if (!icu_pattern) {
+      LOG(ERROR) << "Even ICU cannot parse this regular expression, "
+                    "this should have been caught during parsing. Will "
+                    "ignore this filter: "
+                 << regular_expression;
+      return;
+    }
+    icu_cache_[std::make_pair(regular_expression, case_sensitive)] =
+        std::move(icu_pattern);
+  }
+}
+
+bool RegexMatcher::MatchesRegex(base::StringPiece regex_pattern,
                                 const GURL& url,
                                 bool case_sensitive) const {
-  DCHECK(ExtractRegexFilterFromPattern(filter_pattern))
-      << filter_pattern << " is not a regular expression filter pattern";
   const base::StringPiece input = url.spec();
-  const auto cache_key = std::make_pair(filter_pattern, case_sensitive);
+  const auto cache_key = std::make_pair(regex_pattern, case_sensitive);
 
   const auto cached_re2_expression = re2_cache_.find(cache_key);
   if (cached_re2_expression != re2_cache_.end()) {
@@ -78,8 +96,7 @@ bool RegexMatcher::MatchesRegex(base::StringPiece filter_pattern,
     return is_match;
   }
   VLOG(1) << "Matching a non-prebuilt expression, this will be slow";
-  return utils::RegexMatches(*ExtractRegexFilterFromPattern(filter_pattern),
-                             input, case_sensitive);
+  return utils::RegexMatches(regex_pattern, input, case_sensitive);
 }
 
 void RegexMatcher::PreBuildPatternsFrom(const UrlFilterIndex* index) {
@@ -103,24 +120,7 @@ void RegexMatcher::PreBuildPatternsFrom(const UrlFilterIndex* index) {
     if (!regex_string) {
       continue;  // This is not a regex filter.
     }
-
-    auto re2_pattern = BuildRe2Expression(*regex_string, filter->match_case());
-    if (re2_pattern) {
-      re2_cache_[std::make_pair(filter_string, filter->match_case())] =
-          std::move(re2_pattern);
-    } else {
-      auto icu_pattern =
-          BuildIcuExpression(*regex_string, filter->match_case());
-      if (!icu_pattern) {
-        LOG(ERROR) << "Even ICU cannot parse this regular expression, "
-                      "this should have been caught during parsing. Will "
-                      "ignore this filter: "
-                   << *regex_string;
-        continue;
-      }
-      icu_cache_[std::make_pair(filter_string, filter->match_case())] =
-          std::move(icu_pattern);
-    }
+    PreBuildRegexPattern(*regex_string, filter->match_case());
   }
 }
 

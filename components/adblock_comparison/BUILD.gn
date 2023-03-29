@@ -45,5 +45,12 @@ executable("verify_flatbuffer_adblocking") {
     ":test_support",
     "//components/adblock/core/converter",
     "//components/adblock/core:core",
+    "//third_party/zlib/google:compression_utils",
+  ]
+
+  data = [
+    "//components/test/data/adblock/easylist.txt.gz",
+    "//components/test/data/adblock/exceptionrules.txt.gz",
+    "//components/test/data/adblock/anticv.txt.gz",
   ]
 }

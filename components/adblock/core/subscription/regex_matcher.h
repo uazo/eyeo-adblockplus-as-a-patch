@@ -45,8 +45,10 @@ class RegexMatcher {
   // There are typically few of them and they are matched very often, so
   // pre-build them.
   void PreBuildRegexPatternsWithNoKeyword(const flat::Subscription* index);
+  void PreBuildRegexPattern(base::StringPiece regular_expression,
+                            bool case_sensitive);
 
-  bool MatchesRegex(base::StringPiece filter_pattern,
+  bool MatchesRegex(base::StringPiece regex_pattern,
                     const GURL& url,
                     bool case_sensitive) const;
 

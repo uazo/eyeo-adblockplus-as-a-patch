@@ -44,7 +44,10 @@ source_set("converter") {
 executable("adblock_flatbuffer_converter") {
   sources = [ "converter_main.cc" ]
 
-  deps = [ ":converter" ]
+  deps = [
+    ":converter",
+    "//third_party/zlib/google:compression_utils",
+  ]
 }
 
 source_set("unit_tests") {
@@ -70,12 +73,11 @@ source_set("perf_tests") {
   deps = [
     ":converter",
     "//testing/gtest",
+    "//third_party/zlib/google:compression_utils",
   ]
 
   data = [
-    "//components/test/data/adblock/easylist.txt",
-    "//components/test/data/adblock/exceptionrules.txt",
-    "//components/test/data/adblock/anticv.txt",
-    "//components/test/data/adblock/longurl.txt",
+    "//components/test/data/adblock/easylist.txt.gz",
+    "//components/test/data/adblock/exceptionrules.txt.gz",
   ]
 }

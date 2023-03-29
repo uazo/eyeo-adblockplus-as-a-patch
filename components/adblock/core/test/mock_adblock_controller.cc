@@ -20,14 +20,7 @@
 namespace adblock {
 
 MockAdblockController::MockAdblockController() = default;
-MockAdblockController::~MockAdblockController() = default;
 
-void MockAdblockController::AddObserver(AdblockController::Observer* observer) {
-  observers_.AddObserver(observer);
-}
-void MockAdblockController::RemoveObserver(
-    AdblockController::Observer* observer) {
-  observers_.RemoveObserver(observer);
-}
+MockAdblockController::~MockAdblockController() = default;
 
 }  // namespace adblock
