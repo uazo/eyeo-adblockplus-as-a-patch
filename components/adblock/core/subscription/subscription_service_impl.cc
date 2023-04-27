@@ -130,8 +130,9 @@ void SubscriptionServiceImpl::OnEnabledStateChanged(
 
 void SubscriptionServiceImpl::OnSubscriptionUpdated(
     const GURL& subscription_url) {
-  for (auto& observer : observers_)
+  for (auto& observer : observers_) {
     observer.OnSubscriptionInstalled(subscription_url);
+  }
 }
 
 std::unique_ptr<FilteringConfigurationMaintainer>

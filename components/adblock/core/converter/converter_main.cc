@@ -25,6 +25,7 @@
 #include "base/logging.h"
 #include "components/adblock/core/common/flatbuffer_data.h"
 #include "components/adblock/core/converter/flatbuffer_converter.h"
+#include "third_party/zlib/google/compression_utils.h"
 
 #if BUILDFLAG(IS_WIN)
 #include "base/strings/sys_string_conversions.h"
@@ -41,6 +42,12 @@ bool Convert(base::FilePath input_path, GURL url, base::FilePath output_path) {
   if (!base::ReadFileToString(input_path, &content)) {
     LOG(ERROR) << "[eyeo] Could not open input file " << input_path;
     return false;
+  }
+  if (input_path.MatchesFinalExtension(".gz")) {
+    if (!compression::GzipUncompress(content, &content)) {
+      LOG(ERROR) << "[eyeo] Could not decompress input file " << input_path;
+      return false;
+    }
   }
   std::stringstream input(content);
   auto converter_result =

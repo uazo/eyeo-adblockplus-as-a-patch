@@ -126,9 +126,9 @@ void SubscriptionPersistentMetadataImpl::RemoveMetadata(
 }
 
 void SubscriptionPersistentMetadataImpl::UpdatePrefs() {
-  base::Value dict(base::Value::Type::DICTIONARY);
+  base::Value dict(base::Value::Type::DICT);
   for (const auto& pair : metadata_map_) {
-    base::Value subscription(base::Value::Type::DICTIONARY);
+    base::Value subscription(base::Value::Type::DICT);
     subscription.SetKey(kExpirationTimeKey,
                         TimeToValue(pair.second.expiration_time));
     subscription.SetKey(kLastInstallationTimeKey,

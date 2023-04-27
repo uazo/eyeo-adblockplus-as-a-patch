@@ -64,12 +64,13 @@ source_set("perf_tests") {
     ":classifier",
     "//components/adblock/core/converter",
     "//testing/gtest",
+    "//third_party/zlib/google:compression_utils",
   ]
 
   data = [
-    "//components/test/data/adblock/easylist.txt",
-    "//components/test/data/adblock/exceptionrules.txt",
-    "//components/test/data/adblock/anticv.txt",
-    "//components/test/data/adblock/longurl.txt",
+    "//components/test/data/adblock/easylist.txt.gz",
+    "//components/test/data/adblock/exceptionrules.txt.gz",
+    "//components/test/data/adblock/anticv.txt.gz",
+    "//components/test/data/adblock/longurl.txt.gz",
   ]
 }

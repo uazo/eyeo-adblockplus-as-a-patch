@@ -17,7 +17,6 @@
 #define CHROME_BROWSER_EXTENSIONS_API_ADBLOCK_PRIVATE_ADBLOCK_PRIVATE_API_H_
 
 #include "chrome/common/extensions/api/adblock_private.h"
-#include "components/adblock/core/adblock_controller.h"
 #include "extensions/browser/browser_context_keyed_api_factory.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_function.h"
@@ -142,6 +141,112 @@ class AdblockPrivateGetBuiltInSubscriptionsFunction : public ExtensionFunction {
       const AdblockPrivateGetBuiltInSubscriptionsFunction&) = delete;
   AdblockPrivateGetBuiltInSubscriptionsFunction& operator=(
       const AdblockPrivateGetBuiltInSubscriptionsFunction&) = delete;
+};
+
+class AdblockPrivateSelectBuiltInSubscriptionFunction
+    : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.selectBuiltInSubscription",
+                             ADBLOCKPRIVATE_SELECTBUILTINSUBSCRIPTION)
+  AdblockPrivateSelectBuiltInSubscriptionFunction();
+
+ private:
+  ~AdblockPrivateSelectBuiltInSubscriptionFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateSelectBuiltInSubscriptionFunction(
+      const AdblockPrivateSelectBuiltInSubscriptionFunction&) = delete;
+  AdblockPrivateSelectBuiltInSubscriptionFunction& operator=(
+      const AdblockPrivateSelectBuiltInSubscriptionFunction&) = delete;
+};
+
+class AdblockPrivateUnselectBuiltInSubscriptionFunction
+    : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.unselectBuiltInSubscription",
+                             ADBLOCKPRIVATE_UNSELECTBUILTINSUBSCRIPTION)
+  AdblockPrivateUnselectBuiltInSubscriptionFunction();
+
+ private:
+  ~AdblockPrivateUnselectBuiltInSubscriptionFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateUnselectBuiltInSubscriptionFunction(
+      const AdblockPrivateUnselectBuiltInSubscriptionFunction&) = delete;
+  AdblockPrivateUnselectBuiltInSubscriptionFunction& operator=(
+      const AdblockPrivateUnselectBuiltInSubscriptionFunction&) = delete;
+};
+
+class AdblockPrivateGetSelectedBuiltInSubscriptionsFunction
+    : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.getSelectedBuiltInSubscriptions",
+                             ADBLOCKPRIVATE_GETSELECTEDBUILTINSUBSCRIPTIONS)
+  AdblockPrivateGetSelectedBuiltInSubscriptionsFunction();
+
+ private:
+  ~AdblockPrivateGetSelectedBuiltInSubscriptionsFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateGetSelectedBuiltInSubscriptionsFunction(
+      const AdblockPrivateGetSelectedBuiltInSubscriptionsFunction&) = delete;
+  AdblockPrivateGetSelectedBuiltInSubscriptionsFunction& operator=(
+      const AdblockPrivateGetSelectedBuiltInSubscriptionsFunction&) = delete;
+};
+
+class AdblockPrivateAddCustomSubscriptionFunction : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.addCustomSubscription",
+                             ADBLOCKPRIVATE_ADDCUSTOMSUBSCRIPTION)
+  AdblockPrivateAddCustomSubscriptionFunction();
+
+ private:
+  ~AdblockPrivateAddCustomSubscriptionFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateAddCustomSubscriptionFunction(
+      const AdblockPrivateAddCustomSubscriptionFunction&) = delete;
+  AdblockPrivateAddCustomSubscriptionFunction& operator=(
+      const AdblockPrivateAddCustomSubscriptionFunction&) = delete;
+};
+
+class AdblockPrivateRemoveCustomSubscriptionFunction
+    : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.removeCustomSubscription",
+                             ADBLOCKPRIVATE_REMOVECUSTOMSUBSCRIPTION)
+  AdblockPrivateRemoveCustomSubscriptionFunction();
+
+ private:
+  ~AdblockPrivateRemoveCustomSubscriptionFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateRemoveCustomSubscriptionFunction(
+      const AdblockPrivateRemoveCustomSubscriptionFunction&) = delete;
+  AdblockPrivateRemoveCustomSubscriptionFunction& operator=(
+      const AdblockPrivateRemoveCustomSubscriptionFunction&) = delete;
+};
+
+class AdblockPrivateGetCustomSubscriptionsFunction : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("adblockPrivate.getCustomSubscriptions",
+                             ADBLOCKPRIVATE_GETCUSTOMSUBSCRIPTIONS)
+  AdblockPrivateGetCustomSubscriptionsFunction();
+
+ private:
+  ~AdblockPrivateGetCustomSubscriptionsFunction() override;
+
+  ResponseAction Run() override;
+
+  AdblockPrivateGetCustomSubscriptionsFunction(
+      const AdblockPrivateGetCustomSubscriptionsFunction&) = delete;
+  AdblockPrivateGetCustomSubscriptionsFunction& operator=(
+      const AdblockPrivateGetCustomSubscriptionsFunction&) = delete;
 };
 
 class AdblockPrivateInstallSubscriptionFunction : public ExtensionFunction {

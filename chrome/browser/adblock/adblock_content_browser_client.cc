@@ -85,7 +85,7 @@ class AdblockContextData : public base::SupportsUserData::Data {
       int render_process_id,
       mojo::PendingReceiver<network::mojom::URLLoaderFactory> receiver,
       mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory,
-      content::ContentBrowserClient::URLLoaderFactoryType type) {
+      bool use_test_loader) {
     const void* const kAdblockContextUserDataKey = &kAdblockContextUserDataKey;
     auto* self = static_cast<AdblockContextData*>(
         profile->GetUserData(kAdblockContextUserDataKey));
@@ -105,14 +105,7 @@ class AdblockContextData : public base::SupportsUserData::Data {
         adblock::ContentSecurityPolicyInjectorFactory::GetForBrowserContext(
             browser_context)};
 #ifdef EYEO_INTERCEPT_DEBUG_URL
-    content::WebContents* wc = content::WebContents::FromRenderFrameHost(frame);
-    bool is_adblock_test_url =
-        (type ==
-         content::ContentBrowserClient::URLLoaderFactoryType::kNavigation) &&
-        wc->GetVisibleURL().is_valid() &&
-        wc->GetVisibleURL().host() ==
-            adblock::AdblockURLLoaderFactoryForTest::kAdblockDebugDataHostName;
-    if (is_adblock_test_url) {
+    if (use_test_loader) {
       auto proxy = std::make_unique<adblock::AdblockURLLoaderFactoryForTest>(
           std::move(config),
           content::GlobalRenderFrameHostId(render_process_id,
@@ -354,13 +347,26 @@ bool AdblockContentBrowserClient::WillCreateURLLoaderFactory(
       (type == URLLoaderFactoryType::kDocumentSubResource ||
        type == URLLoaderFactoryType::kNavigation) &&
       IsFilteringNeeded(frame);
+
+  bool use_test_loader = false;
+#ifdef EYEO_INTERCEPT_DEBUG_URL
+  content::WebContents* wc = content::WebContents::FromRenderFrameHost(frame);
+  use_test_loader =
+      (type ==
+       content::ContentBrowserClient::URLLoaderFactoryType::kNavigation) &&
+      wc->GetVisibleURL().is_valid() &&
+      wc->GetVisibleURL().host() ==
+          adblock::AdblockURLLoaderFactoryForTest::kAdblockDebugDataHostName;
+  use_adblock_proxy |= use_test_loader;
+#endif
+
   if (use_adblock_proxy) {
     auto proxied_receiver = std::move(*factory_receiver);
     mojo::PendingRemote<network::mojom::URLLoaderFactory> target_factory_remote;
     *factory_receiver = target_factory_remote.InitWithNewPipeAndPassReceiver();
-    AdblockContextData::StartProxying(profile, frame, render_process_id,
-                                      std::move(proxied_receiver),
-                                      std::move(target_factory_remote), type);
+    AdblockContextData::StartProxying(
+        profile, frame, render_process_id, std::move(proxied_receiver),
+        std::move(target_factory_remote), use_test_loader);
   }
   return use_adblock_proxy || use_chrome_proxy;
 }

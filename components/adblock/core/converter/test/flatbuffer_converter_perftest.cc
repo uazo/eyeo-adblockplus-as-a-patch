@@ -26,6 +26,7 @@
 #include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/converter/flatbuffer_converter.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/zlib/google/compression_utils.h"
 
 namespace adblock {
 
@@ -41,6 +42,7 @@ class ConverterPerfTest : public testing::Test {
                       .AppendASCII(filename);
     std::string content;
     ASSERT_TRUE(base::ReadFileToString(source_file, &content));
+    ASSERT_TRUE(compression::GzipUncompress(content, &content));
     std::stringstream input(std::move(content));
     base::ElapsedTimer timer;
     auto buffer = FlatbufferConverter::Convert(input, CustomFiltersUrl(), true);
@@ -52,11 +54,11 @@ class ConverterPerfTest : public testing::Test {
 };
 
 TEST_F(ConverterPerfTest, ConvertEasylistTime) {
-  MeasureConversionTime("easylist.txt");
+  MeasureConversionTime("easylist.txt.gz");
 }
 
 TEST_F(ConverterPerfTest, ConvertExceptionrulesTime) {
-  MeasureConversionTime("exceptionrules.txt");
+  MeasureConversionTime("exceptionrules.txt.gz");
 }
 
 }  // namespace adblock

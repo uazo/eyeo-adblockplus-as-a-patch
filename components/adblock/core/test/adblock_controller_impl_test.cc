@@ -48,12 +48,6 @@ using testing::Return;
 
 namespace {
 
-class MockObserver : public AdblockController::Observer {
- public:
-  MOCK_METHOD(void, OnSubscriptionUpdated, (const GURL& url), (override));
-  MOCK_METHOD(void, OnEnabledStateChanged, (), (override));
-};
-
 class MockFilteringConfiguration : public FilteringConfiguration {
  public:
   MOCK_METHOD(void, AddObserver, (Observer * observer), (override));
@@ -107,14 +101,11 @@ class AdblockControllerImplTest : public testing::Test {
       std::vector<KnownSubscriptionInfo> known_subscriptions =
           config::GetKnownSubscriptions()) {
     if (testee_) {
-      testee_->RemoveObserver(&observer_);
       testee_.reset();
     }
     testee_ = std::make_unique<AdblockControllerImpl>(
         &filtering_configuration_, &subscription_service_, locale,
         std::move(known_subscriptions));
-    EXPECT_EQ(subscription_service_.observer_, testee_.get());
-    testee_->AddObserver(&observer_);
   }
 
   void ExpectInstallationTriggered(const GURL& subscription_url) {
@@ -136,7 +127,6 @@ class AdblockControllerImplTest : public testing::Test {
   }
 
   base::test::TaskEnvironment task_environment_;
-  MockObserver observer_;
   TestingPrefServiceSimple pref_service_;
   MockFilteringConfiguration filtering_configuration_;
   MockSubscriptionService subscription_service_;
@@ -154,7 +144,6 @@ TEST_F(AdblockControllerImplTest, EnableAndDisableAdBlocking) {
   EXPECT_FALSE(testee_->IsAdblockEnabled());
 
   // Switching state notifies observers and stores into FilteringConfiguration.
-  EXPECT_CALL(observer_, OnEnabledStateChanged());
   EXPECT_CALL(filtering_configuration_, SetEnabled(true));
   testee_->SetAdblockEnabled(true);
 }
@@ -168,11 +157,6 @@ TEST_F(AdblockControllerImplTest, InstallingSubscription) {
   ExpectInstallationTriggered(subscription_url);
 
   testee_->InstallSubscription(subscription_url);
-
-  // SubscriptionService notifies observers about installation progress, this is
-  // relayed to AdblockController's observer.
-  EXPECT_CALL(observer_, OnSubscriptionUpdated(subscription_url));
-  subscription_service_.observer_->OnSubscriptionInstalled(subscription_url);
 }
 
 TEST_F(AdblockControllerImplTest, UninstallingSubscription) {

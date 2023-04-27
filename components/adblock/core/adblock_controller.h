@@ -36,6 +36,8 @@ namespace adblock {
  */
 class AdblockController : public KeyedService {
  public:
+  // Deprecated, to be removed in version 115
+  // [deprecated="Use FilteringConfiguration::Observer instead"]
   class Observer : public base::CheckedObserver {
    public:
     virtual void OnSubscriptionUpdated(const GURL& url) {}
@@ -43,7 +45,11 @@ class AdblockController : public KeyedService {
   };
   ~AdblockController() override = default;
 
+  // Deprecated, to be removed in version 115
+  // [deprecated="Use FilteringConfiguration::AddObserver instead"]
   virtual void AddObserver(Observer* observer) = 0;
+  // Deprecated, to be removed in version 115
+  // [deprecated="Use FilteringConfiguration::RemoveObserver instead"]
   virtual void RemoveObserver(Observer* observer) = 0;
 
   virtual void SetAdblockEnabled(bool enabled) = 0;
@@ -65,6 +71,28 @@ class AdblockController : public KeyedService {
   virtual std::vector<std::string> GetCustomFilters() const = 0;
 
   virtual std::vector<KnownSubscriptionInfo> GetKnownSubscriptions() const = 0;
+
+  // Deprecated, SelectBuiltInSubscription will be removed in version 115
+  // Use InstallSubscription(const GURL& url) instead.
+  virtual void SelectBuiltInSubscription(const GURL& url) = 0;
+  // Deprecated, UnselectBuiltInSubscription will be removed in version 115
+  // Use UninstallSubscription(const GURL& url) instead.
+  virtual void UnselectBuiltInSubscription(const GURL& url) = 0;
+  // Deprecated, GetSelectedBuiltInSubscriptions will be removed in version 115
+  // Use GetInstalledSubscriptions() instead.
+  virtual std::vector<scoped_refptr<Subscription>>
+  GetSelectedBuiltInSubscriptions() const = 0;
+
+  // Deprecated, AddCustomSubscription will be removed in version 115
+  // Use InstallSubscription(const GURL& url) instead.
+  virtual void AddCustomSubscription(const GURL& url) = 0;
+  // Deprecated, RemoveCustomSubscription will be removed in version 115
+  // Use UninstallSubscription(const GURL& url) instead.
+  virtual void RemoveCustomSubscription(const GURL& url) = 0;
+  // Deprecated, GetCustomSubscriptions will be removed in version 115
+  // Use GetInstalledSubscriptions() instead.
+  virtual std::vector<scoped_refptr<Subscription>> GetCustomSubscriptions()
+      const = 0;
 };
 
 }  // namespace adblock

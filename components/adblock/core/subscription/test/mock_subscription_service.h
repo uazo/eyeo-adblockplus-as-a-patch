@@ -19,8 +19,8 @@
 #define COMPONENTS_ADBLOCK_CORE_SUBSCRIPTION_TEST_MOCK_SUBSCRIPTION_SERVICE_H_
 
 #include <vector>
-#include "components/adblock/core/configuration/fake_filtering_configuration.h"
 #include "components/adblock/core/configuration/filtering_configuration.h"
+#include "components/adblock/core/configuration/test/fake_filtering_configuration.h"
 #include "components/adblock/core/subscription/subscription_service.h"
 
 #include "testing/gmock/include/gmock/gmock.h"

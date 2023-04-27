@@ -32,6 +32,7 @@
 #include "components/adblock/core/subscription/subscription_collection_impl.h"
 #include "components/adblock/core/subscription/subscription_service.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/zlib/google/compression_utils.h"
 
 namespace adblock {
 
@@ -67,7 +68,8 @@ class ResourceClassifierPerfTest : public testing::Test {
                       .AppendASCII("adblock")
                       .AppendASCII(file_name);
     std::string content;
-    EXPECT_TRUE(base::ReadFileToString(source_file, &content));
+    CHECK(base::ReadFileToString(source_file, &content));
+    CHECK(compression::GzipUncompress(content, &content));
     return content;
   }
 
@@ -172,28 +174,28 @@ class ResourceClassifierPerfTest : public testing::Test {
 };
 
 TEST_F(ResourceClassifierPerfTest, UrlNoMatch) {
-  auto sub_collection =
-      CreateSubscriptionCollection({"easylist.txt", "exceptionrules.txt"});
+  auto sub_collection = CreateSubscriptionCollection(
+      {"easylist.txt.gz", "exceptionrules.txt.gz"});
   MeasureUrlMatchingTime(UnknownAddress(), ContentType::Image,
                          std::move(sub_collection));
 }
 
 TEST_F(ResourceClassifierPerfTest, UrlBlocked) {
-  auto sub_collection =
-      CreateSubscriptionCollection({"easylist.txt", "exceptionrules.txt"});
+  auto sub_collection = CreateSubscriptionCollection(
+      {"easylist.txt.gz", "exceptionrules.txt.gz"});
   MeasureUrlMatchingTime(BlockedAddress(), ContentType::Image,
                          std::move(sub_collection));
 }
 
 TEST_F(ResourceClassifierPerfTest, ElemhideNoMatch) {
-  auto sub_collection =
-      CreateSubscriptionCollection({"easylist.txt", "exceptionrules.txt"});
+  auto sub_collection = CreateSubscriptionCollection(
+      {"easylist.txt.gz", "exceptionrules.txt.gz"});
   MeasureElemhideGeneretionTime(UnknownAddress(), std::move(sub_collection));
 }
 
 TEST_F(ResourceClassifierPerfTest, ElemhideMatch) {
-  auto sub_collection =
-      CreateSubscriptionCollection({"easylist.txt", "exceptionrules.txt"});
+  auto sub_collection = CreateSubscriptionCollection(
+      {"easylist.txt.gz", "exceptionrules.txt.gz"});
   MeasureElemhideGeneretionTime(
       GURL{"https://www.heise.de/news/"
            "Privacy-Shield-2-0-Viele-offene-Fragen-zum-Datenverkehr-mit-den-"
@@ -202,9 +204,9 @@ TEST_F(ResourceClassifierPerfTest, ElemhideMatch) {
 }
 
 TEST_F(ResourceClassifierPerfTest, LongUrlMatch) {
-  auto sub_collection =
-      CreateSubscriptionCollection({"easylist.txt", "exceptionrules.txt"});
-  // "longurl.txt" contains a 300K-long URL that encodes a ton of debug data.
+  auto sub_collection = CreateSubscriptionCollection(
+      {"easylist.txt.gz", "exceptionrules.txt.gz"});
+  // "longurl.txt.gz" contains a 300K-long URL that encodes a ton of debug data.
   // This URL was recorded from a real site. It can be orders of magnitude
   // slower to match than typical URLs so we use a custom repetition count.
 #if BUILDFLAG(IS_ANDROID)
@@ -212,20 +214,20 @@ TEST_F(ResourceClassifierPerfTest, LongUrlMatch) {
 #else
   const int kRepCount = 50;
 #endif
-  const GURL long_url(ReadFromTestData("longurl.txt"));
+  const GURL long_url(ReadFromTestData("longurl.txt.gz"));
   MeasureUrlMatchingTime(long_url, ContentType::Subdocument,
                          std::move(sub_collection), kRepCount);
 }
 
 TEST_F(ResourceClassifierPerfTest, LongUrlFindCsp) {
-  auto sub_collection =
-      CreateSubscriptionCollection({"easylist.txt", "exceptionrules.txt"});
+  auto sub_collection = CreateSubscriptionCollection(
+      {"easylist.txt.gz", "exceptionrules.txt.gz"});
 #if BUILDFLAG(IS_ANDROID)
   const int kRepCount = 1;
 #else
   const int kRepCount = 5;
 #endif
-  const GURL long_url(ReadFromTestData("longurl.txt"));
+  const GURL long_url(ReadFromTestData("longurl.txt.gz"));
   MeasureCSPMatchingTime(long_url, ContentType::Subdocument,
                          std::move(sub_collection), kRepCount);
 }

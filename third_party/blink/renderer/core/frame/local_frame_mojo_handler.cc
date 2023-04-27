@@ -26,11 +26,6 @@
 #include "third_party/blink/public/mojom/timing/resource_timing.mojom-blink-forward.h"
 #include "third_party/blink/public/platform/interface_registry.h"
 #include "third_party/blink/public/platform/platform.h"
-<<<<<<< HEAD
-=======
-#include "third_party/blink/public/web/web_css_origin.h"
-#include "third_party/blink/public/web/web_frame_serializer.h"
->>>>>>> c94f606ccefe0... Squashed commits
 #include "third_party/blink/public/web/web_local_frame.h"
 #include "third_party/blink/public/web/web_local_frame_client.h"
 #include "third_party/blink/public/web/web_plugin.h"
@@ -750,8 +745,8 @@ void LocalFrameMojoHandler::AdvanceFocusForIME(
     return;
 
   Element* next_element =
-      GetPage()->GetFocusController().NextFocusableElementForIME(element,
-                                                                 focus_type);
+      GetPage()->GetFocusController().NextFocusableElementForImeAndAutofill(
+          element, focus_type);
   if (!next_element)
     return;
 
@@ -969,7 +964,7 @@ void LocalFrameMojoHandler::JavaScriptExecuteRequestInIsolatedWorld(
 
   WebScriptSource web_script_source(javascript);
   frame_->RequestExecuteScript(
-      world_id, {&web_script_source, 1},
+      world_id, {&web_script_source, 1u},
       mojom::blink::UserActivationOption::kDoNotActivate,
       mojom::blink::EvaluationTiming::kSynchronous,
       mojom::blink::LoadEventBlockingOption::kDoNotBlock,

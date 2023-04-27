@@ -90,6 +90,8 @@ source_set("subscription") {
 source_set("test_support") {
   testonly = true
   sources = [
+    "test/load_gzipped_test_file.cc",
+    "test/load_gzipped_test_file.h",
     "test/mock_conversion_executors.cc",
     "test/mock_conversion_executors.h",
     "test/mock_filtering_configuration_mainainer.cc",
@@ -116,6 +118,8 @@ source_set("test_support") {
     "//testing/gmock",
     "//testing/gtest",
   ]
+
+  deps = [ "//third_party/zlib/google:compression_utils" ]
 }
 
 source_set("unit_tests") {
@@ -147,5 +151,28 @@ source_set("unit_tests") {
     "//net:test_support",
     "//services/network:test_support",
     "//testing/gtest",
+  ]
+}
+
+source_set("perf_tests") {
+  testonly = true
+  sources = [
+    "test/pattern_matcher_perftest.cc",
+    "test/regex_matcher_perftest.cc",
+  ]
+
+  deps = [
+    ":subscription",
+    ":test_support",
+    "//base",
+    "//components/adblock/core",
+    "//testing/gtest",
+    "//testing/perf",
+  ]
+
+  data = [
+    "//components/test/data/adblock/40_regex_patterns.txt.gz",
+    "//components/test/data/adblock/5000_patterns.txt.gz",
+    "//components/test/data/adblock/5000_url.txt.gz",
   ]
 }

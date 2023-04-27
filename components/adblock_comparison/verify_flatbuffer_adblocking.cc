@@ -15,6 +15,7 @@
  * along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <fstream>
+#include <sstream>
 
 #include "absl/types/variant.h"
 #include "base/at_exit.h"
@@ -41,6 +42,7 @@
 #include "components/adblock/core/subscription/subscription_config.h"
 #include "components/adblock/core/subscription/subscription_service.h"
 #include "components/adblock_comparison/libadblockplus_reference_database.h"
+#include "third_party/zlib/google/compression_utils.h"
 
 namespace adblock::test {
 
@@ -61,11 +63,11 @@ class FlatbufferAdblockVerifier {
       : reference_db_file_(reference_db_file) {
     auto subscriptions_base_path = subscription_dir;
     auto easy_stream =
-        GetFileStream(subscriptions_base_path.AppendASCII("easylist.txt"));
+        GetFileStream(subscriptions_base_path.AppendASCII("easylist.txt.gz"));
     auto exception_stream = GetFileStream(
-        subscriptions_base_path.AppendASCII("exceptionrules.txt"));
+        subscriptions_base_path.AppendASCII("exceptionrules.txt.gz"));
     auto anti_cv_stream =
-        GetFileStream(subscriptions_base_path.AppendASCII("anticv.txt"));
+        GetFileStream(subscriptions_base_path.AppendASCII("anticv.txt.gz"));
 
     auto easylist_fb = FlatbufferConverter::Convert(
         easy_stream, adblock::DefaultSubscriptionUrl(),
@@ -106,8 +108,11 @@ class FlatbufferAdblockVerifier {
     classifier_ = base::MakeRefCounted<ResourceClassifierImpl>();
   }
 
-  static std::ifstream GetFileStream(const base::FilePath& file) {
-    std::ifstream file_stream(file.AsUTF8Unsafe());
+  static std::stringstream GetFileStream(const base::FilePath& file) {
+    std::string content;
+    CHECK(base::ReadFileToString(file, &content));
+    CHECK(compression::GzipUncompress(content, &content));
+    std::stringstream file_stream(content);
     if (!file_stream) {
       assert(false);
     }

@@ -24,6 +24,10 @@ android_library("adblock_java") {
     "java/src/org/chromium/components/adblock/AdblockElement.java",
     "java/src/org/chromium/components/adblock/FilteringConfiguration.java",
     "java/src/org/chromium/components/adblock/ResourceClassificationNotifier.java",
+  ]
+
+  ### Android UI patch start
+  sources += [
     "java/src/org/chromium/components/adblock/settings/AdblockAllowedDomainsFragment.java",
     "java/src/org/chromium/components/adblock/settings/AdblockCustomFilterListsFragment.java",
     "java/src/org/chromium/components/adblock/settings/AdblockCustomFiltersFragment.java",
@@ -33,6 +37,7 @@ android_library("adblock_java") {
     "java/src/org/chromium/components/adblock/settings/AdblockMoreOptionsFragment.java",
     "java/src/org/chromium/components/adblock/settings/AdblockSettingsFragment.java",
   ]
+### Android UI patch end
 
   deps = [
     ":java_resources",
@@ -66,6 +71,10 @@ generate_jni("jni_headers") {
 
 android_resources("java_resources") {
   sources = [
+    "java/res/values/adblock_settings_locales_titles.xml",
+  ]
+### Android UI patch start
+  sources += [     
     "java/res/drawable-hdpi/fragment_adblock_custom_item_add.png",
     "java/res/drawable-hdpi/fragment_adblock_custom_item_remove.png",
     "java/res/drawable-mdpi/fragment_adblock_custom_item_add.png",
@@ -85,12 +94,12 @@ android_resources("java_resources") {
     "java/res/layout/adblock_custom_item.xml",
     "java/res/layout/adblock_custom_item_settings.xml",
     "java/res/layout/adblock_filter_lists_list_item.xml",
-    "java/res/values/adblock_settings_locales_titles.xml",
     "java/res/xml/adblock_more_options.xml",
     "java/res/xml/adblock_preferences.xml",
   ]
 
   deps = [ ":adblock_strings_grd" ]
+### Android UI patch end
 }
 
 android_library("adblock_java_tests") {
@@ -98,7 +107,6 @@ android_library("adblock_java_tests") {
 
   sources = [
     "javatests/src/org/chromium/components/adblock/AdblockControllerTest.java",
-    "javatests/src/org/chromium/components/adblock/AdblockFilterFragmentTest.java",
     "javatests/src/org/chromium/components/adblock/AdblockPopupInfoBarTest.java",
     "javatests/src/org/chromium/components/adblock/AdblockPopupMessageTest.java",
     "javatests/src/org/chromium/components/adblock/FilteringConfigurationTest.java",
@@ -118,6 +126,12 @@ android_library("adblock_java_tests") {
     "javatests/src/org/chromium/components/adblock/TestPagesTestsHelper.java",
     "javatests/src/org/chromium/components/adblock/TestPagesWebsocketTest.java",
   ]
+
+  ### Android UI patch start
+  sources += [
+        "javatests/src/org/chromium/components/adblock/AdblockFilterFragmentTest.java",
+  ]
+  ### Android UI patch end
 
   deps = [
     ":adblock_java",
@@ -143,7 +157,7 @@ android_library("adblock_java_tests") {
     "//third_party/junit:junit",
   ]
 }
-
+### Android UI patch start
 java_strings_grd("adblock_strings_grd") {
   grd_file = "adblock_strings.grd"
   outputs = [ "values/adblock_strings.xml" ] +
@@ -151,3 +165,4 @@ java_strings_grd("adblock_strings_grd") {
                 android_bundle_locales_as_resources,
                 [ "values-{{source_name_part}}/adblock_strings.xml" ])
 }
+### Android UI patch end

@@ -192,7 +192,7 @@ void ChromeCommandLinePrefStore::ApplyExplicitlyAllowedPortSwitch() {
     return;
   }
 
-  base::Value integer_list(base::Value::Type::LIST);
+  base::Value::List integer_list;
   std::string switch_value =
       command_line()->GetSwitchValueASCII(switches::kExplicitlyAllowedPorts);
   const auto& split = base::SplitStringPiece(
@@ -205,6 +205,7 @@ void ChromeCommandLinePrefStore::ApplyExplicitlyAllowedPortSwitch() {
       continue;
     integer_list.Append(base::Value(port));
   }
-  SetValue(prefs::kExplicitlyAllowedNetworkPorts, std::move(integer_list),
+  SetValue(prefs::kExplicitlyAllowedNetworkPorts,
+           base::Value(std::move(integer_list)),
            WriteablePrefStore::DEFAULT_PREF_WRITE_FLAGS);
 }

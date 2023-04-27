@@ -35,7 +35,7 @@
 #include "components/adblock/core/common/flatbuffer_data.h"
 #include "components/adblock/core/common/header_filter_data.h"
 #include "components/adblock/core/common/sitekey.h"
-#include "components/adblock/core/configuration/fake_filtering_configuration.h"
+#include "components/adblock/core/configuration/test/fake_filtering_configuration.h"
 #include "components/adblock/core/subscription/installed_subscription.h"
 #include "components/adblock/core/subscription/subscription_config.h"
 #include "components/adblock/core/subscription/test/mock_conversion_executors.h"

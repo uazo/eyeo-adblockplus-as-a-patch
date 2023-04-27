@@ -31,11 +31,14 @@ source_set("configuration") {
 source_set("test_support") {
   testonly = true
   sources = [
-    "fake_filtering_configuration.cc",
-    "fake_filtering_configuration.h",
+    "test/fake_filtering_configuration.cc",
+    "test/fake_filtering_configuration.h",
+    "test/mock_filtering_configuration.cc",
+    "test/mock_filtering_configuration.h",
   ]
   public_deps = [
     ":configuration",
+    "//testing/gmock",
     "//testing/gtest",
   ]
 }

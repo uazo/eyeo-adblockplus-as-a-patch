@@ -20,7 +20,6 @@
 #include <string>
 
 #include "base/functional/bind.h"
-#include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
@@ -28,7 +27,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
-#include "components/adblock/core/adblock_controller.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/prefs/pref_service.h"
 #include "net/base/load_flags.h"
@@ -179,19 +177,21 @@ class AdblockTelemetryService::Conversation {
 };
 
 AdblockTelemetryService::AdblockTelemetryService(
-    AdblockController* controller,
+    FilteringConfiguration* filtering_configuration,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
     base::TimeDelta initial_delay,
     base::TimeDelta check_interval)
-    : controller_(controller),
+    : adblock_filtering_configuration_(filtering_configuration),
       url_loader_factory_(url_loader_factory),
       initial_delay_(initial_delay),
       check_interval_(check_interval) {
-  controller_->AddObserver(this);
+  DCHECK(adblock_filtering_configuration_);
+  adblock_filtering_configuration_->AddObserver(this);
 }
 
 AdblockTelemetryService::~AdblockTelemetryService() {
-  controller_->RemoveObserver(this);
+  DCHECK(adblock_filtering_configuration_);
+  adblock_filtering_configuration_->RemoveObserver(this);
 }
 
 void AdblockTelemetryService::AddTopicProvider(
@@ -202,17 +202,22 @@ void AdblockTelemetryService::AddTopicProvider(
 
 void AdblockTelemetryService::Start() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  OnEnabledStateChanged();
+  OnEnabledStateChangedInternal();
 }
 
-void AdblockTelemetryService::OnEnabledStateChanged() {
+void AdblockTelemetryService::OnEnabledStateChanged(FilteringConfiguration*) {
+  OnEnabledStateChangedInternal();
+}
+
+void AdblockTelemetryService::OnEnabledStateChangedInternal() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (controller_->IsAdblockEnabled() && !timer_.IsRunning()) {
+  if (adblock_filtering_configuration_->IsEnabled() && !timer_.IsRunning()) {
     VLOG(1) << "[eyeo] Starting periodic Telemetry requests";
     timer_.Start(FROM_HERE, initial_delay_,
                  base::BindRepeating(&AdblockTelemetryService::RunPeriodicCheck,
                                      base::Unretained(this)));
-  } else if (!controller_->IsAdblockEnabled() && timer_.IsRunning()) {
+  } else if (!adblock_filtering_configuration_->IsEnabled() &&
+             timer_.IsRunning()) {
     VLOG(1) << "[eyeo] Stopping periodic Telemetry requests";
     Shutdown();
   }
@@ -220,8 +225,9 @@ void AdblockTelemetryService::OnEnabledStateChanged() {
 
 void AdblockTelemetryService::RunPeriodicCheck() {
   for (auto& conversation : ongoing_conversations_) {
-    if (conversation->IsRequestDue())
+    if (conversation->IsRequestDue()) {
       conversation->StartRequest();
+    }
   }
   timer_.Start(FROM_HERE, check_interval_,
                base::BindRepeating(&AdblockTelemetryService::RunPeriodicCheck,
@@ -230,8 +236,9 @@ void AdblockTelemetryService::RunPeriodicCheck() {
 
 void AdblockTelemetryService::Shutdown() {
   timer_.Stop();
-  for (auto& conversation : ongoing_conversations_)
+  for (auto& conversation : ongoing_conversations_) {
     conversation->Stop();
+  }
 }
 
 }  // namespace adblock

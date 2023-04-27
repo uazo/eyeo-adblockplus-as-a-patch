@@ -25,7 +25,8 @@
 #include "base/sequence_checker.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
-#include "components/adblock/core/adblock_controller.h"
+#include "components/adblock/core/configuration/filtering_configuration.h"
+#include "components/adblock/core/subscription/subscription_service.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "url/gurl.h"
@@ -40,7 +41,7 @@ namespace adblock {
  * from Browser process UI main thread.
  */
 class AdblockTelemetryService : public KeyedService,
-                                public AdblockController::Observer {
+                                public FilteringConfiguration::Observer {
  public:
   // Provides data and behavior relevant for a Telemetry "topic". A topic could
   // be "counting users" or "reporting filter list hits" for example.
@@ -65,10 +66,7 @@ class AdblockTelemetryService : public KeyedService,
         std::unique_ptr<std::string> response_content) = 0;
   };
   AdblockTelemetryService(
-      // TODO(mpawlowski): we're observing AdblockController and will disable
-      // telemetry when IsAdblockEnabled() == false. Should it stay enabled when
-      // some other FilteringConfigurations are enabled?
-      AdblockController* controller,
+      FilteringConfiguration* filtering_configuration,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
       base::TimeDelta initial_delay,
       base::TimeDelta check_interval);
@@ -85,14 +83,15 @@ class AdblockTelemetryService : public KeyedService,
   // KeyedService:
   void Shutdown() override;
 
-  // AdblockController::Observer:
-  void OnEnabledStateChanged() override;
+  // FilteringConfiguration::Observer
+  void OnEnabledStateChanged(FilteringConfiguration* config) override;
 
  private:
+  void OnEnabledStateChangedInternal();
   void RunPeriodicCheck();
 
   SEQUENCE_CHECKER(sequence_checker_);
-  AdblockController* controller_;
+  FilteringConfiguration* adblock_filtering_configuration_;
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
   base::TimeDelta initial_delay_;
   base::TimeDelta check_interval_;

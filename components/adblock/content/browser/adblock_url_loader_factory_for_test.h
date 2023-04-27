@@ -23,20 +23,17 @@
 
 namespace adblock {
 
-// A simple class which handles following commands passed via intercepted url:
-// - add filter, f.e. `adblock.test.data/add?payload=filer_text_to_add`
-// - remove filter, f.e. `adblock.test.data/remove?payload=filer_text_to_remove`
-// - clear all filter, f.e. `adblock.test.data/clear`
-// - list all filter, f.e. ``adblock.test.data/list`
-// `filer_text_to_add` is expected to be an url encoded string.
-// When adding or removing filter one can encode several entries splitting them
-// by a new line character. Real example:
-// - call `adblock.test.data/add?payload=%2FadsPlugin%2F%2A%0A%2Fadsponsor.`
-// - then calling `adblock.test.data/list` returns:
-//   OK
-//
-//   /adsPlugin/*
-//   /adsponsor.
+// A simple class which handles following commands passed via intercepted url
+// in a format `adblock.test.data/[topic]/[action]/[payload]` where:
+// - `topic` is either `domains` (allowed domains), `filters`, `subscriptions`,
+//   `adblock`, `aa` (Acceptable Ads)
+// - `action` is either:
+//    - `add`, `clear` (remove all), `list`, `remove` valid for `domains`,
+//      `filters` and `subscriptions`
+//    - `enable`, `disable` or `state` valid for `aa` and `adblock`
+// - `payload` is url encoded string required for action `add` and `remove`.
+// When adding or removing filter/domain/subscription one can encode several
+// entries splitting them by a new line character.
 class AdblockURLLoaderFactoryForTest final : public AdblockURLLoaderFactory {
  public:
   AdblockURLLoaderFactoryForTest(

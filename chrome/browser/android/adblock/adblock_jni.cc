@@ -52,15 +52,17 @@ namespace adblock {
 namespace {
 
 AdblockController* GetController() {
-  if (!g_browser_process || !g_browser_process->profile_manager())
+  if (!g_browser_process || !g_browser_process->profile_manager()) {
     return nullptr;
+  }
   return AdblockControllerFactory::GetForBrowserContext(
       g_browser_process->profile_manager()->GetLastUsedProfile());
 }
 
 AdblockJNI* GetJNI() {
-  if (!g_browser_process || !g_browser_process->profile_manager())
+  if (!g_browser_process || !g_browser_process->profile_manager()) {
     return nullptr;
+  }
   return AdblockJNIFactory::GetForBrowserContext(
       g_browser_process->profile_manager()->GetLastUsedProfile());
 }
@@ -140,6 +142,7 @@ ScopedJavaLocalRef<jobject> ToJava(JNIEnv* env,
                                    jmethodID& url_constructor,
                                    const std::string& url,
                                    const std::string& title,
+                                   const std::string& version,
                                    const std::vector<std::string>& languages) {
   ScopedJavaLocalRef<jobject> url_param(
       env, env->NewObject(url_class.obj(), url_constructor,
@@ -147,6 +150,7 @@ ScopedJavaLocalRef<jobject> ToJava(JNIEnv* env,
   CheckException(env);
   return Java_Subscription_Constructor(env, url_param,
                                        ConvertUTF8ToJavaString(env, title),
+                                       ConvertUTF8ToJavaString(env, version),
                                        ToJavaArrayOfStrings(env, languages));
 }
 
@@ -159,9 +163,9 @@ std::vector<ScopedJavaLocalRef<jobject>> CSubscriptionsToJObjects(
   std::vector<ScopedJavaLocalRef<jobject>> jobjects;
   jobjects.reserve(subscriptions.size());
   for (auto& sub : subscriptions) {
-    jobjects.push_back(ToJava(env, url_class, url_constructor,
-                              sub->GetSourceUrl().spec(), sub->GetTitle(),
-                              std::vector<std::string>{}));
+    jobjects.push_back(ToJava(
+        env, url_class, url_constructor, sub->GetSourceUrl().spec(),
+        sub->GetTitle(), sub->GetCurrentVersion(), std::vector<std::string>{}));
   }
   return jobjects;
 }
@@ -180,7 +184,8 @@ std::vector<ScopedJavaLocalRef<jobject>> CSubscriptionsToJObjects(
       DCHECK(sub.url.is_valid());
       if (sub.url.is_valid()) {
         jobjects.push_back(ToJava(env, url_class, url_constructor,
-                                  sub.url.spec(), sub.title, sub.languages));
+                                  sub.url.spec(), sub.title, "",
+                                  sub.languages));
       }
     }
   }
@@ -189,17 +194,19 @@ std::vector<ScopedJavaLocalRef<jobject>> CSubscriptionsToJObjects(
 
 }  // namespace
 
-AdblockJNI::AdblockJNI(AdblockController* controller)
-    : controller_(controller) {
+AdblockJNI::AdblockJNI(SubscriptionService* subscription_service)
+    : subscription_service_(subscription_service) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (controller_)
-    controller_->AddObserver(this);
+  if (subscription_service_) {
+    subscription_service_->AddObserver(this);
+  }
 }
 
 AdblockJNI::~AdblockJNI() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (controller_)
-    controller_->RemoveObserver(this);
+  if (subscription_service_) {
+    subscription_service_->RemoveObserver(this);
+  }
 }
 
 void AdblockJNI::Bind(JavaObjectWeakGlobalRef weak_java_controller) {
@@ -207,12 +214,13 @@ void AdblockJNI::Bind(JavaObjectWeakGlobalRef weak_java_controller) {
   weak_java_controller_ = weak_java_controller;
 }
 
-void AdblockJNI::OnSubscriptionUpdated(const GURL& url) {
+void AdblockJNI::OnSubscriptionInstalled(const GURL& url) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> obj = weak_java_controller_.get(env);
-  if (obj.is_null())
+  if (obj.is_null()) {
     return;
+  }
 
   ScopedJavaLocalRef<jstring> j_url = ConvertUTF8ToJavaString(env, url.spec());
   Java_AdblockController_subscriptionUpdatedCallback(env, obj, j_url);
@@ -224,8 +232,9 @@ static void JNI_AdblockController_Bind(
     JNIEnv* env,
     const base::android::JavaParamRef<jobject>& caller) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
+  if (!adblock::GetController()) {
     return;
+  }
   JavaObjectWeakGlobalRef weak_controller_ref(env, caller);
   adblock::GetJNI()->Bind(weak_controller_ref);
 }
@@ -233,9 +242,10 @@ static void JNI_AdblockController_Bind(
 static base::android::ScopedJavaLocalRef<jobjectArray>
 JNI_AdblockController_GetInstalledSubscriptions(JNIEnv* env) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
+  if (!adblock::GetController()) {
     return ToJavaArrayOfObjects(env,
                                 std::vector<ScopedJavaLocalRef<jobject>>{});
+  }
 
   return ToJavaArrayOfObjects(
       env, adblock::CSubscriptionsToJObjects(
@@ -245,9 +255,10 @@ JNI_AdblockController_GetInstalledSubscriptions(JNIEnv* env) {
 static base::android::ScopedJavaLocalRef<jobjectArray>
 JNI_AdblockController_GetRecommendedSubscriptions(JNIEnv* env) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!adblock::GetController())
+  if (!adblock::GetController()) {
     return ToJavaArrayOfObjects(env,
                                 std::vector<ScopedJavaLocalRef<jobject>>{});
+  }
 
   auto list = adblock::GetController()->GetKnownSubscriptions();
   return ToJavaArrayOfObjects(env,

@@ -1,5 +1,26 @@
 # Release Notes
 
+## eyeo Chromium SDK 112.0
+* Updated to Chromium 112.0.5615.37
+* Subscription for adblock_private events available in incognito mode (DPD-1868)
+* Restored deprecated subscriptions API removed in previous version. This methods will be kept until version 115 (DPD-1839, DPD-1771)
+* AdblockController::Observer is deprecated. Will be removed in version 115 (DPD-1754)
+* Java Subscription class now has method to report version (DPD-1794)
+* Regexp filters should not be converted to lowercase internally (DPD-1806)
+* Filter lists in repo now compressed (DPD-1774)
+
+## eyeo Chromium SDK 111.0
+* Updated to Chromium 111.0.5563.38
+* Updated snippets library from v0.5.5 to v0.6.1
+* Removed deprecated subscriptions API (DPD-1771)
+* Refactored filter lists converter (DPD-1355)
+* Rewritten pattern matching logic to improve url filtering performance (DPD-1745)
+* Added collecting frame hierarchy for popup filtering (DPD-1749)
+* Added Java API for multiple FilteringConfigurations (DPD-1661)
+* Fixed bug when AdblockController is created too late to register its FilteringConfiguration (DPD-1752)
+* Fixed sending redundant HEAD requests for Acceptable Ads when multiple FilteringConfigurations are enabled (DPD-1763)
+* Fixed problem of not removing downloaded filter list file from temp folder (DPD-1748)
+
 ## eyeo Chromium SDK 110.0
 * Updated to Chromium 110.0.5481.50
 * Support multiple FilteringConfigurations (DPD-1568)
@@ -31,7 +52,6 @@
     all existing semantics and APIs
   - Support for multiple configurations is planned for a future release
 * Fixed invalid behavior when removing previously added custom filters and allowed domains
-
 
 ## eyeo Chromium SDK 108.0
 * Updated to Chromium 108.0.5359.28
