@@ -33,7 +33,7 @@ import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.test.ChromeBrowserTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
-import org.chromium.components.adblock.TestPagesTestsHelper.IncludeSubframes;
+import org.chromium.components.adblock.TestVerificationUtils.IncludeSubframes;
 
 import java.util.concurrent.TimeoutException;
 
@@ -45,6 +45,11 @@ public class TestPagesHeaderFilterTest {
     @Rule
     public ChromeTabbedActivityTestRule mActivityTestRule = new ChromeTabbedActivityTestRule();
     private TestPagesTestsHelper mHelper = new TestPagesTestsHelper();
+
+    public static final String HEADER_TESTPAGES_URL =
+            TestPagesTestsHelper.FILTER_TESTPAGES_TESTCASES_ROOT + "header";
+    public static final String HEADER_EXCEPTIONS_TESTPAGES_URL =
+            TestPagesTestsHelper.EXCEPTION_TESTPAGES_TESTCASES_ROOT + "header";
 
     @Before
     public void setUp() {
@@ -61,14 +66,15 @@ public class TestPagesHeaderFilterTest {
     @Feature({"adblock"})
     public void testHeaderFilterScript() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "||abptestpages.org/testfiles/header/$header=content-type=application/javascript");
-        mHelper.loadUrl("https://abptestpages.org/en/filters/header");
+                String.format("||%s/testfiles/header/$header=content-type=application/javascript",
+                        TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(HEADER_TESTPAGES_URL);
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_SCRIPT));
-        Assert.assertTrue(
-                mHelper.isBlocked("https://abptestpages.org/testfiles/header/script.js"));
-        mHelper.verifyDisplayedCount(
-                0, "div#functionproperty-target > div[data-expectedresult='fail']");
+        Assert.assertTrue(mHelper.isBlocked(String.format(
+                "https://%s/testfiles/header/script.js", TestPagesTestsHelper.TESTPAGES_DOMAIN)));
+        TestVerificationUtils.verifyDisplayedCount(mActivityTestRule, 0,
+                "div#functionproperty-target > div[data-expectedresult='fail']");
     }
 
     @Test
@@ -76,65 +82,69 @@ public class TestPagesHeaderFilterTest {
     @Feature({"adblock"})
     public void testHeaderFilterImage() throws TimeoutException, InterruptedException {
         mHelper.addCustomFilter(
-                "||abptestpages.org/testfiles/header/image.png$header=content-type=image/png");
-        mHelper.loadUrl("https://abptestpages.org/en/filters/header");
+                String.format("||%s/testfiles/header/image.png$header=content-type=image/png",
+                        TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(HEADER_TESTPAGES_URL);
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_IMAGE));
-        Assert.assertTrue(
-                mHelper.isBlocked("https://abptestpages.org/testfiles/header/image.png"));
-        mHelper.verifyDisplayedCount(0, "img[id='image-fail-1']");
+        Assert.assertTrue(mHelper.isBlocked(String.format(
+                "https://%s/testfiles/header/image.png", TestPagesTestsHelper.TESTPAGES_DOMAIN)));
+        TestVerificationUtils.verifyDisplayedCount(mActivityTestRule, 0, "img[id='image-fail-1']");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testHeaderFilterImageAndComma() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter(
-                "||abptestpages.org/testfiles/header/image2.png$header=date=\\x2c");
-        mHelper.loadUrl("https://abptestpages.org/en/filters/header");
+        mHelper.addCustomFilter(String.format("||%s/testfiles/header/image2.png$header=date=\\x2c",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(HEADER_TESTPAGES_URL);
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_IMAGE));
-        Assert.assertTrue(
-                mHelper.isBlocked("https://abptestpages.org/testfiles/header/image2.png"));
-        mHelper.verifyDisplayedCount(0, "img[id='comma-fail-1']");
+        Assert.assertTrue(mHelper.isBlocked(String.format(
+                "https://%s/testfiles/header/image2.png", TestPagesTestsHelper.TESTPAGES_DOMAIN)));
+        TestVerificationUtils.verifyDisplayedCount(mActivityTestRule, 0, "img[id='comma-fail-1']");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testHeaderFilterStylesheet() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter(
-                "||abptestpages.org/testfiles/header/$header=content-type=text/css");
-        mHelper.loadUrl("https://abptestpages.org/en/filters/header");
+        mHelper.addCustomFilter(String.format("||%s/testfiles/header/$header=content-type=text/css",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(HEADER_TESTPAGES_URL);
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertEquals(
                 1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_STYLESHEET));
-        Assert.assertTrue(mHelper.isBlocked(
-                "https://abptestpages.org/testfiles/header/stylesheet.css"));
+        Assert.assertTrue(
+                mHelper.isBlocked(String.format("https://%s/testfiles/header/stylesheet.css",
+                        TestPagesTestsHelper.TESTPAGES_DOMAIN)));
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testHeaderFilterException() throws TimeoutException, InterruptedException {
-        // TODO: uncomment this part of test after DPD-1257.
         // Add blocking filter, expect blocked image
-        // mHelper.addCustomFilter(
-        //         "||abptestpages.org/testfiles/header_exception/$header=content-type=image/png");
-        // mHelper.loadUrl("https://abptestpages.org/en/exceptions/header");
-        // Assert.assertEquals(1, mHelper.numBlocked());
-        // Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_IMAGE));
-        // mHelper.verifyDisplayedCount(0, "img[id='image-header-exception-pass-1']");
+        mHelper.addCustomFilter(
+                String.format("||%s/testfiles/header_exception/$header=content-type=image/png",
+                        TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(HEADER_EXCEPTIONS_TESTPAGES_URL);
+        Assert.assertEquals(1, mHelper.numBlocked());
+        Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_IMAGE));
+        TestVerificationUtils.verifyDisplayedCount(
+                mActivityTestRule, 0, "img[id='image-header-exception-pass-1']");
 
         // Add exception filter, expect image allowed
-        mHelper.addCustomFilter(
-                "||abptestpages.org/testfiles/header_exception/$header=content-type=image/png");
-        mHelper.addCustomFilter("@@abptestpages.org/testfiles/header_exception/$header");
-        mHelper.loadUrl("https://abptestpages.org/en/exceptions/header");
+        mHelper.addCustomFilter(String.format(
+                "@@%s/testfiles/header_exception/$header", TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(HEADER_EXCEPTIONS_TESTPAGES_URL);
         Assert.assertEquals(1, mHelper.numAllowed());
         Assert.assertEquals(1, mHelper.numAllowedByType(AdblockContentType.CONTENT_TYPE_IMAGE));
-        Assert.assertTrue(mHelper.isAllowed(
-                "https://abptestpages.org/testfiles/header_exception/image.png"));
-        mHelper.verifyDisplayedCount(1, "img[id='image-header-exception-pass-1']");
+        Assert.assertTrue(
+                mHelper.isAllowed(String.format("https://%s/testfiles/header_exception/image.png",
+                        TestPagesTestsHelper.TESTPAGES_DOMAIN)));
+        TestVerificationUtils.verifyDisplayedCount(
+                mActivityTestRule, 1, "img[id='image-header-exception-pass-1']");
     }
 }

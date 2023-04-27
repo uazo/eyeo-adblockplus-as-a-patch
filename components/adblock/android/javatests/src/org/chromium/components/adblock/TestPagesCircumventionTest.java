@@ -50,7 +50,7 @@ public class TestPagesCircumventionTest {
     @Before
     public void setUp() {
         mHelper.setUp(mActivityTestRule);
-        mHelper.addFilterList(TestPagesTestsHelper.DISTRIBUTION_UNIT_TESTPAGE_SUBSCRIPTION);
+        mHelper.addFilterList(TestPagesTestsHelper.TESTPAGES_SUBSCRIPTION);
     }
 
     @After
@@ -63,9 +63,9 @@ public class TestPagesCircumventionTest {
     @Feature({"adblock"})
     public void testVerifyCircumventionInlineStyleNotImportant()
             throws TimeoutException, InterruptedException {
-        mHelper.loadUrl(TestPagesTestsHelper.CIRCUMVENTION_DISTRIBUTION_UNIT_TESTCASES_ROOT
+        mHelper.loadUrl(TestPagesTestsHelper.CIRCUMVENTION_TESTPAGES_TESTCASES_ROOT
                 + "inline-style-important");
-        mHelper.verifyHiddenCount(2, "div");
+        TestVerificationUtils.verifyHiddenCount(mActivityTestRule, 2, "div");
     }
 
     @Test
@@ -73,9 +73,10 @@ public class TestPagesCircumventionTest {
     @Feature({"adblock"})
     public void testVerifyCircumventionAnonymousFrameDocumentWrite()
             throws TimeoutException, InterruptedException {
-        mHelper.loadUrl(TestPagesTestsHelper.CIRCUMVENTION_DISTRIBUTION_UNIT_TESTCASES_ROOT
+        mHelper.loadUrl(TestPagesTestsHelper.CIRCUMVENTION_TESTPAGES_TESTCASES_ROOT
                 + "anoniframe-documentwrite");
-        mHelper.verifyHiddenCount(1, "span[data-expectedresult='fail']");
+        TestVerificationUtils.verifyHiddenCount(
+                mActivityTestRule, 1, "span[data-expectedresult='fail']");
         String numHidden = JavaScriptUtils.executeJavaScriptAndWaitForResult(
                 mHelper.getWebContents(),
                 "var hiddenCount = 0;"

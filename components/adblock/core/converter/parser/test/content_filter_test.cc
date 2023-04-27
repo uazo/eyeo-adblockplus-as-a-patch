@@ -22,7 +22,7 @@
 
 namespace adblock {
 
-using ::testing::ElementsAre;
+using ::testing::UnorderedElementsAre;
 
 TEST(AdblockContentFilterTest, ParseEmptyContentFilter) {
   EXPECT_FALSE(
@@ -38,7 +38,7 @@ TEST(AdblockContentFilterTest, ParseElemHideFilter) {
   EXPECT_EQ(content_filter->selector,
             ".testcase-container > .testcase-eh-descendant");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("example.org"));
+              UnorderedElementsAre("example.org"));
   EXPECT_TRUE(content_filter->domains.GetExcludeDomains().empty());
 }
 
@@ -50,7 +50,7 @@ TEST(AdblockContentFilterTest, ParseElemHideFilterWithNonAsciiCharacters) {
   EXPECT_EQ(content_filter->type, FilterType::ElemHide);
   EXPECT_EQ(content_filter->selector, ".ad_bÖx");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("test.com"));
+              UnorderedElementsAre("test.com"));
   EXPECT_TRUE(content_filter->domains.GetExcludeDomains().empty());
 }
 
@@ -62,9 +62,9 @@ TEST(AdblockContentFilterTest, ParseElemHideFilterMultipleDomains) {
   EXPECT_EQ(content_filter->type, FilterType::ElemHide);
   EXPECT_EQ(content_filter->selector, "test-selector");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("example.org", "bar.example.org"));
+              UnorderedElementsAre("example.org", "bar.example.org"));
   EXPECT_THAT(content_filter->domains.GetExcludeDomains(),
-              ElementsAre("foo.example.org"));
+              UnorderedElementsAre("foo.example.org"));
 }
 
 TEST(AdblockContentFilterTest, ParseElemHideFilterWithIdSelector) {
@@ -74,7 +74,7 @@ TEST(AdblockContentFilterTest, ParseElemHideFilterWithIdSelector) {
   EXPECT_EQ(content_filter->type, FilterType::ElemHide);
   EXPECT_EQ(content_filter->selector, "#this_is_an_id");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("example.org"));
+              UnorderedElementsAre("example.org"));
   EXPECT_TRUE(content_filter->domains.GetExcludeDomains().empty());
 }
 
@@ -101,7 +101,7 @@ TEST(AdblockContentFilterTest, ParseElemHideExceptionFilter) {
   EXPECT_EQ(content_filter->type, FilterType::ElemHideException);
   EXPECT_EQ(content_filter->selector, "selector");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("example.org"));
+              UnorderedElementsAre("example.org"));
   EXPECT_TRUE(content_filter->domains.GetExcludeDomains().empty());
 }
 
@@ -112,7 +112,7 @@ TEST(AdblockContentFilterTest, ParseElemHideExceptionFilterWithIdSelector) {
   EXPECT_EQ(content_filter->type, FilterType::ElemHideException);
   EXPECT_EQ(content_filter->selector, "#this_is_an_id");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("example.org"));
+              UnorderedElementsAre("example.org"));
   EXPECT_TRUE(content_filter->domains.GetExcludeDomains().empty());
 }
 
@@ -123,7 +123,7 @@ TEST(AdblockContentFilterTest, ParseElemHideEmulationFilter) {
   EXPECT_EQ(content_filter->type, FilterType::ElemHideEmulation);
   EXPECT_EQ(content_filter->selector, "foo");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("foo.example.org"));
+              UnorderedElementsAre("foo.example.org"));
   EXPECT_TRUE(content_filter->domains.GetExcludeDomains().empty());
 }
 
@@ -136,7 +136,7 @@ TEST(AdblockContentFilterTest,
   EXPECT_EQ(content_filter->type, FilterType::ElemHideEmulation);
   EXPECT_EQ(content_filter->selector, ".ad_bÖx");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("test.com"));
+              UnorderedElementsAre("test.com"));
   EXPECT_TRUE(content_filter->domains.GetExcludeDomains().empty());
 }
 
@@ -155,9 +155,9 @@ TEST(AdblockContentFilterTest,
   EXPECT_EQ(content_filter->type, FilterType::ElemHideEmulation);
   EXPECT_EQ(content_filter->selector, "foo");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("example.org"));
+              UnorderedElementsAre("example.org"));
   EXPECT_THAT(content_filter->domains.GetExcludeDomains(),
-              ElementsAre("example_too.org"));
+              UnorderedElementsAre("example_too.org"));
 }
 
 TEST(AdblockContentFilterTest,
@@ -169,9 +169,27 @@ TEST(AdblockContentFilterTest,
   EXPECT_EQ(content_filter->type, FilterType::ElemHideEmulation);
   EXPECT_EQ(content_filter->selector, "foo");
   EXPECT_THAT(content_filter->domains.GetIncludeDomains(),
-              ElementsAre("example.org"));
+              UnorderedElementsAre("example.org"));
   EXPECT_THAT(content_filter->domains.GetExcludeDomains(),
-              ElementsAre("example_too.org", "localhost"));
+              UnorderedElementsAre("example_too.org", "localhost"));
+}
+
+TEST(AdblockContentFilterTest, ParseUnspecifcContentFilter) {
+  // Short, non domain-specific filters are disallowed because they could break
+  // a lot of sites by accident:
+  EXPECT_FALSE(
+      ContentFilter::FromString("", FilterType::ElemHide, "li").has_value());
+  EXPECT_FALSE(ContentFilter::FromString("", FilterType::ElemHideException, "p")
+                   .has_value());
+
+  // This filter is long enough:
+  EXPECT_TRUE(
+      ContentFilter::FromString("", FilterType::ElemHide, "adv").has_value());
+  // This filter is short ("p") but domain-specific, so in worst case it could
+  // only break example.com.
+  EXPECT_TRUE(
+      ContentFilter::FromString("example.com", FilterType::ElemHide, "p")
+          .has_value());
 }
 
 }  // namespace adblock

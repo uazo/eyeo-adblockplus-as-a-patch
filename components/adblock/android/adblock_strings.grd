@@ -206,7 +206,7 @@
         Add custom filter lists
       </message>
       <message name="IDS_FRAGMENT_ADBLOCK_MORE_OPTIONS_ADD_CUSTOM_FILTER_LIST" desc="Hint shown in a EditView for adding custom filter list URL">
-        http://example.org/myFilterList.txt
+        https://example.org/myFilterList.txt
       </message>
       <message name="IDS_FRAGMENT_ADBLOCK_MORE_OPTIONS_CUSTOM_FILTERS_TITLE" desc="Title of the Preference and fragment for adding custom filters">
         Custom Filters

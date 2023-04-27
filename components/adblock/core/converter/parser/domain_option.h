@@ -42,6 +42,7 @@ class DomainOption {
   const std::vector<std::string>& GetIncludeDomains() const;
 
   void RemoveDomainsWithNoSubdomain();
+  bool UnrestrictedByDomain() const;
 
  private:
   DomainOption(std::vector<std::string> exclude_domains,

@@ -199,6 +199,10 @@ absl::optional<base::StringPiece> FindNextTokenInInput(
     return NextTokenBeginsInput(base::StringPiece(), tokenizer, recursion_depth)
                ? absl::optional<base::StringPiece>{consumed_input}
                : absl::nullopt;
+  } else if (token == "|") {
+    // If we're skipping characters, we can always skip enough to reach the end
+    // anchor.
+    return consumed_input;
   } else {
     // The searched token is just ASCII text. Keep searching for occurrences of
     // it within consumed_input.

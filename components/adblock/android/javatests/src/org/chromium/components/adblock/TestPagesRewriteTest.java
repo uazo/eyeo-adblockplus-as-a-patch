@@ -47,7 +47,7 @@ public class TestPagesRewriteTest {
     private TestPagesTestsHelper mHelper = new TestPagesTestsHelper();
 
     public static final String REWRITE_TEST_URL =
-       "https://abptestpages.org/en/filters/rewrite";
+            TestPagesTestsHelper.FILTER_TESTPAGES_TESTCASES_ROOT + "rewrite";
 
     @Before
     public void setUp() {
@@ -63,95 +63,115 @@ public class TestPagesRewriteTest {
     @LargeTest
     @Feature({"adblock"})
     public void testRewriteScript() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/*.js$rewrite=abp-resource:blank-js,domain=abptestpages.org");
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/*.js$rewrite=abp-resource:blank-js,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(REWRITE_TEST_URL);
-        mHelper.verifyDisplayedCount(0, "div[id='script-fail-1']");
+        TestVerificationUtils.verifyDisplayedCount(mActivityTestRule, 0, "div[id='script-fail-1']");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testRewriteStylesheet() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/*.css$rewrite=abp-resource:blank-css,domain=abptestpages.org");
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/*.css$rewrite=abp-resource:blank-css,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(REWRITE_TEST_URL);
-        mHelper.verifyGreenBackground("stylesheet-target");
+        TestVerificationUtils.verifyGreenBackground(mActivityTestRule, "stylesheet-target");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testRewriteSubdocument() throws TimeoutException, InterruptedException {
-      mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/*.html$rewrite=abp-resource:blank-html,domain=abptestpages.org");
-      mHelper.loadUrl(REWRITE_TEST_URL);
-      mHelper.verifySelfTestPass("subdocument-target");
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/*.html$rewrite=abp-resource:blank-html,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(REWRITE_TEST_URL);
+        TestVerificationUtils.verifySelfTestPass(mActivityTestRule, "subdocument-target");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testRewriteText() throws TimeoutException, InterruptedException {
-      mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/*.txt$rewrite=abp-resource:blank-text,domain=abptestpages.org");
-      mHelper.loadUrl(REWRITE_TEST_URL);
-      mHelper.verifySelfTestPass("text-status");
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/*.txt$rewrite=abp-resource:blank-text,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(REWRITE_TEST_URL);
+        TestVerificationUtils.verifySelfTestPass(mActivityTestRule, "text-status");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testRewriteGif() throws TimeoutException, InterruptedException {
-      mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/1x1.gif$rewrite=abp-resource:1x1-transparent-gif,domain=abptestpages.org");
-      mHelper.loadUrl(REWRITE_TEST_URL);
-      mHelper.verifySelfTestPass("1x1-target");
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/1x1.gif$rewrite=abp-resource:1x1-transparent-gif,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(REWRITE_TEST_URL);
+        TestVerificationUtils.verifySelfTestPass(mActivityTestRule, "1x1-target");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testRewrite2x2Png() throws TimeoutException, InterruptedException {
-      mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/2x2.png$rewrite=abp-resource:2x2-transparent-png,domain=abptestpages.org");
-      mHelper.loadUrl(REWRITE_TEST_URL);
-      mHelper.verifySelfTestPass("2x2-target");
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/2x2.png$rewrite=abp-resource:2x2-transparent-png,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(REWRITE_TEST_URL);
+        TestVerificationUtils.verifySelfTestPass(mActivityTestRule, "2x2-target");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testRewrite3x2Png() throws TimeoutException, InterruptedException {
-      mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/3x2.png$rewrite=abp-resource:3x2-transparent-png,domain=abptestpages.org");
-      mHelper.loadUrl(REWRITE_TEST_URL);
-      mHelper.verifySelfTestPass("3x2-target");
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/3x2.png$rewrite=abp-resource:3x2-transparent-png,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(REWRITE_TEST_URL);
+        TestVerificationUtils.verifySelfTestPass(mActivityTestRule, "3x2-target");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testRewrite32x32Png() throws TimeoutException, InterruptedException {
-      mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/32x32.png$rewrite=abp-resource:32x32-transparent-png,domain=abptestpages.org");
-      mHelper.loadUrl(REWRITE_TEST_URL);
-      mHelper.verifySelfTestPass("32x32-target");
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/32x32.png$rewrite=abp-resource:32x32-transparent-png,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(REWRITE_TEST_URL);
+        TestVerificationUtils.verifySelfTestPass(mActivityTestRule, "32x32-target");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testRewriteAudio() throws TimeoutException, InterruptedException {
-      mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/*.mp3$rewrite=abp-resource:blank-mp3,domain=abptestpages.org");
-      mHelper.loadUrl(REWRITE_TEST_URL);
-      String value = JavaScriptUtils.executeJavaScriptAndWaitForResult(
-          mActivityTestRule.getActivity().getActivityTab().getWebContents(),
-          "document.getElementById('audio-area').lastChild.getAttribute('data-expectedresult')");
-      Assert.assertEquals("\"pass\"", value);
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/*.mp3$rewrite=abp-resource:blank-mp3,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(REWRITE_TEST_URL);
+        String value = JavaScriptUtils.executeJavaScriptAndWaitForResult(
+                mActivityTestRule.getActivity().getActivityTab().getWebContents(),
+                "document.getElementById('audio-area').lastChild.getAttribute('data-expectedresult')");
+        Assert.assertEquals("\"pass\"", value);
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
     public void testRewriteVideo() throws TimeoutException, InterruptedException {
-      mHelper.addCustomFilter("||abptestpages.org/testfiles/rewrite/*.mp4$rewrite=abp-resource:blank-mp4,domain=abptestpages.org");
-      mHelper.loadUrl(REWRITE_TEST_URL);
-      String value = JavaScriptUtils.executeJavaScriptAndWaitForResult(
-          mActivityTestRule.getActivity().getActivityTab().getWebContents(),
-          "document.getElementById('video-area').lastChild.getAttribute('data-expectedresult')");
-      Assert.assertEquals("\"pass\"", value);
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/rewrite/*.mp4$rewrite=abp-resource:blank-mp4,domain=%s",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN, TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.loadUrl(REWRITE_TEST_URL);
+        String value = JavaScriptUtils.executeJavaScriptAndWaitForResult(
+                mActivityTestRule.getActivity().getActivityTab().getWebContents(),
+                "document.getElementById('video-area').lastChild.getAttribute('data-expectedresult')");
+        Assert.assertEquals("\"pass\"", value);
     }
 }

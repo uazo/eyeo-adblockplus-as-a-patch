@@ -36,7 +36,6 @@ namespace adblock {
 namespace {
 std::optional<base::TimeDelta> g_check_interval_for_testing;
 std::optional<base::TimeDelta> g_initial_delay_for_testing;
-constexpr base::StringPiece kAdblockFilteringConfigurationName = "adblock";
 
 base::TimeDelta GetInitialDelay() {
   static base::TimeDelta kInitialDelay =
@@ -52,17 +51,6 @@ base::TimeDelta GetCheckInterval() {
   return kCheckInterval;
 }
 
-FilteringConfiguration* GetAdblockFilteringConfiguration(
-    content::BrowserContext* context) {
-  auto filtering_configurations =
-      SubscriptionServiceFactory::GetForBrowserContext(context)
-          ->GetInstalledFilteringConfigurations();
-  const auto it = base::ranges::find(filtering_configurations,
-                                     kAdblockFilteringConfigurationName,
-                                     &FilteringConfiguration::GetName);
-  DCHECK(it != filtering_configurations.end());
-  return *it;
-}
 }  // namespace
 
 // static
@@ -99,8 +87,9 @@ KeyedService* AdblockTelemetryServiceFactory::BuildServiceInstanceFor(
           ->GetURLLoaderFactoryForBrowserProcess();
   auto* prefs = Profile::FromBrowserContext(context)->GetPrefs();
   auto service = std::make_unique<AdblockTelemetryService>(
-      GetAdblockFilteringConfiguration(context), url_loader_factory,
-      GetInitialDelay(), GetCheckInterval());
+      SubscriptionServiceFactory::GetForBrowserContext(context)
+          ->GetAdblockFilteringConfiguration(),
+      url_loader_factory, GetInitialDelay(), GetCheckInterval());
   service->AddTopicProvider(std::make_unique<ActivepingTelemetryTopicProvider>(
       utils::GetAppInfo(), prefs,
       AdblockControllerFactory::GetForBrowserContext(context),

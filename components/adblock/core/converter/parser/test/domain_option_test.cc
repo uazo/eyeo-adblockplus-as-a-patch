@@ -22,7 +22,7 @@
 
 namespace adblock {
 
-using ::testing::ElementsAre;
+using ::testing::UnorderedElementsAre;
 
 TEST(AdblockDomainOptionTest, ParseDomainOptionEmpty) {
   auto domains = DomainOption::FromString("", ",");
@@ -32,14 +32,14 @@ TEST(AdblockDomainOptionTest, ParseDomainOptionEmpty) {
 
 TEST(AdblockDomainOptionTest, ParseDomainOptionIncludeSimple) {
   auto domains = DomainOption::FromString("domain.org", ",");
-  EXPECT_THAT(domains.GetIncludeDomains(), ElementsAre("domain.org"));
+  EXPECT_THAT(domains.GetIncludeDomains(), UnorderedElementsAre("domain.org"));
   EXPECT_TRUE(domains.GetExcludeDomains().empty());
 }
 
 TEST(AdblockDomainOptionTest, ParseDomainOptionExcludeSimple) {
   auto domains = DomainOption::FromString("~domain.org", ",");
   EXPECT_TRUE(domains.GetIncludeDomains().empty());
-  EXPECT_THAT(domains.GetExcludeDomains(), ElementsAre("domain.org"));
+  EXPECT_THAT(domains.GetExcludeDomains(), UnorderedElementsAre("domain.org"));
 }
 
 TEST(AdblockDomainOptionTest, ParseDomainOptionMultiple) {
@@ -48,9 +48,10 @@ TEST(AdblockDomainOptionTest, ParseDomainOptionMultiple) {
       "org",
       ",");
   EXPECT_THAT(domains.GetIncludeDomains(),
-              ElementsAre("test.domain.org", "domain.org"));
-  EXPECT_THAT(domains.GetExcludeDomains(),
-              ElementsAre("test.exclude_domain.org", "exclude_domain.org"));
+              UnorderedElementsAre("test.domain.org", "domain.org"));
+  EXPECT_THAT(
+      domains.GetExcludeDomains(),
+      UnorderedElementsAre("test.exclude_domain.org", "exclude_domain.org"));
 }
 
 TEST(AdblockDomainOptionTest, ParseDomainOptionCaseInsensitive) {
@@ -59,9 +60,10 @@ TEST(AdblockDomainOptionTest, ParseDomainOptionCaseInsensitive) {
       "org",
       ",");
   EXPECT_THAT(domains.GetIncludeDomains(),
-              ElementsAre("test.domain.org", "domain.org"));
-  EXPECT_THAT(domains.GetExcludeDomains(),
-              ElementsAre("test.exclude_domain.org", "exclude_domain.org"));
+              UnorderedElementsAre("test.domain.org", "domain.org"));
+  EXPECT_THAT(
+      domains.GetExcludeDomains(),
+      UnorderedElementsAre("test.exclude_domain.org", "exclude_domain.org"));
 }
 
 TEST(AdblockDomainOptionTest, ParseDomainOptionMultipleWithWs) {
@@ -70,15 +72,16 @@ TEST(AdblockDomainOptionTest, ParseDomainOptionMultipleWithWs) {
       ",~test.exclude_domain.org ",
       ",");
   EXPECT_THAT(domains.GetIncludeDomains(),
-              ElementsAre("test.domain.org", "domain.org"));
-  EXPECT_THAT(domains.GetExcludeDomains(),
-              ElementsAre("test.exclude_domain.org", "exclude_domain.org"));
+              UnorderedElementsAre("test.domain.org", "domain.org"));
+  EXPECT_THAT(
+      domains.GetExcludeDomains(),
+      UnorderedElementsAre("test.exclude_domain.org", "exclude_domain.org"));
 }
 
 TEST(AdblockDomainOptionTest, ParseDomainOptionIncludeMultiple) {
   auto domains = DomainOption::FromString("domain.org,test.domain.org", ",");
   EXPECT_THAT(domains.GetIncludeDomains(),
-              ElementsAre("domain.org", "test.domain.org"));
+              UnorderedElementsAre("domain.org", "test.domain.org"));
   EXPECT_TRUE(domains.GetExcludeDomains().empty());
 }
 
@@ -86,16 +89,19 @@ TEST(AdblockDomainOptionTest, ParseDomainOptionExcludeMultiple) {
   auto domains = DomainOption::FromString(
       "~exclude_domain.org,~test.exclude_domain.org", ",");
   EXPECT_TRUE(domains.GetIncludeDomains().empty());
-  EXPECT_THAT(domains.GetExcludeDomains(),
-              ElementsAre("exclude_domain.org", "test.exclude_domain.org"));
+  EXPECT_THAT(
+      domains.GetExcludeDomains(),
+      UnorderedElementsAre("exclude_domain.org", "test.exclude_domain.org"));
 }
 
 TEST(AdblockDomainOptionTest, RemoveDomainsWithNoSubdomain) {
   auto domains = DomainOption::FromString(
       "org,include_domain.org,~com,~exclude_domain.org", ",");
   domains.RemoveDomainsWithNoSubdomain();
-  EXPECT_THAT(domains.GetIncludeDomains(), ElementsAre("include_domain.org"));
-  EXPECT_THAT(domains.GetExcludeDomains(), ElementsAre("exclude_domain.org"));
+  EXPECT_THAT(domains.GetIncludeDomains(),
+              UnorderedElementsAre("include_domain.org"));
+  EXPECT_THAT(domains.GetExcludeDomains(),
+              UnorderedElementsAre("exclude_domain.org"));
 }
 
 TEST(AdblockDomainOptionTest, RemoveDomainsWithNoSubdomainButLocalhost) {
@@ -103,9 +109,21 @@ TEST(AdblockDomainOptionTest, RemoveDomainsWithNoSubdomainButLocalhost) {
       "localhost,include_domain.org,~localhost,~exclude_domain.org", ",");
   domains.RemoveDomainsWithNoSubdomain();
   EXPECT_THAT(domains.GetIncludeDomains(),
-              ElementsAre("include_domain.org", "localhost"));
+              UnorderedElementsAre("include_domain.org", "localhost"));
   EXPECT_THAT(domains.GetExcludeDomains(),
-              ElementsAre("exclude_domain.org", "localhost"));
+              UnorderedElementsAre("exclude_domain.org", "localhost"));
+}
+
+TEST(AdblockDomainOptionTest, ParseDomainOptionWithDuplications) {
+  auto domains = DomainOption::FromString(
+      "domain.org,~exclude_domain.org,test.domain.org,~test.exclude_domain.org,"
+      "domain.org,~exclude_domain.org,test.domain.org",
+      ",");
+  EXPECT_THAT(domains.GetIncludeDomains(),
+              UnorderedElementsAre("test.domain.org", "domain.org"));
+  EXPECT_THAT(
+      domains.GetExcludeDomains(),
+      UnorderedElementsAre("test.exclude_domain.org", "exclude_domain.org"));
 }
 
 }  // namespace adblock

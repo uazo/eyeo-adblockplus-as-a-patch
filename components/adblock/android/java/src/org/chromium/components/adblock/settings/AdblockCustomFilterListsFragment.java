@@ -20,7 +20,9 @@ package org.chromium.components.adblock.settings;
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
 import android.webkit.URLUtil;
+import android.widget.Toast;
 
 import org.chromium.components.adblock.AdblockController;
 import org.chromium.components.adblock.R;
@@ -89,9 +91,18 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment 
 
     @Override
     protected void addItemImpl(String url) {
+        if (!URLUtil.isHttpsUrl(url)) {
+            Toast toast =
+                    Toast.makeText(getActivity(), "Url must be https format", Toast.LENGTH_SHORT);
+            toast.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL, 0, 0);
+            toast.show();
+            Log.e(TAG, "Invalid url: " + url);
+            return;
+        }
         try {
             AdblockController.getInstance().installSubscription(new URL(URLUtil.guessUrl(url)));
         } catch (MalformedURLException ex) {
+            Toast.makeText(getActivity(), "Error parsing url", Toast.LENGTH_SHORT).show();
             Log.e(TAG, "Error parsing url: " + url);
         }
     }

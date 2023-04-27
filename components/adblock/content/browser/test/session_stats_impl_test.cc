@@ -46,23 +46,6 @@ class AdblockSessionStatsTest : public testing::Test {
 };
 
 TEST_F(AdblockSessionStatsTest, StatsDataCollected) {
-  EXPECT_TRUE(session_stats_->GetSessionAllowedAdsCount().empty());
-  EXPECT_TRUE(session_stats_->GetSessionBlockedAdsCount().empty());
-
-  classfier_.NotifyAdMatched(GURL(), FilterMatchResult::kAllowRule,
-                             std::vector<GURL>(), ContentType::Subdocument,
-                             nullptr, GURL());
-
-  classfier_.NotifyAdMatched(GURL(), FilterMatchResult::kBlockRule,
-                             std::vector<GURL>(), ContentType::Subdocument,
-                             nullptr, GURL());
-
-  // Before call to StartCollectingStats()
-  EXPECT_TRUE(session_stats_->GetSessionAllowedAdsCount().empty());
-  EXPECT_TRUE(session_stats_->GetSessionBlockedAdsCount().empty());
-
-  session_stats_->StartCollectingStats();
-
   classfier_.NotifyAdMatched(GURL(), FilterMatchResult::kAllowRule,
                              std::vector<GURL>(), ContentType::Subdocument,
                              nullptr, GURL{kAllowedTestSub});

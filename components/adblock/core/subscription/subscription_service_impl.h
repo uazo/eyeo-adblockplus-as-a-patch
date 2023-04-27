@@ -63,6 +63,7 @@ class SubscriptionServiceImpl final : public SubscriptionService,
       std::unique_ptr<FilteringConfiguration> configuration) final;
   std::vector<FilteringConfiguration*> GetInstalledFilteringConfigurations()
       final;
+  FilteringConfiguration* GetAdblockFilteringConfiguration() const final;
   Snapshot GetCurrentSnapshot() const final;
   void AddObserver(SubscriptionObserver*) final;
   void RemoveObserver(SubscriptionObserver*) final;

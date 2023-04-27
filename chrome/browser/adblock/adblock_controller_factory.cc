@@ -26,6 +26,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "components/adblock/core/adblock_controller_impl.h"
 #include "components/adblock/core/adblock_switches.h"
+#include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_prefs.h"
 #include "components/adblock/core/configuration/persistent_filtering_configuration.h"
 #include "components/adblock/core/subscription/subscription_config.h"
@@ -61,7 +62,8 @@ KeyedService* AdblockControllerFactory::BuildServiceInstanceFor(
     content::BrowserContext* context) const {
   auto* prefs = Profile::FromBrowserContext(context)->GetPrefs();
   auto adblock_filtering_configuration =
-      std::make_unique<PersistentFilteringConfiguration>(prefs, "adblock");
+      std::make_unique<PersistentFilteringConfiguration>(
+          prefs, kAdblockFilteringConfigurationName);
 
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           adblock::switches::kDisableAcceptableAds)) {

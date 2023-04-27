@@ -146,19 +146,17 @@ void SubscriptionPersistentMetadataImpl::LoadFromPrefs() {
   DCHECK(dict.is_dict());
   for (const auto dict_item : dict.DictItems()) {
     Metadata subscription;
+    DCHECK(dict_item.second.is_dict());
+    const auto* d = dict_item.second.GetIfDict();
     subscription.expiration_time =
-        ValueToTime(dict_item.second.FindKey(kExpirationTimeKey))
-            .value_or(base::Time());
+        ValueToTime(d->Find(kExpirationTimeKey)).value_or(base::Time());
     subscription.last_installation_time =
-        ValueToTime(dict_item.second.FindKey(kLastInstallationTimeKey))
-            .value_or(base::Time());
-    const auto* version = dict_item.second.FindStringKey(kVersionKey);
+        ValueToTime(d->Find(kLastInstallationTimeKey)).value_or(base::Time());
+    const auto* version = d->FindString(kVersionKey);
     if (version)
       subscription.version = *version;
-    subscription.error_count =
-        dict_item.second.FindIntKey(kErrorCountKey).value_or(0);
-    subscription.download_count =
-        dict_item.second.FindIntKey(kDownloadCountKey).value_or(0);
+    subscription.error_count = d->FindInt(kErrorCountKey).value_or(0);
+    subscription.download_count = d->FindInt(kDownloadCountKey).value_or(0);
     metadata_map_.emplace(dict_item.first, std::move(subscription));
   }
 }

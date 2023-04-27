@@ -38,7 +38,6 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeBrowserTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
-import org.chromium.content_public.browser.test.util.JavaScriptUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 import org.chromium.content_public.common.ContentSwitches;
 import org.chromium.net.test.EmbeddedTestServer;
@@ -103,21 +102,6 @@ public class FilteringConfigurationTest {
 
     public void loadTestUrl() throws InterruptedException {
         mActivityTestRule.loadUrl(mTestUrl, 5);
-    }
-
-    public String getResourcesComputedStyle() throws TimeoutException {
-        final Tab tab = mActivityTestRule.getActivity().getActivityTab();
-        final String javascript =
-                "window.getComputedStyle(document.getElementById('subresource')).display";
-        return JavaScriptUtils.executeJavaScriptAndWaitForResult(tab.getWebContents(), javascript);
-    }
-
-    public void expectResourceBlocked() throws TimeoutException {
-        Assert.assertEquals("\"none\"", getResourcesComputedStyle());
-    }
-
-    public void expectResourceShown() throws TimeoutException {
-        Assert.assertEquals("\"inline\"", getResourcesComputedStyle());
     }
 
     @Before
@@ -317,7 +301,7 @@ public class FilteringConfigurationTest {
         });
         mHelper.waitForCallback(0, 1, 10, TimeUnit.SECONDS);
         loadTestUrl();
-        expectResourceBlocked();
+        TestVerificationUtils.expectResourceBlocked(mActivityTestRule, "subresource");
     }
 
     @Test
@@ -333,7 +317,7 @@ public class FilteringConfigurationTest {
         });
         mHelper.waitForCallback(0, 1, 10, TimeUnit.SECONDS);
         loadTestUrl();
-        expectResourceShown();
+        TestVerificationUtils.expectResourceShown(mActivityTestRule, "subresource");
     }
 
     @Test
@@ -348,7 +332,7 @@ public class FilteringConfigurationTest {
         });
         mHelper.waitForCallback(0, 1, 10, TimeUnit.SECONDS);
         loadTestUrl();
-        expectResourceShown();
+        TestVerificationUtils.expectResourceShown(mActivityTestRule, "subresource");
     }
 
     @Test
@@ -368,7 +352,7 @@ public class FilteringConfigurationTest {
         });
         mHelper.waitForCallback(0, 1, 10, TimeUnit.SECONDS);
         loadTestUrl();
-        expectResourceBlocked();
+        TestVerificationUtils.expectResourceBlocked(mActivityTestRule, "subresource");
     }
 
     @Test
@@ -377,6 +361,6 @@ public class FilteringConfigurationTest {
     @Feature({"adblock"})
     public void noBlockingWithoutFilters() throws Exception {
         loadTestUrl();
-        expectResourceShown();
+        TestVerificationUtils.expectResourceShown(mActivityTestRule, "subresource");
     }
 }

@@ -60,7 +60,8 @@ enum ResourceType: uint32 {
   Ping = 1024,
   XmlHttpRequest = 2048,
   Media = 16384,
-  Font = 32768
+  Font = 32768,
+  WebBundle = 65536
 }
 
 // usage note: you figure out if this is blocking or allowing based on if

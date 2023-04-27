@@ -13,6 +13,61 @@
 // You should have received a copy of the GNU General Public License
 // along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
 
+'use strict';
+
+const urlParams = new URLSearchParams(window.location.search);
+
+// This class binds 1st argument for chrome.eyeoFilteringPrivate to 'adblock'
+// configuration and redirects methods renamed in chrome.eyeoFilteringPrivate
+// (eg. `onAdAllowed` => `onRequestAllowed`) which allows test code to
+// seamlessly call the same methods on chrome.adblockPrivate and on
+// chrome.eyeoFilteringPrivate.
+class FilteringPrivateBoundWithAdblock {
+  constructor() {
+    this.delegate = chrome.eyeoFilteringPrivate;
+    this.configuration = 'adblock';
+    this.getSessionAllowedAdsCount =
+        this.delegate.getSessionAllowedRequestsCount;
+    this.getSessionBlockedAdsCount =
+        this.delegate.getSessionBlockedRequestsCount;
+    this.onAdAllowed = this.delegate.onRequestAllowed;
+    this.onAdBlocked = this.delegate.onRequestBlocked;
+    this.onSubscriptionUpdated = this.delegate.onSubscriptionUpdated;
+    this.onAllowedDomainsUpdated = this.delegate.onAllowedDomainsUpdated;
+    const methodsToBind = [
+      'isEnabled', 'setEnabled', 'getAllowedDomains', 'addAllowedDomain',
+      'removeAllowedDomain', 'getCustomFilters', 'addCustomFilter',
+      'removeCustomFilter'
+    ];
+    for (const method of methodsToBind) {
+      this[method] = function() {
+        const args = Array.from(arguments);
+        args.unshift(this.configuration);
+        this.delegate[method].apply(this.delegate, args);
+      }
+    }
+    const methodsToBindRenamed = new Map([
+      ['installSubscription', 'subscribeToFilterList'],
+      ['uninstallSubscription', 'unsubscribeFromFilterList'],
+      ['getInstalledSubscriptions', 'getFilterLists'],
+    ]);
+    methodsToBindRenamed.forEach((value, key) => {
+      this[key] =
+          function() {
+            const args = Array.from(arguments);
+            args.unshift(this.configuration);
+            this.delegate[value].apply(this.delegate, args);
+          }
+    });
+  }
+};
+
+// Set API object for tests, defaults to chrome.adblockPrivate
+let apiObject = chrome.adblockPrivate;
+if (urlParams.get('api') === 'eyeoFilteringPrivate') {
+  apiObject = new FilteringPrivateBoundWithAdblock;
+}
+
 function findEnglishEasyList(item) {
   console.log(item.title + ' ' + item.url + ' ' + item.languages);
   return item.title.toLowerCase().includes('easylist') &&
@@ -64,24 +119,41 @@ function verifyEventData(event, expectedSubscription) {
   }
 }
 
-var availableTests = [
+function arrayEquals(a, b) {
+  if (a === b)
+    return true;
+  if (a === null || b === null)
+    return false;
+  if (a.length !== b.length)
+    return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] !== b[i])
+      return false;
+  }
+  return true;
+};
+
+const availableTests = [
   function setEnabled_isEnabled() {
-    chrome.adblockPrivate.setEnabled(true);
-    chrome.adblockPrivate.isEnabled(function(enabled) {
+    apiObject.setEnabled(false);
+    apiObject.isEnabled(function(enabled) {
+      if (enabled)
+        chrome.test.fail('Failed: ad blocking should NOT be enabled');
+    });
+    apiObject.setEnabled(true);
+    apiObject.isEnabled(function(enabled) {
       if (enabled)
         chrome.test.succeed();
       else
-        chrome.test.fail('Failed: Adblocking should be enabled');
-    });
-    chrome.adblockPrivate.setEnabled(false);
-    chrome.adblockPrivate.isEnabled(function(enabled) {
-      if (!enabled)
-        chrome.test.succeed();
-      else
-        chrome.test.fail('Failed: Adblocking should be enabled');
+        chrome.test.fail('Failed: ad blocking should be enabled');
     });
   },
   function setAAEnabled_isAAEnabled() {
+    chrome.adblockPrivate.setAcceptableAdsEnabled(false);
+    chrome.adblockPrivate.isAcceptableAdsEnabled(function(enabled) {
+      if (enabled)
+        chrome.test.fail('Failed: AA should NOT be enabled');
+    });
     chrome.adblockPrivate.setAcceptableAdsEnabled(true);
     chrome.adblockPrivate.getSelectedBuiltInSubscriptions(function(selected) {
       if (!containsSubscription(
@@ -96,24 +168,31 @@ var availableTests = [
       else
         chrome.test.fail('Failed: AA should be enabled');
     });
-    chrome.adblockPrivate.setAcceptableAdsEnabled(false);
-    chrome.adblockPrivate.getSelectedBuiltInSubscriptions(function(selected) {
-      if (containsSubscription(
-              selected,
-              'https://easylist-downloads.adblockplus.org/exceptionrules.txt')) {
-        chrome.test.fail('Failed: AA subscription should NOT be on the list');
-      }
-    });
-    chrome.adblockPrivate.isAcceptableAdsEnabled(function(enabled) {
-      if (!enabled)
-        chrome.test.succeed();
-      else
-        chrome.test.fail('Failed: AA should be enabled');
+  },
+  function setAAEnabled_isAAEnabled_newAPI() {
+    const default_config = 'adblock';
+    chrome.eyeoFilteringPrivate.getAcceptableAdsUrl(function(aa_url) {
+      chrome.eyeoFilteringPrivate.unsubscribeFromFilterList(
+          default_config, aa_url);
+      chrome.adblockPrivate.isAcceptableAdsEnabled(function(enabled) {
+        if (enabled)
+          chrome.test.fail('Failed: AA should NOT be enabled');
+      });
+      chrome.eyeoFilteringPrivate.getAcceptableAdsUrl(function(aa_url) {
+        chrome.eyeoFilteringPrivate.subscribeToFilterList(
+            default_config, aa_url);
+        chrome.adblockPrivate.isAcceptableAdsEnabled(function(enabled) {
+          if (enabled)
+            chrome.test.succeed();
+          else
+            chrome.test.fail('Failed: AA should be enabled');
+        });
+      });
     });
   },
   function getBuiltInSubscriptions() {
     chrome.adblockPrivate.getBuiltInSubscriptions(function(recommended) {
-      let found = recommended.find(findEnglishEasyList);
+      const found = recommended.find(findEnglishEasyList);
       if (found) {
         chrome.test.succeed();
       } else {
@@ -175,10 +254,9 @@ var availableTests = [
         });
   },
   function builtInSubscriptionsManagement() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let kEasylist = urlParams.get('easylist');
-    let kExceptionrules = urlParams.get('exceptions');
-    let kABPFilters = urlParams.get('snippets');
+    const kEasylist = urlParams.get('easylist');
+    const kExceptionrules = urlParams.get('exceptions');
+    const kABPFilters = urlParams.get('snippets');
 
     function containsDefaultSubscriptions(subscriptions) {
       return containsSubscription(subscriptions, kEasylist) &&
@@ -253,17 +331,22 @@ var availableTests = [
   // This test works because at the beginning getInstalledSubscriptions returns
   // just default entries from recommended subscriptions.
   function installedSubscriptionsDataSchema() {
-    chrome.adblockPrivate.getInstalledSubscriptions(function(installed) {
+    const disabled = !!urlParams.get('disabled');
+    if (disabled) {
+      apiObject.setEnabled(false);
+    }
+    apiObject.getInstalledSubscriptions(function(installed) {
       for (const subscription of installed) {
-        if (!subscription.current_version)
-          chrome.test.fail('Failed: Must contain "current_version" property');
-        if (!subscription.installation_state)
+        if (!(subscription.installation_state == 'Unknown' && disabled ||
+              subscription.installation_state != 'Unknown' && !disabled))
           chrome.test.fail(
-              'Failed: Must contain "installation_state" property');
-        if (!subscription.last_installation_time)
+              'Failed: Must contain valid "installation_state" property');
+        if (!subscription.current_version && !disabled)
+          chrome.test.fail('Failed: Must contain "current_version" property');
+        if (!subscription.last_installation_time && !disabled)
           chrome.test.fail(
               'Failed: Must contain "last_installation_time" property');
-        if (!subscription.title)
+        if (!subscription.title && !disabled)
           chrome.test.fail('Failed: Must contain "title" property');
         if (!subscription.url)
           chrome.test.fail('Failed: Must contain "url" property');
@@ -272,7 +355,7 @@ var availableTests = [
     });
   },
   function installSubscriptionInvalidURL() {
-    chrome.adblockPrivate.installSubscription('http://', function() {
+    apiObject.installSubscription('http://', function() {
       if (!chrome.runtime.lastError)
         chrome.test.fail('Failed: invalid input accepted');
       else
@@ -280,7 +363,7 @@ var availableTests = [
     });
   },
   function uninstallSubscriptionInvalidURL() {
-    chrome.adblockPrivate.uninstallSubscription('http://', function() {
+    apiObject.uninstallSubscription('http://', function() {
       if (!chrome.runtime.lastError)
         chrome.test.fail('Failed: invalid input accepted');
       else
@@ -288,11 +371,10 @@ var availableTests = [
     });
   },
   function subscriptionsManagement() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let kEasylist = urlParams.get('easylist');
-    let kExceptionrules = urlParams.get('exceptions');
-    let kABPFilters = urlParams.get('snippets');
-    let kCustom = 'https://example.com/subscription.txt';
+    const kEasylist = urlParams.get('easylist');
+    const kExceptionrules = urlParams.get('exceptions');
+    const kABPFilters = urlParams.get('snippets');
+    const kCustom = 'https://example.com/subscription.txt';
 
     function containsDefaultSubscriptions(subscriptions) {
       return containsSubscription(subscriptions, kEasylist) &&
@@ -300,26 +382,30 @@ var availableTests = [
           containsSubscription(subscriptions, kABPFilters);
     }
 
-    chrome.adblockPrivate.getInstalledSubscriptions(function(installed) {
+    if (urlParams.get('disabled')) {
+      apiObject.setEnabled(false);
+    }
+
+    apiObject.getInstalledSubscriptions(function(installed) {
       if (installed.length) {
         if (!containsDefaultSubscriptions(installed)) {
           chrome.test.fail('Failed: Should contain all default subscriptions');
         }
         for (const subscription of installed) {
-          chrome.adblockPrivate.uninstallSubscription(subscription.url);
+          apiObject.uninstallSubscription(subscription.url);
         }
       } else {
         chrome.test.fail('Failed: Should contain default subscriptions');
       }
-      chrome.adblockPrivate.getInstalledSubscriptions(function(installed) {
+      apiObject.getInstalledSubscriptions(function(installed) {
         if (installed.length) {
           chrome.test.fail(
               'Failed: There shouldn\'t be any installed subscriptions');
         }
-        chrome.adblockPrivate.installSubscription(kEasylist);
-        chrome.adblockPrivate.installSubscription(kExceptionrules);
-        chrome.adblockPrivate.installSubscription(kABPFilters);
-        chrome.adblockPrivate.getInstalledSubscriptions(function(installed) {
+        apiObject.installSubscription(kEasylist);
+        apiObject.installSubscription(kExceptionrules);
+        apiObject.installSubscription(kABPFilters);
+        apiObject.getInstalledSubscriptions(function(installed) {
           if (installed.length) {
             if (!containsDefaultSubscriptions(installed)) {
               chrome.test.fail(
@@ -328,14 +414,13 @@ var availableTests = [
           } else {
             chrome.test.fail('Failed: Should contain default subscriptions');
           }
-          chrome.adblockPrivate.installSubscription(kCustom);
-          chrome.adblockPrivate.getInstalledSubscriptions(function(installed) {
+          apiObject.installSubscription(kCustom);
+          apiObject.getInstalledSubscriptions(function(installed) {
             if (!containsSubscription(installed, kCustom)) {
               chrome.test.fail('Failed: Should contain custom subscription');
             }
-            chrome.adblockPrivate.uninstallSubscription(kCustom);
-            chrome.adblockPrivate.getInstalledSubscriptions(function(
-                installed) {
+            apiObject.uninstallSubscription(kCustom);
+            apiObject.getInstalledSubscriptions(function(installed) {
               if (containsSubscription(installed, kCustom)) {
                 chrome.test.fail(
                     'Failed: Should not contain custom subscription');
@@ -420,21 +505,21 @@ var availableTests = [
     });
   },
   function allowedDomainsManagement() {
-    chrome.adblockPrivate.getAllowedDomains(function(domains) {
+    apiObject.getAllowedDomains(function(domains) {
       if (domains.length) {
         for (const domain of domains)
-          chrome.adblockPrivate.removeAllowedDomain(domain);
+          apiObject.removeAllowedDomain(domain);
       }
 
-      chrome.adblockPrivate.getAllowedDomains(function(domains) {
+      apiObject.getAllowedDomains(function(domains) {
         if (domains.length) {
           chrome.test.fail('Failed: There shouldn\'t be any allowed domains');
           return;
         }
 
-        chrome.adblockPrivate.addAllowedDomain('foo.bar');
-        chrome.adblockPrivate.addAllowedDomain('bar.baz');
-        chrome.adblockPrivate.getAllowedDomains(function(domains) {
+        apiObject.addAllowedDomain('foo.bar');
+        apiObject.addAllowedDomain('bar.baz');
+        apiObject.getAllowedDomains(function(domains) {
           if (domains.length != 2) {
             chrome.test.fail('Failed: There should be 2 allowed domains');
             return;
@@ -446,10 +531,10 @@ var availableTests = [
             return;
           }
 
-          chrome.adblockPrivate.removeAllowedDomain('foo.bar');
-          chrome.adblockPrivate.removeAllowedDomain('bar.baz');
+          apiObject.removeAllowedDomain('foo.bar');
+          apiObject.removeAllowedDomain('bar.baz');
 
-          chrome.adblockPrivate.getAllowedDomains(function(domains) {
+          apiObject.getAllowedDomains(function(domains) {
             if (domains.length)
               chrome.test.fail('Failed: Still have allowed domains');
             else
@@ -460,21 +545,21 @@ var availableTests = [
     });
   },
   function customFiltersManagement() {
-    chrome.adblockPrivate.getCustomFilters(function(filters) {
+    apiObject.getCustomFilters(function(filters) {
       if (filters.length) {
         for (const filter of filters)
-          chrome.adblockPrivate.removeCustomFilter(filter);
+          apiObject.removeCustomFilter(filter);
       }
 
-      chrome.adblockPrivate.getCustomFilters(function(filters) {
+      apiObject.getCustomFilters(function(filters) {
         if (filters.length) {
           chrome.test.fail('Failed: There shouldn\'t be any custom filters');
           return;
         }
 
-        chrome.adblockPrivate.addCustomFilter('foo.bar');
-        chrome.adblockPrivate.addCustomFilter('bar.baz');
-        chrome.adblockPrivate.getCustomFilters(function(filters) {
+        apiObject.addCustomFilter('foo.bar');
+        apiObject.addCustomFilter('bar.baz');
+        apiObject.getCustomFilters(function(filters) {
           if (filters.length != 2) {
             chrome.test.fail('Failed: There should be 2 custom filters');
             return;
@@ -486,10 +571,10 @@ var availableTests = [
             return;
           }
 
-          chrome.adblockPrivate.removeCustomFilter('foo.bar');
-          chrome.adblockPrivate.removeCustomFilter('bar.baz');
+          apiObject.removeCustomFilter('foo.bar');
+          apiObject.removeCustomFilter('bar.baz');
 
-          chrome.adblockPrivate.getCustomFilters(function(filters) {
+          apiObject.getCustomFilters(function(filters) {
             if (filters.length)
               chrome.test.fail('Failed: Still have custom filters');
             else
@@ -500,95 +585,153 @@ var availableTests = [
     });
   },
   function adBlockedEvents() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let expectedSubscription = urlParams.get('subscription_url');
-    chrome.adblockPrivate.onSubscriptionUpdated.addListener(function(
-        subscription) {
+    const expectedSubscription = urlParams.get('subscription_url');
+    apiObject.onSubscriptionUpdated.addListener(function(subscription) {
       if (subscription !== expectedSubscription)
         chrome.test.fail('Failed: Unexpected subscription: ' + subscription);
 
-      chrome.adblockPrivate.onAdBlocked.addListener(function(e) {
+      apiObject.onAdBlocked.addListener(function(e) {
         verifyEventData(e, expectedSubscription);
         if (e.url.includes('test1.png')) {
           chrome.test.succeed();
         }
       });
-      let request = new XMLHttpRequest();
-      let handler = function() {};
+      const request = new XMLHttpRequest();
+      const handler = function() {};
       request.onload = handler;
       request.onerror = handler;
       request.open('GET', 'https://example.com/test1.png', true);
       request.send();
     });
-    chrome.adblockPrivate.installSubscription(expectedSubscription);
+    apiObject.installSubscription(expectedSubscription);
   },
   function adAllowedEvents() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let expectedSubscription = urlParams.get('subscription_url');
-    chrome.adblockPrivate.onSubscriptionUpdated.addListener(function(
-        subscription) {
+    const expectedSubscription = urlParams.get('subscription_url');
+    apiObject.onSubscriptionUpdated.addListener(function(subscription) {
       if (subscription !== expectedSubscription)
         chrome.test.fail('Failed: Unexpected subscription: ' + subscription);
 
-      chrome.adblockPrivate.onAdAllowed.addListener(function(e) {
+      apiObject.onAdAllowed.addListener(function(e) {
         verifyEventData(e, expectedSubscription);
         if (e.url.includes('test2.png')) {
           chrome.test.succeed();
         }
       });
-      let request = new XMLHttpRequest();
-      let handler = function() {};
+      const request = new XMLHttpRequest();
+      const handler = function() {};
       request.onload = handler;
       request.onerror = handler;
       request.open('GET', 'https://example.com/test2.png', true);
       request.send();
     });
-    chrome.adblockPrivate.installSubscription(expectedSubscription);
+    apiObject.installSubscription(expectedSubscription);
   },
   function sessionStats() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let expectedSubscription = urlParams.get('subscription_url');
+    const expectedSubscription = urlParams.get('subscription_url');
     // Verify that subscription was downloaded and update event triggered,
     // then verify correct number of a session blocked and allowed ads count
     // for this subscription.
-    chrome.adblockPrivate.onSubscriptionUpdated.addListener(function(
-        subscription) {
+    apiObject.onSubscriptionUpdated.addListener(function(subscription) {
       if (subscription !== expectedSubscription)
         chrome.test.fail('Failed: Unexpected subscription: ' + subscription);
 
-      let handler = function() {
-        chrome.adblockPrivate.getSessionBlockedAdsCount(function(sessionStats) {
+      const handler = function() {
+        apiObject.getSessionBlockedAdsCount(function(sessionStats) {
           verifySessionStats(sessionStats, expectedSubscription);
-          let handler = function() {
-            chrome.adblockPrivate.getSessionAllowedAdsCount(function(
-                sessionStats) {
+          const handler = function() {
+            apiObject.getSessionAllowedAdsCount(function(sessionStats) {
               verifySessionStats(sessionStats, expectedSubscription);
               chrome.test.succeed();
             });
           };
-          let request = new XMLHttpRequest();
+          const request = new XMLHttpRequest();
           request.onload = handler;
           request.onerror = handler;
           request.open('GET', 'https://example.com/test4.png', true);
           request.send();
         });
       };
-      let request = new XMLHttpRequest();
+      const request = new XMLHttpRequest();
       request.onload = handler;
       request.onerror = handler;
       request.open('GET', 'https://example.com/test3.png', true);
       request.send();
     });
-    chrome.adblockPrivate.installSubscription(expectedSubscription);
+    apiObject.installSubscription(expectedSubscription);
+  },
+  function allowedDomainsEvent() {
+    const domain = 'domain.com';
+    let data = [domain];
+    let attempts = 2;
+    chrome.adblockPrivate.onAllowedDomainsChanged.addListener(function() {
+      chrome.adblockPrivate.getAllowedDomains(function(domains) {
+        if (!arrayEquals(data, domains)) {
+          chrome.test.fail('Unexpected domain list');
+        }
+        if (--attempts == 0) {
+          chrome.test.succeed();
+        }
+      });
+    });
+    chrome.adblockPrivate.addAllowedDomain(domain);
+    data = [];
+    chrome.adblockPrivate.removeAllowedDomain(domain);
+  },
+  function enabledStateEvent() {
+    let state = false;
+    let attempts = 2;
+    chrome.adblockPrivate.onEnabledStateChanged.addListener(function() {
+      chrome.adblockPrivate.isEnabled(function(enabled) {
+        if (enabled !== state) {
+          chrome.test.fail('Unexpected enabled state');
+        }
+        if (--attempts == 0) {
+          chrome.test.succeed();
+        }
+      });
+    });
+    chrome.adblockPrivate.setEnabled(false);
+    state = true;
+    chrome.adblockPrivate.setEnabled(true);
+  },
+  function filterListsEvent() {
+    const domain = 'http://domain.com/';
+    let data = [domain];
+    let attempts = 2;
+    chrome.adblockPrivate.onFilterListsChanged.addListener(function() {
+      chrome.adblockPrivate.getCustomSubscriptions(function(custom) {
+        if (!arrayEquals(data, custom)) {
+          chrome.test.fail('Unexpected subscription list');
+        }
+        if (--attempts == 0) {
+          chrome.test.succeed();
+        }
+      });
+    });
+    chrome.adblockPrivate.addCustomSubscription(domain);
+    data = [];
+    chrome.adblockPrivate.removeCustomSubscription(domain);
+  },
+  function customFiltersEvent() {
+    const filter = 'foo.bar';
+    let data = [filter];
+    let attempts = 2;
+    chrome.adblockPrivate.onCustomFiltersChanged.addListener(function() {
+      chrome.adblockPrivate.getCustomFilters(function(filters) {
+        if (!arrayEquals(data, filters)) {
+          chrome.test.fail('Unexpected custom filter list');
+        }
+        if (--attempts == 0) {
+          chrome.test.succeed();
+        }
+      });
+    });
+    chrome.adblockPrivate.addCustomFilter(filter);
+    data = [];
+    chrome.adblockPrivate.removeCustomFilter(filter);
   },
 ];
 
-var testToRun;
-if (window.location.search.indexOf('&') > 1)
-  testToRun =
-      window.location.search.substring(1, window.location.search.indexOf('&'));
-else
-  testToRun = window.location.search.substring(1);
 chrome.test.runTests(availableTests.filter(function(op) {
-  return op.name == testToRun;
+  return op.name == urlParams.get('subtest');
 }));

@@ -28,12 +28,15 @@
 #include "components/adblock/core/subscription/ongoing_subscription_request.h"
 #include "components/adblock/core/subscription/subscription_downloader.h"
 #include "net/base/backoff_entry.h"
+#include "net/base/network_change_notifier.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
 
 namespace adblock {
 
-class OngoingSubscriptionRequestImpl final : public OngoingSubscriptionRequest {
+class OngoingSubscriptionRequestImpl final
+    : public OngoingSubscriptionRequest,
+      public net::NetworkChangeNotifier::NetworkChangeObserver {
  public:
   OngoingSubscriptionRequestImpl(
       const net::BackoffEntry::Policy* backoff_policy,
@@ -45,7 +48,14 @@ class OngoingSubscriptionRequestImpl final : public OngoingSubscriptionRequest {
 
   size_t GetNumberOfRedirects() const final;
 
+  // NetworkChangeObserver:
+  void OnNetworkChanged(
+      net::NetworkChangeNotifier::ConnectionType connection_type) final;
+
  private:
+  bool IsConnectionAvailable(
+      net::NetworkChangeNotifier::ConnectionType connection_type) const;
+  bool IsStarted() const;
   void StartInternal();
   void OnDownloadFinished(base::FilePath downloaded_file);
   void OnHeadersReceived(scoped_refptr<net::HttpResponseHeaders> headers);

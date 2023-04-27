@@ -25,77 +25,37 @@ import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.content_public.browser.WebContents;
-import org.chromium.content_public.browser.test.util.JavaScriptUtils;
 import org.chromium.content_public.browser.test.util.TestThreadUtils;
 
 import java.lang.Thread;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 public class TestPagesTestsHelper {
-    public static final String MAIN_DISTRIBUTION_UNIT_TEST_PAGE =
-            "https://dp-testpages.adblockplus.org/";
-    public static final String MAIN_COMMON_TEST_PAGE = "https://abptestpages.org/";
-    public static final String DISTRIBUTION_UNIT_TESTCASES_ROOT =
-            MAIN_DISTRIBUTION_UNIT_TEST_PAGE + "en/";
-    public static final String COMMON_UNIT_TESTCASES_ROOT = MAIN_COMMON_TEST_PAGE + "en/";
-    public static final String FILTER_DISTRIBUTION_UNIT_TESTCASES_ROOT =
-            DISTRIBUTION_UNIT_TESTCASES_ROOT + "filters/";
-    public static final String EXCEPTION_DISTRIBUTION_UNIT_TESTCASES_ROOT =
-            DISTRIBUTION_UNIT_TESTCASES_ROOT + "exceptions/";
-    public static final String CIRCUMVENTION_DISTRIBUTION_UNIT_TESTCASES_ROOT =
-            DISTRIBUTION_UNIT_TESTCASES_ROOT + "circumvention/";
-    public static final String SNIPPETS_COMMON_UNIT_TESTCASES_ROOT =
-            COMMON_UNIT_TESTCASES_ROOT + "snippets/";
-    public static final String DISTRIBUTION_UNIT_RESOURCES_ROOT =
-            MAIN_DISTRIBUTION_UNIT_TEST_PAGE + "testfiles/";
-    public static final String DISTRIBUTION_UNIT_TESTPAGE_SUBSCRIPTION =
-            DISTRIBUTION_UNIT_TESTCASES_ROOT + "abp-testcase-subscription.txt";
-    public static final String DISTRIBUTION_UNIT_WEBSOCKET_TESTPAGE_SUBSCRIPTION =
-            DISTRIBUTION_UNIT_TESTCASES_ROOT + "websocket-webrtc-subscription.txt";
-    public static final String TESTPAGE_SUBSCRIPTION =
-            "https://abptestpages.org/en/abp-testcase-subscription.txt";
-
-    public enum IncludeSubframes {
-        YES,
-        NO,
-    }
+    public static final String TESTPAGES_DOMAIN = "abptestpages.org";
+    public static final String TESTPAGES_BASE_URL = "https://" + TESTPAGES_DOMAIN;
+    public static final String TESTPAGES_TESTCASES_ROOT = TESTPAGES_BASE_URL + "/en/";
+    public static final String FILTER_TESTPAGES_TESTCASES_ROOT =
+            TESTPAGES_TESTCASES_ROOT + "filters/";
+    public static final String EXCEPTION_TESTPAGES_TESTCASES_ROOT =
+            TESTPAGES_TESTCASES_ROOT + "exceptions/";
+    public static final String CIRCUMVENTION_TESTPAGES_TESTCASES_ROOT =
+            TESTPAGES_TESTCASES_ROOT + "circumvention/";
+    public static final String SITEKEY_TESTPAGES_TESTCASES_ROOT =
+            EXCEPTION_TESTPAGES_TESTCASES_ROOT + "sitekey";
+    public static final String SNIPPETS_TESTPAGES_TESTCASES_ROOT =
+            TESTPAGES_TESTCASES_ROOT + "snippets/";
+    public static final String TESTPAGES_RESOURCES_ROOT = TESTPAGES_BASE_URL + "/testfiles/";
+    public static final String TESTPAGES_SUBSCRIPTION =
+            TESTPAGES_TESTCASES_ROOT + "/abp-testcase-subscription.txt";
 
     private static final int TEST_TIMEOUT_SEC = 30;
-
-    private static final String MATCHES_HIDDEN_FUNCTION = "function matches(element) {"
-            + "  return window.getComputedStyle(element).display == \"none\""
-            + "}";
-
-    private static final String MATCHES_DISPLAYED_FUNCTION = "function matches(element) {"
-            + "  return window.getComputedStyle(element).display != \"none\""
-            + "}";
-
-    private static final String COUNT_ELEMENT_FUNCTION =
-            "function countElements(selector, includeSubframes) {"
-            + "  var count = 0;"
-            + "  for (let element of document.querySelectorAll(selector)) {"
-            + "    if (matches(element))"
-            + "      count++"
-            + "  }"
-            + "  if (includeSubframes) {"
-            + "    for (let frame of document.querySelectorAll(\"iframe\")) {"
-            + "      for (let element of frame.contentWindow.document.body.querySelectorAll(selector)) {"
-            + "        if (matches(element))"
-            + "          count++"
-            + "      }"
-            + "    }"
-            + "  }"
-            + "  return count"
-            + "}";
 
     private URL mTestSubscriptionUrl;
     private CallbackHelper mHelper = new CallbackHelper();
@@ -117,7 +77,7 @@ public class TestPagesTestsHelper {
         }
     }
 
-    public void setUp(ChromeTabbedActivityTestRule activityRule) {
+    public void setUp(final ChromeTabbedActivityTestRule activityRule) {
         mActivityTestRule = activityRule;
         mActivityTestRule.startMainActivityOnBlankPage();
         TestThreadUtils.runOnUiThreadBlocking(() -> {
@@ -127,7 +87,7 @@ public class TestPagesTestsHelper {
         });
     }
 
-    public void addFilterList(String filterListUrl) {
+    public void addFilterList(final String filterListUrl) {
         try {
             mTestSubscriptionUrl = new URL(filterListUrl);
             mObserver.setExpectedSubscriptionUrl(mTestSubscriptionUrl);
@@ -145,7 +105,7 @@ public class TestPagesTestsHelper {
         }
     }
 
-    public void addCustomFilter(String filter) {
+    public void addCustomFilter(final String filter) {
         TestThreadUtils.runOnUiThreadBlocking(
                 () -> { AdblockController.getInstance().addCustomFilter(filter); });
     }
@@ -166,66 +126,33 @@ public class TestPagesTestsHelper {
         return mActivityTestRule.getActivity().getTabModelSelector().getTotalTabCount();
     }
 
-    public void verifyHiddenCount(int num, String selector) throws TimeoutException {
-        verifyHiddenCount(num, selector, IncludeSubframes.YES);
-    }
-
-    public void verifyHiddenCount(int num, String selector, IncludeSubframes includeSubframes)
-            throws TimeoutException {
-        verifyMatchesCount(num, MATCHES_HIDDEN_FUNCTION, selector, includeSubframes);
-    }
-
-    public void verifyDisplayedCount(int num, String selector) throws TimeoutException {
-        verifyDisplayedCount(num, selector, IncludeSubframes.YES);
-    }
-
-    public void verifyDisplayedCount(int num, String selector, IncludeSubframes includeSubframes)
-            throws TimeoutException {
-        verifyMatchesCount(num, MATCHES_DISPLAYED_FUNCTION, selector, includeSubframes);
-    }
-
-    public void verifyMatchesCount(int num, String matchesFunction, String selector,
-            IncludeSubframes includeSubframes) throws TimeoutException {
-        final Tab tab = mActivityTestRule.getActivity().getActivityTab();
-        final String boolIncludeSubframes =
-                includeSubframes == IncludeSubframes.YES ? "true" : "false";
-        final String count = JavaScriptUtils.executeJavaScriptAndWaitForResult(tab.getWebContents(),
-                matchesFunction + COUNT_ELEMENT_FUNCTION + "\n countElements(\"" + selector + "\", "
-                        + boolIncludeSubframes + ");");
-        Assert.assertEquals(Integer.toString(num), count);
-    }
-
-    public void verifyGreenBackground(String elemId) throws TimeoutException {
-        String color = JavaScriptUtils.executeJavaScriptAndWaitForResult(
-                mActivityTestRule.getActivity().getActivityTab().getWebContents(),
-                "window.getComputedStyle(document.getElementById('" + elemId
-                        + "')).backgroundColor");
-        Assert.assertEquals("\"rgb(13, 199, 75)\"", color);
-    }
-
-    // For some cases it is better to rely on page script testing element
-    // rather than invent a specific script to check condition. For example
-    // checks for rewrite filters replaces content proper way.
-    public void verifySelfTestPass(String elemId) throws TimeoutException {
-        String value = JavaScriptUtils.executeJavaScriptAndWaitForResult(
-                mActivityTestRule.getActivity().getActivityTab().getWebContents(),
-                "document.getElementById('" + elemId + "').getAttribute('data-expectedresult')");
-        Assert.assertEquals("\"pass\"", value);
-    }
-
+    // Note: Use either setOnAdMatchedLatch XOR setOnAdMatchedExpectations
     public void setOnAdMatchedLatch(final CountDownLatch countDownLatch) {
+        Assert.assertTrue(
+                mObserver.countDownLatch == null || mObserver.countDownLatch.getCount() == 0);
         mObserver.countDownLatch = countDownLatch;
     }
 
-    public boolean isBlocked(String url) {
+    // Note: Use either setOnAdMatchedLatch XOR setOnAdMatchedExpectations
+    public CountDownLatch setOnAdMatchedExpectations(
+            final Set<String> onBlocked, final Set<String> onAllowed) {
+        Assert.assertTrue(
+                mObserver.countDownLatch == null || mObserver.countDownLatch.getCount() == 0);
+        mObserver.countDownLatch = new CountDownLatch(1);
+        mObserver.expectedBlocked = onBlocked;
+        mObserver.expectedAllowed = onAllowed;
+        return mObserver.countDownLatch;
+    }
+
+    public boolean isBlocked(final String url) {
         return mObserver.isBlocked(url);
     }
 
-    public boolean isPopupBlocked(String url) {
+    public boolean isPopupBlocked(final String url) {
         return mObserver.isPopupBlocked(url);
     }
 
-    public int numBlockedByType(AdblockContentType type) {
+    public int numBlockedByType(final AdblockContentType type) {
         return mObserver.numBlockedByType(type);
     }
 
@@ -233,7 +160,7 @@ public class TestPagesTestsHelper {
         return mObserver.numBlockedPopups();
     }
 
-    public int numAllowedByType(AdblockContentType type) {
+    public int numAllowedByType(final AdblockContentType type) {
         return mObserver.numAllowedByType(type);
     }
 
@@ -241,26 +168,27 @@ public class TestPagesTestsHelper {
         return mObserver.numAllowedPopups();
     }
 
-    public boolean isAllowed(String url) {
+    public boolean isAllowed(final String url) {
         return mObserver.isAllowed(url);
     }
 
-    public boolean isPageAllowed(String url) {
+    public boolean isPageAllowed(final String url) {
         return mObserver.isPageAllowed(url);
     }
 
-    public boolean isPopupAllowed(String url) {
+    public boolean isPopupAllowed(final String url) {
         return mObserver.isPopupAllowed(url);
     }
 
-    public void loadUrl(String url) throws InterruptedException {
+    public void loadUrl(final String url) throws InterruptedException, TimeoutException {
         mActivityTestRule.loadUrl(url, TEST_TIMEOUT_SEC);
-        // Some tests were using a short delay (up to 1s) on case by case basis.
-        // Do this for all to get rid of some flackiness and surprises when
-        // adding new tests.
-        // TODO(pstanek): Why it's suddenly needed and so long.
-        // TODO(mpawlowski): get rid of this sleep - DPD-1207
-        Thread.sleep(2000);
+    }
+
+    public void loadUrlWaitForContent(final String url)
+            throws InterruptedException, TimeoutException {
+        loadUrl(url);
+        TestVerificationUtils.verifyCondition(mActivityTestRule,
+                "document.getElementsByClassName('testcase-waiting-content').length == 0");
     }
 
     public int numBlocked() {

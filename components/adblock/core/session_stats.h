@@ -35,8 +35,6 @@ class SessionStats : public KeyedService {
   virtual std::map<GURL, long> GetSessionAllowedAdsCount() const = 0;
 
   virtual std::map<GURL, long> GetSessionBlockedAdsCount() const = 0;
-
-  virtual void StartCollectingStats() = 0;
 };
 
 }  // namespace adblock

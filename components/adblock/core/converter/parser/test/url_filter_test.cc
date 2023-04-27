@@ -129,4 +129,21 @@ TEST(AdblockUrlFilterTest, ParseAllowingFilterWithExceptionType) {
               ElementsAre(UrlFilterOptions::ExceptionType::Generichide));
 }
 
+TEST(AdblockUrlFilterTest, ParseUnspecifcGenericFilter) {
+  // Filter too short and too generic, could "break the internet":
+  EXPECT_FALSE(UrlFilter::FromString("adv").has_value());
+  // |-anchored filters still too short:
+  EXPECT_FALSE(UrlFilter::FromString("|adv").has_value());
+  EXPECT_FALSE(UrlFilter::FromString("||adv").has_value());
+  // Short filter is content-type-specific but not domain-specific:
+  EXPECT_FALSE(UrlFilter::FromString("n$image").has_value());
+
+  // Short pattern OK because the filter is domain specific:
+  EXPECT_TRUE(UrlFilter::FromString("n$domain=example.com").has_value());
+  // Filter pattern long enough:
+  EXPECT_TRUE(UrlFilter::FromString("advert").has_value());
+  // Filter pattern contains wildcard, allowed to be short:
+  EXPECT_TRUE(UrlFilter::FromString("a*").has_value());
+}
+
 }  // namespace adblock

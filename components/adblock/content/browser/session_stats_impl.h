@@ -36,8 +36,6 @@ class SessionStatsImpl final : public SessionStats,
 
   std::map<GURL, long> GetSessionBlockedAdsCount() const final;
 
-  void StartCollectingStats() final;
-
   // ResourceClassificationRunner::Observer:
   void OnAdMatched(const GURL& url,
                    FilterMatchResult match_result,

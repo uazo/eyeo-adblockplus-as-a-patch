@@ -42,7 +42,8 @@ public class TestPagesElemhideEmuInvTest {
     private TestPagesTestsHelper mHelper = new TestPagesTestsHelper();
 
     public static final String ELEMENT_HIDING_EMULATION_TESTPAGES_URL =
-            "https://abptestpages.org/en/filters/element-hiding-emulation-inversion";
+            TestPagesTestsHelper.FILTER_TESTPAGES_TESTCASES_ROOT
+            + "element-hiding-emulation-inversion";
 
     @Before
     public void setUp() {
@@ -57,61 +58,71 @@ public class TestPagesElemhideEmuInvTest {
     @Test
     @LargeTest
     @Feature({"adblock"})
-    public void testElemHideEmuNotAbpProperties()
-            throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("abptestpages.org#?#.ehei-properties:not(:-abp-properties(width: 238px))");
+    public void testElemHideEmuNotAbpProperties() throws TimeoutException, InterruptedException {
+        mHelper.addCustomFilter(
+                String.format("%s#?#.ehei-properties:not(:-abp-properties(width: 238px))",
+                        TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
-        mHelper.verifyHiddenCount(1, "div[id='basic-not-abp-properties-usage-fail']");
+        TestVerificationUtils.verifyHiddenCount(
+                mActivityTestRule, 1, "div[id='basic-not-abp-properties-usage-fail']");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
-    public void testElemHideEmuNotAbpHas()
-            throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("abptestpages.org#?#.ehei-has:not(:-abp-has(span.ehei-has-not-hide))");
+    public void testElemHideEmuNotAbpHas() throws TimeoutException, InterruptedException {
+        mHelper.addCustomFilter(
+                String.format("%s#?#.ehei-has:not(:-abp-has(span.ehei-has-not-hide))",
+                        TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
-        mHelper.verifyHiddenCount(1, "div[id='basic-not-abp-has-usage-fail']");
+        TestVerificationUtils.verifyHiddenCount(
+                mActivityTestRule, 1, "div[id='basic-not-abp-has-usage-fail']");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
-    public void testElemHideEmuNotAbpContains()
-            throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("abptestpages.org#?#.ehei-contains:not(span:-abp-contains(example-content))");
+    public void testElemHideEmuNotAbpContains() throws TimeoutException, InterruptedException {
+        mHelper.addCustomFilter(
+                String.format("%s#?#.ehei-contains:not(span:-abp-contains(example-content))",
+                        TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
-        mHelper.verifyHiddenCount(1, "span[id='basic-not-abp-contains-usage-fail']");
+        TestVerificationUtils.verifyHiddenCount(
+                mActivityTestRule, 1, "span[id='basic-not-abp-contains-usage-fail']");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
-    public void testElemHideEmuNotChained()
-            throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("abptestpages.org#?#.ehei-chained-parent:not(:-abp-has(> div:-abp-properties(width: 198px)))");
+    public void testElemHideEmuNotChained() throws TimeoutException, InterruptedException {
+        mHelper.addCustomFilter(String.format(
+                "%s#?#.ehei-chained-parent:not(:-abp-has(> div:-abp-properties(width: 198px)))",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
-        mHelper.verifyHiddenCount(1, "div[id='chained-extended-selectors-with-not-selector-fail-1']");
+        TestVerificationUtils.verifyHiddenCount(mActivityTestRule, 1,
+                "div[id='chained-extended-selectors-with-not-selector-fail-1']");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
-    public void testElemHideEmuNotCaseIsensitive()
-            throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("abptestpages.org#?#.ehei-case:not(:-abp-properties(WiDtH: 209px))");
+    public void testElemHideEmuNotCaseIsensitive() throws TimeoutException, InterruptedException {
+        mHelper.addCustomFilter(String.format("%s#?#.ehei-case:not(:-abp-properties(WiDtH: 209px))",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
-        mHelper.verifyHiddenCount(1, "div[id='case-insensitive-extended-selectors-with-not-selector-fail']");
+        TestVerificationUtils.verifyHiddenCount(mActivityTestRule, 1,
+                "div[id='case-insensitive-extended-selectors-with-not-selector-fail']");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
-    public void testElemHideEmuNotWildcard()
-            throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("abptestpages.org#?#.ehei-wildcard:not(:-abp-properties(cursor:*))");
+    public void testElemHideEmuNotWildcard() throws TimeoutException, InterruptedException {
+        mHelper.addCustomFilter(String.format("%s#?#.ehei-wildcard:not(:-abp-properties(cursor:*))",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
-        mHelper.verifyHiddenCount(1, "div[id='wildcard-in-extended-selector-combined-with-not-selector-fail']");
+        TestVerificationUtils.verifyHiddenCount(mActivityTestRule, 1,
+                "div[id='wildcard-in-extended-selector-combined-with-not-selector-fail']");
     }
 
     @Test
@@ -119,22 +130,29 @@ public class TestPagesElemhideEmuInvTest {
     @Feature({"adblock"})
     public void testElemHideEmuNotRegexAbpProperties()
             throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("abptestpages.org#?#.ehei-regex:not(:-abp-properties(/width: 11[1-5]px;/))");
+        mHelper.addCustomFilter(
+                String.format("%s#?#.ehei-regex:not(:-abp-properties(/width: 11[1-5]px;/))",
+                        TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
-        mHelper.verifyHiddenCount(1, "div[id='regular-expression-in-not-abp-properties-fail-1']");
-        mHelper.verifyHiddenCount(1, "div[id='regular-expression-in-not-abp-properties-fail-2']");
-        mHelper.verifyDisplayedCount(1, ".ehei-regex3");
+        TestVerificationUtils.verifyHiddenCount(
+                mActivityTestRule, 1, "div[id='regular-expression-in-not-abp-properties-fail-1']");
+        TestVerificationUtils.verifyHiddenCount(
+                mActivityTestRule, 1, "div[id='regular-expression-in-not-abp-properties-fail-2']");
+        TestVerificationUtils.verifyDisplayedCount(mActivityTestRule, 1, ".ehei-regex3");
     }
 
     @Test
     @LargeTest
     @Feature({"adblock"})
-    public void testElemHideEmuNotRegexAbpContains()
-            throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("abptestpages.org#?#.ehei-contains-regex:not(span:-abp-contains(/example-contentregex\\d/))");
+    public void testElemHideEmuNotRegexAbpContains() throws TimeoutException, InterruptedException {
+        mHelper.addCustomFilter(String.format(
+                "%s#?#.ehei-contains-regex:not(span:-abp-contains(/example-contentregex\\d/))",
+                TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.loadUrl(ELEMENT_HIDING_EMULATION_TESTPAGES_URL);
-        mHelper.verifyHiddenCount(1, "span[id='regular-expression-in-not-abp-contains-fail-1']");
-        mHelper.verifyHiddenCount(1, "span[id='regular-expression-in-not-abp-contains-fail-2']");
-        mHelper.verifyDisplayedCount(2, ".ehei-contains-regex");
+        TestVerificationUtils.verifyHiddenCount(
+                mActivityTestRule, 1, "span[id='regular-expression-in-not-abp-contains-fail-1']");
+        TestVerificationUtils.verifyHiddenCount(
+                mActivityTestRule, 1, "span[id='regular-expression-in-not-abp-contains-fail-2']");
+        TestVerificationUtils.verifyDisplayedCount(mActivityTestRule, 2, ".ehei-contains-regex");
     }
 }

@@ -30,6 +30,7 @@
 #include "base/ranges/algorithm.h"
 #include "base/trace_event/common/trace_event_common.h"
 #include "base/trace_event/trace_event.h"
+#include "components/adblock/core/common/adblock_constants.h"
 #include "components/adblock/core/common/adblock_utils.h"
 #include "components/adblock/core/configuration/filtering_configuration.h"
 #include "components/adblock/core/subscription/filtering_configuration_maintainer.h"
@@ -38,14 +39,36 @@
 
 namespace adblock {
 
+class EmptySubscription : public Subscription {
+ public:
+  EmptySubscription(const GURL& url) : url_(url) {}
+  GURL GetSourceUrl() const override { return url_; }
+  std::string GetTitle() const override { return ""; }
+  std::string GetCurrentVersion() const override { return ""; }
+  InstallationState GetInstallationState() const override {
+    return InstallationState::Unknown;
+  }
+  base::Time GetInstallationTime() const override {
+    return base::Time::UnixEpoch();
+  }
+  base::TimeDelta GetExpirationInterval() const override {
+    return base::TimeDelta();
+  }
+
+ private:
+  ~EmptySubscription() override {}
+  const GURL url_;
+};
+
 SubscriptionServiceImpl::SubscriptionServiceImpl(
     FilteringConfigurationMaintainerFactory maintainer_factory)
     : maintainer_factory_(std::move(maintainer_factory)) {}
 
 SubscriptionServiceImpl::~SubscriptionServiceImpl() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  for (auto& entry : maintainers_)
+  for (auto& entry : maintainers_) {
     entry.first->RemoveObserver(this);
+  }
 }
 
 std::vector<scoped_refptr<Subscription>>
@@ -57,8 +80,16 @@ SubscriptionServiceImpl::GetCurrentSubscriptions(
   });
   DCHECK(it != maintainers_.end()) << "Cannot get Subscriptions from an "
                                       "unregistered FilteringConfiguration";
-  if (!it->second)
-    return {};  // Configuration is disabled
+  if (!it->second) {
+    // Configuration is disabled
+    auto urls = it->first->GetFilterLists();
+    std::vector<scoped_refptr<adblock::Subscription>> result;
+    base::ranges::transform(
+        urls, std::back_inserter(result), [](const auto& url) {
+          return base::MakeRefCounted<EmptySubscription>(url);
+        });
+    return result;
+  }
   return it->second->GetCurrentSubscriptions();
 }
 
@@ -74,8 +105,12 @@ void SubscriptionServiceImpl::InstallFilteringConfiguration(
     // created in OnEnabledStateChanged.
     maintainer = MakeMaintainer(configuration.get());
   }
+  auto* ptr = configuration.get();
   maintainers_.insert(
       std::make_pair(std::move(configuration), std::move(maintainer)));
+  for (auto& observer : observers_) {
+    observer.OnFilteringConfigurationInstalled(ptr);
+  }
 }
 
 std::vector<FilteringConfiguration*>
@@ -86,13 +121,23 @@ SubscriptionServiceImpl::GetInstalledFilteringConfigurations() {
   return result;
 }
 
+FilteringConfiguration*
+SubscriptionServiceImpl::GetAdblockFilteringConfiguration() const {
+  const auto it = base::ranges::find_if(maintainers_, [](const auto& pair) {
+    return pair.first->GetName() == kAdblockFilteringConfigurationName;
+  });
+  DCHECK(it != maintainers_.end());
+  return it->first.get();
+}
+
 SubscriptionService::Snapshot SubscriptionServiceImpl::GetCurrentSnapshot()
     const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   Snapshot snapshot;
   for (const auto& entry : maintainers_) {
-    if (!entry.second)
+    if (!entry.second) {
       continue;  // Configuration is disabled
+    }
     snapshot.push_back(entry.second->GetSubscriptionCollection());
   }
   return snapshot;

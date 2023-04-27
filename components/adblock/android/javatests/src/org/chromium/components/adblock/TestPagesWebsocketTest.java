@@ -33,6 +33,10 @@ import org.chromium.chrome.test.ChromeBrowserTestRule;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 @RunWith(ChromeJUnit4ClassRunner.class)
@@ -48,7 +52,7 @@ public class TestPagesWebsocketTest {
     public void setUp() {
         mHelper.setUp(mActivityTestRule);
         mHelper.addCustomFilter(
-                "$websocket,domain=dp-testpages.adblockplus.org");
+                String.format("$websocket,domain=%s", TestPagesTestsHelper.TESTPAGES_DOMAIN));
     }
 
     @After
@@ -60,20 +64,14 @@ public class TestPagesWebsocketTest {
     @LargeTest
     @Feature({"adblock"})
     public void testVerifyWebsocketFilter() throws TimeoutException, InterruptedException {
-        mHelper.loadUrl(TestPagesTestsHelper.FILTER_DISTRIBUTION_UNIT_TESTCASES_ROOT + "websocket");
-        Assert.assertEquals(1, mHelper.numBlocked());
+        final String wssUrl =
+                String.format("wss://%s/websocket", TestPagesTestsHelper.TESTPAGES_DOMAIN);
+        final CountDownLatch countDownLatch =
+                mHelper.setOnAdMatchedExpectations(new HashSet<>(Arrays.asList(wssUrl)), null);
+        mHelper.loadUrl(TestPagesTestsHelper.FILTER_TESTPAGES_TESTCASES_ROOT + "websocket");
+        // Wait with 10 seconds max timeout
+        countDownLatch.await(10, TimeUnit.SECONDS);
         Assert.assertEquals(1, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_WEBSOCKET));
-        Assert.assertTrue(mHelper.isBlocked("wss://echo.websocket.org"));
-    }
-
-    @Test
-    @LargeTest
-    @CommandLineFlags.Add({"disable-adblock"})
-    @Feature({"adblock"})
-    public void testVerifyWebsocketFilterWhenAbpDisabled() throws TimeoutException, InterruptedException {
-        mHelper.loadUrl(TestPagesTestsHelper.FILTER_DISTRIBUTION_UNIT_TESTCASES_ROOT + "websocket");
-        Assert.assertEquals(0, mHelper.numBlocked());
-        Assert.assertEquals(0, mHelper.numBlockedByType(AdblockContentType.CONTENT_TYPE_WEBSOCKET));
-        Assert.assertFalse(mHelper.isBlocked("wss://echo.websocket.org"));
+        Assert.assertTrue(mHelper.isBlocked(wssUrl));
     }
 }

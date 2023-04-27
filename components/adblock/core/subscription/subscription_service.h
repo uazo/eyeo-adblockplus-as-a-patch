@@ -43,6 +43,9 @@ class SubscriptionService : public KeyedService {
     // Called only on successful installation or update of a subscription.
     // TODO(mpawlowski) add error reporting.
     virtual void OnSubscriptionInstalled(const GURL& subscription_url) {}
+    // Called on installation of new filtering configuration
+    virtual void OnFilteringConfigurationInstalled(
+        FilteringConfiguration* config) {}
   };
   // Returns currently available subscriptions installed for |configuration|.
   // Includes subscriptions that are still being downloaded.
@@ -58,6 +61,8 @@ class SubscriptionService : public KeyedService {
   // InstallFilteringConfiguration.
   virtual std::vector<FilteringConfiguration*>
   GetInstalledFilteringConfigurations() = 0;
+  // Get default "adblock" filtering configuration.
+  virtual FilteringConfiguration* GetAdblockFilteringConfiguration() const = 0;
   // Returns a snapshot of subscriptions as present at the time of calling the
   // function that can be used to query filters.
   // The result may be passed between threads, even called

@@ -830,18 +830,15 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermissionID::kAccessibilityPrivate);
   skip.insert(APIPermissionID::kArcAppsPrivate);
   skip.insert(APIPermissionID::kAutoTestPrivate);
-  skip.insert(APIPermissionID::kBookmarkManagerPrivate);
   skip.insert(APIPermissionID::kBrailleDisplayPrivate);
   skip.insert(APIPermissionID::kCecPrivate);
   skip.insert(APIPermissionID::kChromeosInfoPrivate);
   skip.insert(APIPermissionID::kCommandLinePrivate);
   skip.insert(APIPermissionID::kCrashReportPrivate);
   skip.insert(APIPermissionID::kDeveloperPrivate);
-  skip.insert(APIPermissionID::kDownloadsInternal);
   skip.insert(APIPermissionID::kEchoPrivate);
   skip.insert(APIPermissionID::kEnterprisePlatformKeysPrivate);
   skip.insert(APIPermissionID::kFeedbackPrivate);
-  skip.insert(APIPermissionID::kFileBrowserHandlerInternal);
   skip.insert(APIPermissionID::kFileManagerPrivate);
   skip.insert(APIPermissionID::kFirstRunPrivate);
   skip.insert(APIPermissionID::kSharedStoragePrivate);
@@ -851,9 +848,7 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermissionID::kLockWindowFullscreenPrivate);
   skip.insert(APIPermissionID::kMediaPlayerPrivate);
   skip.insert(APIPermissionID::kMediaPerceptionPrivate);
-  skip.insert(APIPermissionID::kMediaRouterPrivate);
   skip.insert(APIPermissionID::kMetricsPrivate);
-  skip.insert(APIPermissionID::kNetworkingCastPrivate);
   skip.insert(APIPermissionID::kPdfViewerPrivate);
   skip.insert(APIPermissionID::kImageWriterPrivate);
   skip.insert(APIPermissionID::kResourcesPrivate);
@@ -874,6 +869,7 @@ TEST(PermissionsTest, PermissionMessages) {
 
   // Adblock API is also private (in separate block to minimize conflicts).
   skip.insert(APIPermissionID::kAdblockPrivate);
+  skip.insert(APIPermissionID::kEyeoFilteringPrivate);
 
   // Warned as part of host permissions.
   skip.insert(APIPermissionID::kDevtools);
@@ -1766,16 +1762,6 @@ TEST(PermissionsTest, IsEmpty) {
       APIPermissionSet(), ManifestPermissionSet(), URLPatternSet(),
       non_empty_extent.Clone());
   EXPECT_FALSE(perm_set->IsEmpty());
-}
-
-TEST(PermissionsTest, ImpliedPermissions) {
-  APIPermissionSet apis;
-  apis.insert(APIPermissionID::kFileBrowserHandler);
-  EXPECT_EQ(1U, apis.size());
-
-  PermissionSet perm_set(std::move(apis), ManifestPermissionSet(),
-                         URLPatternSet(), URLPatternSet());
-  EXPECT_EQ(2U, perm_set.apis().size());
 }
 
 TEST(PermissionsTest, SyncFileSystemPermission) {

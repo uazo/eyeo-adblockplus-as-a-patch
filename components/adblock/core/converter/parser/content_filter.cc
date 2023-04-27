@@ -48,6 +48,10 @@ absl::optional<ContentFilter> ContentFilter::FromString(
                  "filters require include domains.";
       return {};
     }
+  } else if (selector.size() < 3 && domains.UnrestrictedByDomain()) {
+    VLOG(1) << "[eyeo] Content filter is not specific enough.  Must be longer "
+               "than 2 characters or restricted by domain.";
+    return {};
   }
 
   return ContentFilter(filter_type, selector, std::move(domains));

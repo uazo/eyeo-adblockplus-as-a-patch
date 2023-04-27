@@ -19,11 +19,12 @@
 
 #include <memory>
 
-#include "base/functional/callback_helpers.h"
 #include "base/files/file_util.h"
+#include "base/functional/callback_helpers.h"
 #include "base/strings/string_piece_forward.h"
 #include "base/test/mock_callback.h"
 #include "base/test/task_environment.h"
+#include "net/base/mock_network_change_notifier.h"
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/url_loader_completion_status.h"
@@ -40,6 +41,7 @@ class AdblockOngoingSubscriptionRequestImplTest
     : public testing::TestWithParam<OngoingSubscriptionRequest::Method> {
  public:
   void SetUp() final {
+    SetOnline();
     ongoing_request_ = std::make_unique<OngoingSubscriptionRequestImpl>(
         &kRetryBackoffPolicy, test_shared_url_loader_factory_);
   }
@@ -59,8 +61,20 @@ class AdblockOngoingSubscriptionRequestImplTest
 
   void VerifyRequestSent() { VerifyRequestSent(GetParam()); }
 
+  void SetOffline() {
+    network_change_notifier_->SetConnectionTypeAndNotifyObservers(
+        net::NetworkChangeNotifier::CONNECTION_NONE);
+  }
+
+  void SetOnline() {
+    network_change_notifier_->SetConnectionTypeAndNotifyObservers(
+        net::NetworkChangeNotifier::CONNECTION_WIFI);
+  }
+
   base::test::TaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
+  std::unique_ptr<net::test::MockNetworkChangeNotifier>
+      network_change_notifier_ = net::test::MockNetworkChangeNotifier::Create();
   network::TestURLLoaderFactory test_url_loader_factory_;
   scoped_refptr<network::SharedURLLoaderFactory>
       test_shared_url_loader_factory_{
@@ -78,6 +92,42 @@ class AdblockOngoingSubscriptionRequestImplTest
   };
   std::unique_ptr<OngoingSubscriptionRequestImpl> ongoing_request_;
 };
+
+TEST_P(AdblockOngoingSubscriptionRequestImplTest,
+       RequestDeferredUntilConnectionAvailable) {
+  SetOffline();
+  base::MockCallback<OngoingSubscriptionRequest::ResponseCallback>
+      response_callback;
+  ongoing_request_->Start(kUrl, GetParam(), response_callback.Get());
+
+  // Download did not start yet.
+  EXPECT_EQ(test_url_loader_factory_.NumPending(), 0);
+
+  SetOnline();
+
+  // Request started.
+  VerifyRequestSent();
+}
+
+TEST_P(AdblockOngoingSubscriptionRequestImplTest,
+       RequestConnectionAvailableTriggersDownloadsOnlyAfterStart) {
+  SetOffline();
+  base::MockCallback<OngoingSubscriptionRequest::ResponseCallback>
+      response_callback;
+
+  // Download did not start yet.
+  EXPECT_EQ(test_url_loader_factory_.NumPending(), 0);
+
+  SetOnline();
+
+  // Download did not start yet.
+  EXPECT_EQ(test_url_loader_factory_.NumPending(), 0);
+
+  ongoing_request_->Start(kUrl, GetParam(), response_callback.Get());
+
+  // Request started.
+  VerifyRequestSent();
+}
 
 TEST_P(AdblockOngoingSubscriptionRequestImplTest,
        RequestCompletedSuccessfully) {

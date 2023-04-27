@@ -125,6 +125,7 @@ android_library("adblock_java_tests") {
     "javatests/src/org/chromium/components/adblock/TestPagesSnippetsTest.java",
     "javatests/src/org/chromium/components/adblock/TestPagesTestsHelper.java",
     "javatests/src/org/chromium/components/adblock/TestPagesWebsocketTest.java",
+    "javatests/src/org/chromium/components/adblock/TestVerificationUtils.java",
   ]
 
   ### Android UI patch start

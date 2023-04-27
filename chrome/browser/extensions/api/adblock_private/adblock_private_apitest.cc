@@ -36,15 +36,12 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
-using testing::_;
-using testing::Mock;
-using testing::Return;
-
 namespace extensions {
 
 namespace {
 enum class Mode { Normal, Incognito };
-}
+enum class EyeoExtensionApi { Old, New };
+}  // namespace
 
 class AdblockPrivateApiTest : public ExtensionApiTest,
                               public testing::WithParamInterface<Mode> {
@@ -79,7 +76,7 @@ class AdblockPrivateApiTest : public ExtensionApiTest,
   bool IsIncognito() { return GetParam() == Mode::Incognito; }
 
   bool RunTest(const std::string& subtest) {
-    const std::string page_url = "main.html?" + subtest;
+    const std::string page_url = "main.html?subtest=" + subtest;
     return RunExtensionTest("adblock_private",
                             {.extension_url = page_url.c_str()},
                             {.allow_in_incognito = IsIncognito(),
@@ -100,7 +97,8 @@ class AdblockPrivateApiTest : public ExtensionApiTest,
 
   bool RunTestWithServer(const std::string& subtest,
                          const std::string& subscription_path,
-                         const std::string& subscription_filters) {
+                         const std::string& subscription_filters,
+                         std::map<std::string, std::string> params = {{}}) {
     net::EmbeddedTestServer https_server{
         net::EmbeddedTestServer(net::EmbeddedTestServer::TYPE_HTTPS)};
     https_server.SetSSLConfig(net::EmbeddedTestServer::CERT_OK);
@@ -110,10 +108,9 @@ class AdblockPrivateApiTest : public ExtensionApiTest,
     if (!https_server.Start()) {
       return false;
     }
-    const std::string subtest_with_params =
-        subtest +
-        "&subscription_url=" + https_server.GetURL(subscription_path).spec();
-    return RunTest(subtest_with_params);
+    params.insert(
+        {"subscription_url", https_server.GetURL(subscription_path).spec()});
+    return RunTestWithParams(subtest, params);
   }
 
   std::unique_ptr<net::test_server::HttpResponse>
@@ -141,14 +138,57 @@ class AdblockPrivateApiTest : public ExtensionApiTest,
     // Unhandled requests result in the Embedded test server sending a 404.
     return nullptr;
   }
+
+  std::map<std::string, std::string> SubscriptionsManagementSetup() {
+    DCHECK(browser()->profile());
+    auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
+        browser()->profile());
+    auto selected = controller->GetInstalledSubscriptions();
+    const auto easylist = std::find_if(
+        selected.begin(), selected.end(),
+        [&](scoped_refptr<adblock::Subscription> subscription) {
+          return base::EndsWith(subscription->GetSourceUrl().path_piece(),
+                                "easylist.txt");
+        });
+    const auto exceptions = std::find_if(
+        selected.begin(), selected.end(),
+        [&](scoped_refptr<adblock::Subscription> subscription) {
+          return base::EndsWith(subscription->GetSourceUrl().path_piece(),
+                                "exceptionrules.txt");
+        });
+    const auto snippets = std::find_if(
+        selected.begin(), selected.end(),
+        [&](scoped_refptr<adblock::Subscription> subscription) {
+          return base::EndsWith(subscription->GetSourceUrl().path_piece(),
+                                "abp-filters-anti-cv.txt");
+        });
+    if (easylist == selected.end() || exceptions == selected.end() ||
+        snippets == selected.end()) {
+      return std::map<std::string, std::string>{};
+    }
+    return std::map<std::string, std::string>{
+        {"easylist", (*easylist)->GetSourceUrl().spec()},
+        {"exceptions", (*exceptions)->GetSourceUrl().spec()},
+        {"snippets", (*snippets)->GetSourceUrl().spec()}};
+  }
 };
 
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, SetAndCheckEnabled) {
   EXPECT_TRUE(RunTest("setEnabled_isEnabled")) << message_;
 }
 
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, SetAndCheckEnabledNewAPI) {
+  EXPECT_TRUE(RunTestWithParams("setEnabled_isEnabled",
+                                {{"api", "eyeoFilteringPrivate"}}))
+      << message_;
+}
+
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, SetAndCheckAAEnabled) {
   EXPECT_TRUE(RunTest("setAAEnabled_isAAEnabled")) << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, SetAndCheckAAEnabledNewAPI) {
+  EXPECT_TRUE(RunTest("setAAEnabled_isAAEnabled_newAPI")) << message_;
 }
 
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, GetBuiltInSubscriptions) {
@@ -180,37 +220,11 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest,
 }
 
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, BuiltInSubscriptionsManagement) {
-  DCHECK(browser()->profile());
-  auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
-      browser()->profile());
-  auto selected = controller->GetSelectedBuiltInSubscriptions();
-  const auto easylist = std::find_if(
-      selected.begin(), selected.end(),
-      [&](scoped_refptr<adblock::Subscription> subscription) {
-        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
-                              "easylist.txt");
-      });
-  const auto exceptions = std::find_if(
-      selected.begin(), selected.end(),
-      [&](scoped_refptr<adblock::Subscription> subscription) {
-        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
-                              "exceptionrules.txt");
-      });
-  const auto snippets = std::find_if(
-      selected.begin(), selected.end(),
-      [&](scoped_refptr<adblock::Subscription> subscription) {
-        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
-                              "abp-filters-anti-cv.txt");
-      });
-  if (easylist == selected.end() || exceptions == selected.end() ||
-      snippets == selected.end()) {
+  auto params = SubscriptionsManagementSetup();
+  if (params.empty()) {
     // Since default configuration has been changed let's skip this test
     return;
   }
-  const std::map<std::string, std::string> params = {
-      {"easylist", (*easylist)->GetSourceUrl().spec()},
-      {"exceptions", (*exceptions)->GetSourceUrl().spec()},
-      {"snippets", (*snippets)->GetSourceUrl().spec()}};
   EXPECT_TRUE(RunTestWithParams("builtInSubscriptionsManagement", params))
       << message_;
 }
@@ -220,46 +234,91 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest,
   EXPECT_TRUE(RunTest("installedSubscriptionsDataSchema")) << message_;
 }
 
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest,
+                       InstalledSubscriptionsDataSchemaNewAPI) {
+  EXPECT_TRUE(RunTestWithParams("installedSubscriptionsDataSchema",
+                                {{"api", "eyeoFilteringPrivate"}}))
+      << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest,
+                       InstalledSubscriptionsDataSchemaConfigDisabled) {
+  EXPECT_TRUE(RunTestWithParams("installedSubscriptionsDataSchema",
+                                {{"disabled", "true"}}))
+      << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest,
+                       InstalledSubscriptionsDataSchemaConfigDisabledNewAPI) {
+  EXPECT_TRUE(RunTestWithParams(
+      "installedSubscriptionsDataSchema",
+      {{"api", "eyeoFilteringPrivate"}, {"disabled", "true"}}))
+      << message_;
+}
+
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, InstallSubscriptionInvalidURL) {
   EXPECT_TRUE(RunTest("installSubscriptionInvalidURL")) << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest,
+                       InstallSubscriptionInvalidURLNewAPI) {
+  EXPECT_TRUE(RunTestWithParams("installSubscriptionInvalidURL",
+                                {{"api", "eyeoFilteringPrivate"}}))
+      << message_;
 }
 
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, UninstallSubscriptionInvalidURL) {
   EXPECT_TRUE(RunTest("uninstallSubscriptionInvalidURL")) << message_;
 }
 
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest,
+                       UninstallSubscriptionInvalidURLNewAPI) {
+  EXPECT_TRUE(RunTestWithParams("uninstallSubscriptionInvalidURL",
+                                {{"api", "eyeoFilteringPrivate"}}))
+      << message_;
+}
+
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, SubscriptionsManagement) {
-  DCHECK(browser()->profile());
-  auto* controller = adblock::AdblockControllerFactory::GetForBrowserContext(
-      browser()->profile());
-  auto selected = controller->GetInstalledSubscriptions();
-  const auto easylist = std::find_if(
-      selected.begin(), selected.end(),
-      [&](scoped_refptr<adblock::Subscription> subscription) {
-        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
-                              "easylist.txt");
-      });
-  const auto exceptions = std::find_if(
-      selected.begin(), selected.end(),
-      [&](scoped_refptr<adblock::Subscription> subscription) {
-        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
-                              "exceptionrules.txt");
-      });
-  const auto snippets = std::find_if(
-      selected.begin(), selected.end(),
-      [&](scoped_refptr<adblock::Subscription> subscription) {
-        return base::EndsWith(subscription->GetSourceUrl().path_piece(),
-                              "abp-filters-anti-cv.txt");
-      });
-  if (easylist == selected.end() || exceptions == selected.end() ||
-      snippets == selected.end()) {
+  auto params = SubscriptionsManagementSetup();
+  if (params.empty()) {
     // Since default configuration has been changed let's skip this test
     return;
   }
-  const std::map<std::string, std::string> params = {
-      {"easylist", (*easylist)->GetSourceUrl().spec()},
-      {"exceptions", (*exceptions)->GetSourceUrl().spec()},
-      {"snippets", (*snippets)->GetSourceUrl().spec()}};
+  EXPECT_TRUE(RunTestWithParams("subscriptionsManagement", params)) << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, SubscriptionsManagementNewAPI) {
+  auto params = SubscriptionsManagementSetup();
+  if (params.empty()) {
+    // Since default configuration has been changed let's skip this test
+    return;
+  }
+  params.insert({"api", "eyeoFilteringPrivate"});
+  SubscriptionsManagementSetup();
+  EXPECT_TRUE(RunTestWithParams("subscriptionsManagement", params)) << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest,
+                       SubscriptionsManagementConfigDisabled) {
+  auto params = SubscriptionsManagementSetup();
+  if (params.empty()) {
+    // Since default configuration has been changed let's skip this test
+    return;
+  }
+  params.insert({"disabled", "true"});
+  EXPECT_TRUE(RunTestWithParams("subscriptionsManagement", params)) << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest,
+                       SubscriptionsManagementConfigDisabledNewAPI) {
+  auto params = SubscriptionsManagementSetup();
+  if (params.empty()) {
+    // Since default configuration has been changed let's skip this test
+    return;
+  }
+  params.insert({"api", "eyeoFilteringPrivate"});
+  params.insert({"disabled", "true"});
+  SubscriptionsManagementSetup();
   EXPECT_TRUE(RunTestWithParams("subscriptionsManagement", params)) << message_;
 }
 
@@ -279,31 +338,87 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, AllowedDomainsManagement) {
   EXPECT_TRUE(RunTest("allowedDomainsManagement")) << message_;
 }
 
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, AllowedDomainsManagementNewAPI) {
+  EXPECT_TRUE(RunTestWithParams("allowedDomainsManagement",
+                                {{"api", "eyeoFilteringPrivate"}}))
+      << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, CustomFiltersManagement) {
+  EXPECT_TRUE(RunTest("customFiltersManagement")) << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, CustomFiltersManagementNewAPI) {
+  EXPECT_TRUE(RunTestWithParams("customFiltersManagement",
+                                {{"api", "eyeoFilteringPrivate"}}))
+      << message_;
+}
+
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, AdBlockedEvents) {
   std::string subscription_path = "/testeventssub.txt";
   std::string subscription_filters = "test1.png";
-
   EXPECT_TRUE(RunTestWithServer("adBlockedEvents", subscription_path,
                                 subscription_filters))
+      << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, AdBlockedEventsNewAPI) {
+  std::string subscription_path = "/testeventssub.txt";
+  std::string subscription_filters = "test1.png";
+  std::map<std::string, std::string> params = {{"api", "eyeoFilteringPrivate"}};
+  EXPECT_TRUE(RunTestWithServer("adBlockedEvents", subscription_path,
+                                subscription_filters, std::move(params)))
       << message_;
 }
 
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, AdAllowedEvents) {
   std::string subscription_path = "/testeventssub.txt";
   std::string subscription_filters = "test2.png\n@@test2.png";
-
   EXPECT_TRUE(RunTestWithServer("adAllowedEvents", subscription_path,
                                 subscription_filters))
+      << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, AdAllowedEventsNewAPI) {
+  std::string subscription_path = "/testeventssub.txt";
+  std::string subscription_filters = "test2.png\n@@test2.png";
+  std::map<std::string, std::string> params = {{"api", "eyeoFilteringPrivate"}};
+  EXPECT_TRUE(RunTestWithServer("adAllowedEvents", subscription_path,
+                                subscription_filters, std::move(params)))
       << message_;
 }
 
 IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, SessionStats) {
   std::string subscription_path = "/teststatssub.txt";
   std::string subscription_filters = "test3.png\ntest4.png\n@@test4.png";
-
   EXPECT_TRUE(RunTestWithServer("sessionStats", subscription_path,
                                 subscription_filters))
       << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, SessionStatsNewAPI) {
+  std::string subscription_path = "/teststatssub.txt";
+  std::string subscription_filters = "test3.png\ntest4.png\n@@test4.png";
+  std::map<std::string, std::string> params = {{"api", "eyeoFilteringPrivate"}};
+  EXPECT_TRUE(RunTestWithServer("sessionStats", subscription_path,
+                                subscription_filters, std::move(params)))
+      << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, AllowedDomainsEvent) {
+  EXPECT_TRUE(RunTest("allowedDomainsEvent")) << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, EnabledStateEvent) {
+  EXPECT_TRUE(RunTest("enabledStateEvent")) << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, FilterListsEvent) {
+  EXPECT_TRUE(RunTest("filterListsEvent")) << message_;
+}
+
+IN_PROC_BROWSER_TEST_P(AdblockPrivateApiTest, CustomFiltersEvent) {
+  EXPECT_TRUE(RunTest("customFiltersEvent")) << message_;
 }
 
 INSTANTIATE_TEST_SUITE_P(All,
@@ -312,7 +427,7 @@ INSTANTIATE_TEST_SUITE_P(All,
 
 class AdblockPrivateApiBackgroundPageTest
     : public ExtensionApiTest,
-      public testing::WithParamInterface<Mode> {
+      public testing::WithParamInterface<std::tuple<EyeoExtensionApi, Mode>> {
  public:
   AdblockPrivateApiBackgroundPageTest() {}
   ~AdblockPrivateApiBackgroundPageTest() override = default;
@@ -340,12 +455,36 @@ class AdblockPrivateApiBackgroundPageTest
         ->RemoveCustomFilter(adblock::kAllowlistEverythingFilter);
   }
 
-  bool IsIncognito() { return GetParam() == Mode::Incognito; }
+  bool IsOldApi() { return std::get<0>(GetParam()) == EyeoExtensionApi::Old; }
+
+  bool IsIncognito() { return std::get<1>(GetParam()) == Mode::Incognito; }
 
   void ExecuteScript(const std::string& js_code) const {
     content::WebContents* web_contents =
         browser()->tab_strip_model()->GetActiveWebContents();
     ASSERT_TRUE(content::ExecJs(web_contents->GetPrimaryMainFrame(), js_code));
+  }
+
+  void SetupApiObjectAndMethods(const std::string& extension_id) {
+    std::string setup_script;
+    if (IsOldApi()) {
+      setup_script =
+          "var apiObject = chrome.adblockPrivate;"
+          "var sessionAllowedCount = 'getSessionAllowedAdsCount';"
+          "var sessionBlockedCount = 'getSessionBlockedAdsCount';"
+          "var onAllowedEvent = 'onAdAllowed';"
+          "var onBlockedEvent = 'onAdBlocked';"
+          "window.domAutomationController.send('');";
+    } else {
+      setup_script =
+          "var apiObject = chrome.eyeoFilteringPrivate;"
+          "var sessionAllowedCount = 'getSessionAllowedRequestsCount';"
+          "var sessionBlockedCount = 'getSessionBlockedRequestsCount';"
+          "var onAllowedEvent = 'onRequestAllowed';"
+          "var onBlockedEvent = 'onRequestBlocked';"
+          "window.domAutomationController.send('');";
+    }
+    ExecuteScriptInBackgroundPage(extension_id, setup_script);
   }
 };
 
@@ -358,7 +497,7 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PageAllowedEvents) {
   constexpr char kSetListenersScript[] = R"(
     var testData = {};
     testData.pageAllowedCount = 0;
-    chrome.adblockPrivate.onPageAllowed.addListener(function(e) {
+    apiObject.onPageAllowed.addListener(function(e) {
       if (!e.url.endsWith('test.html')) {
         return;
       }
@@ -372,12 +511,14 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PageAllowedEvents) {
   )";
 
   constexpr char kAllowDomainScript[] = R"(
-    chrome.adblockPrivate.addAllowedDomain('example.com');
+    apiObject.addAllowedDomain(%s'example.com');
     window.domAutomationController.send('');
   )";
 
   const GURL test_url = embedded_test_server()->GetURL(
       "example.com", "/extensions/api_test/adblock_private/test.html");
+
+  SetupApiObjectAndMethods(extension->id());
 
   ExecuteScriptInBackgroundPage(extension->id(), kSetListenersScript);
 
@@ -385,7 +526,9 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PageAllowedEvents) {
   ASSERT_EQ(
       "0", ExecuteScriptInBackgroundPage(extension->id(), kReadCountersScript));
 
-  ExecuteScriptInBackgroundPage(extension->id(), kAllowDomainScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(),
+      base::StringPrintf(kAllowDomainScript, IsOldApi() ? "" : "'adblock', "));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
   ASSERT_EQ(
       "1", ExecuteScriptInBackgroundPage(extension->id(), kReadCountersScript));
@@ -398,7 +541,7 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PageAllowedStats) {
   ASSERT_TRUE(extension);
 
   constexpr char kReadAllowedStatsScript[] = R"(
-    chrome.adblockPrivate.getSessionAllowedAdsCount(function(sessionStats) {
+    apiObject[sessionAllowedCount](function(sessionStats) {
       let count = 0;
       for (const entry of sessionStats) {
         if (entry.url === 'adblock:custom') {
@@ -410,16 +553,21 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PageAllowedStats) {
   )";
 
   constexpr char kAllowDomainScript[] = R"(
-    chrome.adblockPrivate.addAllowedDomain('example.com');
+    apiObject.addAllowedDomain(%s'example.com');
     window.domAutomationController.send('');
   )";
 
   const GURL test_url = embedded_test_server()->GetURL(
       "example.com", "/extensions/api_test/adblock_private/test.html");
+
+  SetupApiObjectAndMethods(extension->id());
+
   int initial_value = std::stoi(
       ExecuteScriptInBackgroundPage(extension->id(), kReadAllowedStatsScript));
 
-  ExecuteScriptInBackgroundPage(extension->id(), kAllowDomainScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(),
+      base::StringPrintf(kAllowDomainScript, IsOldApi() ? "" : "'adblock', "));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
 
   ASSERT_EQ(initial_value + 1, std::stoi(ExecuteScriptInBackgroundPage(
@@ -436,13 +584,13 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PopupEvents) {
     var testData = {};
     testData.popupBlockedCount = 0;
     testData.popupAllowedCount = 0;
-    chrome.adblockPrivate.onPopupAllowed.addListener(function(e, blocked) {
+    apiObject.onPopupAllowed.addListener(function(e, blocked) {
       if (!e.url.endsWith('some-popup.html')) {
         return;
       }
       testData.popupAllowedCount = testData.popupAllowedCount + 1;
     });
-    chrome.adblockPrivate.onPopupBlocked.addListener(function(e, blocked) {
+    apiObject.onPopupBlocked.addListener(function(e, blocked) {
       if (!e.url.endsWith('some-popup.html')) {
         return;
       }
@@ -457,29 +605,34 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PopupEvents) {
   )";
 
   constexpr char kBlockPopupScript[] = R"(
-    chrome.adblockPrivate.addCustomFilter('some-popup.html^$popup');
+    apiObject.addCustomFilter(%s'some-popup.html^$popup');
     window.domAutomationController.send('');
   )";
 
   constexpr char kAllowPopupScript[] = R"(
-    chrome.adblockPrivate.addCustomFilter('@@some-popup.html^$popup');
+    apiObject.addCustomFilter(%s'@@some-popup.html^$popup');
     window.domAutomationController.send('');
   )";
 
   const GURL test_url = embedded_test_server()->GetURL(
       "example.com", "/extensions/api_test/adblock_private/test.html");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
+  SetupApiObjectAndMethods(extension->id());
 
   ExecuteScriptInBackgroundPage(extension->id(), kSetListenersScript);
   ASSERT_EQ("0-0", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
 
-  ExecuteScriptInBackgroundPage(extension->id(), kBlockPopupScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(),
+      base::StringPrintf(kBlockPopupScript, IsOldApi() ? "" : "'adblock', "));
   ExecuteScript("window.open('some-popup.html');");
   ASSERT_EQ("1-0", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
 
-  ExecuteScriptInBackgroundPage(extension->id(), kAllowPopupScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(),
+      base::StringPrintf(kAllowPopupScript, IsOldApi() ? "" : "'adblock', "));
   ExecuteScript("window.open('some-popup.html');");
   ASSERT_EQ("1-1", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
@@ -492,7 +645,7 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PopupStats) {
   ASSERT_TRUE(extension);
 
   constexpr char kReadAllowedStatsScript[] = R"(
-    chrome.adblockPrivate.getSessionAllowedAdsCount(function(sessionStats) {
+    apiObject[sessionAllowedCount](function(sessionStats) {
       let count = 0;
       for (const entry of sessionStats) {
         if (entry.url === 'adblock:custom') {
@@ -504,7 +657,7 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PopupStats) {
   )";
 
   constexpr char kReadBlockedStatsScript[] = R"(
-    chrome.adblockPrivate.getSessionBlockedAdsCount(function(sessionStats) {
+    apiObject[sessionBlockedCount](function(sessionStats) {
       let count = 0;
       for (const entry of sessionStats) {
         if (entry.url === 'adblock:custom') {
@@ -516,40 +669,48 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTest, PopupStats) {
   )";
 
   constexpr char kBlockPopupScript[] = R"(
-    chrome.adblockPrivate.addCustomFilter('some-popup.html^$popup');
+    apiObject.addCustomFilter(%s'some-popup.html^$popup');
     window.domAutomationController.send('');
   )";
 
   constexpr char kAllowPopupScript[] = R"(
-    chrome.adblockPrivate.addCustomFilter('@@some-popup.html^$popup');
+    apiObject.addCustomFilter(%s'@@some-popup.html^$popup');
     window.domAutomationController.send('');
   )";
 
   const GURL test_url = embedded_test_server()->GetURL(
       "example.com", "/extensions/api_test/adblock_private/test.html");
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
+  SetupApiObjectAndMethods(extension->id());
 
   int initial_allowed_value = std::stoi(
       ExecuteScriptInBackgroundPage(extension->id(), kReadAllowedStatsScript));
   int initial_blocked_value = std::stoi(
       ExecuteScriptInBackgroundPage(extension->id(), kReadBlockedStatsScript));
 
-  ExecuteScriptInBackgroundPage(extension->id(), kBlockPopupScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(),
+      base::StringPrintf(kBlockPopupScript, IsOldApi() ? "" : "'adblock', "));
   ExecuteScript("window.open('some-popup.html');");
   ASSERT_EQ(initial_blocked_value + 1,
             std::stoi(ExecuteScriptInBackgroundPage(extension->id(),
                                                     kReadBlockedStatsScript)));
 
-  ExecuteScriptInBackgroundPage(extension->id(), kAllowPopupScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(),
+      base::StringPrintf(kAllowPopupScript, IsOldApi() ? "" : "'adblock', "));
   ExecuteScript("window.open('some-popup.html');");
   ASSERT_EQ(initial_allowed_value + 1,
             std::stoi(ExecuteScriptInBackgroundPage(extension->id(),
                                                     kReadAllowedStatsScript)));
 }
 
-INSTANTIATE_TEST_SUITE_P(All,
-                         AdblockPrivateApiBackgroundPageTest,
-                         testing::Values(Mode::Normal, Mode::Incognito));
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    AdblockPrivateApiBackgroundPageTest,
+    testing::Combine(testing::Values(EyeoExtensionApi::Old,
+                                     EyeoExtensionApi::New),
+                     testing::Values(Mode::Normal, Mode::Incognito)));
 
 class AdblockPrivateApiBackgroundPageTestWithRedirect
     : public AdblockPrivateApiBackgroundPageTest {
@@ -630,7 +791,7 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTestWithRedirect,
     var testData = {};
     testData.pageAllowedBeforeRedirectCount = 0;
     testData.pageAllowedAfterRedirectCount = 0;
-    chrome.adblockPrivate.onPageAllowed.addListener(function(e) {
+    apiObject.onPageAllowed.addListener(function(e) {
       if (e.url.includes('before-redirect.com')) {
         ++testData.pageAllowedBeforeRedirectCount;
       } else if (e.url.includes('after-redirect.com')) {
@@ -647,17 +808,17 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTestWithRedirect,
   )";
 
   constexpr char kAddAllowDomainScript[] = R"(
-    chrome.adblockPrivate.addAllowedDomain('after-redirect.com');
+    apiObject.addAllowedDomain(%s'after-redirect.com');
     window.domAutomationController.send('');
   )";
 
   constexpr char kRemoveAllowDomainScript[] = R"(
-    chrome.adblockPrivate.removeAllowedDomain('after-redirect.com');
+    apiObject.removeAllowedDomain(%s'after-redirect.com');
     window.domAutomationController.send('');
   )";
 
   constexpr char kAddBlockDomainFilterScript[] = R"(
-    chrome.adblockPrivate.addCustomFilter('after-redirect.com');
+    apiObject.addCustomFilter(%s'after-redirect.com');
     window.domAutomationController.send('');
   )";
 
@@ -665,6 +826,8 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTestWithRedirect,
   // a domain we are passing here source domain as a path in url.
   const GURL test_url = embedded_test_server()->GetURL(
       before_redirect_domain, "/" + before_redirect_domain);
+
+  SetupApiObjectAndMethods(extension->id());
 
   ExecuteScriptInBackgroundPage(extension->id(), kSetListenersScript);
 
@@ -674,19 +837,27 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTestWithRedirect,
                                                  kReadCountersScript));
 
   // Just allow filter
-  ExecuteScriptInBackgroundPage(extension->id(), kAddAllowDomainScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(), base::StringPrintf(kAddAllowDomainScript,
+                                          IsOldApi() ? "" : "'adblock', "));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
   ASSERT_EQ("0-1", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
   // Just block filter
-  ExecuteScriptInBackgroundPage(extension->id(), kAddBlockDomainFilterScript);
-  ExecuteScriptInBackgroundPage(extension->id(), kRemoveAllowDomainScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(), base::StringPrintf(kAddBlockDomainFilterScript,
+                                          IsOldApi() ? "" : "'adblock', "));
+  ExecuteScriptInBackgroundPage(
+      extension->id(), base::StringPrintf(kRemoveAllowDomainScript,
+                                          IsOldApi() ? "" : "'adblock', "));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
   ASSERT_EQ("0-1", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
 
   // Allow and block filter
-  ExecuteScriptInBackgroundPage(extension->id(), kAddAllowDomainScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(), base::StringPrintf(kAddAllowDomainScript,
+                                          IsOldApi() ? "" : "'adblock', "));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
   ASSERT_EQ("0-2", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
@@ -704,12 +875,12 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTestWithRedirect,
     var testData = {};
     testData.adBlockedCount = 0;
     testData.adAllowedCount = 0;
-    chrome.adblockPrivate.onAdBlocked.addListener(function(e) {
+    apiObject[onBlockedEvent].addListener(function(e) {
       if (e.url.includes('http://after-redirect.com')) {
         ++testData.adBlockedCount;
       }
     });
-    chrome.adblockPrivate.onAdAllowed.addListener(function(e) {
+    apiObject[onAllowedEvent].addListener(function(e) {
       if (e.url.includes('http://after-redirect.com')) {
         ++testData.adAllowedCount;
       }
@@ -723,14 +894,16 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTestWithRedirect,
   )";
 
   constexpr char kAddBlockingFilterScript[] = R"(
-    chrome.adblockPrivate.addCustomFilter('||after-redirect.com*/image.png');
+    apiObject.addCustomFilter(%s'||after-redirect.com*/image.png');
     window.domAutomationController.send('');
   )";
 
   constexpr char kAddAllowingFilterScript[] = R"(
-    chrome.adblockPrivate.addCustomFilter('@@||after-redirect.com*/image.png');
+    apiObject.addCustomFilter(%s'@@||after-redirect.com*/image.png');
     window.domAutomationController.send('');
   )";
+
+  SetupApiObjectAndMethods(extension->id());
 
   ExecuteScriptInBackgroundPage(extension->id(), kSetListenersScript);
 
@@ -743,20 +916,27 @@ IN_PROC_BROWSER_TEST_P(AdblockPrivateApiBackgroundPageTestWithRedirect,
                                                  kReadCountersScript));
 
   // Just block filter
-  ExecuteScriptInBackgroundPage(extension->id(), kAddBlockingFilterScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(), base::StringPrintf(kAddBlockingFilterScript,
+                                          IsOldApi() ? "" : "'adblock', "));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
   ASSERT_EQ("1-0", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
 
   // Allow and block filter
-  ExecuteScriptInBackgroundPage(extension->id(), kAddAllowingFilterScript);
+  ExecuteScriptInBackgroundPage(
+      extension->id(), base::StringPrintf(kAddAllowingFilterScript,
+                                          IsOldApi() ? "" : "'adblock', "));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_url));
   ASSERT_EQ("1-1", ExecuteScriptInBackgroundPage(extension->id(),
                                                  kReadCountersScript));
 }
 
-INSTANTIATE_TEST_SUITE_P(All,
-                         AdblockPrivateApiBackgroundPageTestWithRedirect,
-                         testing::Values(Mode::Normal, Mode::Incognito));
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    AdblockPrivateApiBackgroundPageTestWithRedirect,
+    testing::Combine(testing::Values(EyeoExtensionApi::Old,
+                                     EyeoExtensionApi::New),
+                     testing::Values(Mode::Normal, Mode::Incognito)));
 
 }  // namespace extensions

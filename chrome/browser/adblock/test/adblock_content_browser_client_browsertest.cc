@@ -111,7 +111,7 @@ IN_PROC_BROWSER_TEST_F(AdblockContentBrowserClientBrowserTest,
       AdblockControllerFactory::GetForBrowserContext(browser()->profile());
   controller->SetAdblockEnabled(true);
   controller->RemoveCustomFilter(kAllowlistEverythingFilter);
-  controller->AddCustomFilter({"$websocket"});
+  controller->AddCustomFilter({"*$websocket"});
 
   NavigateToHTTP("split_packet_check.html");
 

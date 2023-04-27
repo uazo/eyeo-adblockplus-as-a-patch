@@ -56,8 +56,9 @@ bool IsDocumentRequest(const network::ResourceRequest& request) {
 }
 
 ContentType ToAdblockResourceType(const network::ResourceRequest& request) {
-  if (request.url.SchemeIsWSOrWSS())
+  if (request.url.SchemeIsWSOrWSS()) {
     return ContentType::Websocket;
+  }
   if (request.is_fetch_like_api) {
     // See https://crbug.com/611453
     return ContentType::Xmlhttprequest;
@@ -90,10 +91,12 @@ ContentType ToAdblockResourceType(const network::ResourceRequest& request) {
       return ContentType::Media;
     case network::mojom::RequestDestination::kEmpty:
       // https://fetch.spec.whatwg.org/#concept-request-destination
-      if (request.keepalive)
+      if (request.keepalive) {
         return ContentType::Ping;
+      }
       return ContentType::Other;
     case network::mojom::RequestDestination::kWebBundle:
+      return ContentType::WebBundle;
     case network::mojom::RequestDestination::kReport:
     case network::mojom::RequestDestination::kAudioWorklet:
     case network::mojom::RequestDestination::kManifest:
@@ -672,8 +675,9 @@ void AdblockURLLoaderFactory::RemoveRequest(InProgressRequest* request) {
 }
 
 void AdblockURLLoaderFactory::MaybeDestroySelf() {
-  if (proxy_receivers_.empty() && requests_.empty())
+  if (proxy_receivers_.empty() && requests_.empty()) {
     std::move(on_disconnect_).Run(this);
+  }
 }
 
 }  // namespace adblock

@@ -36,6 +36,7 @@ enum ContentType {
   Xmlhttprequest = 2048,
   Media = 16384,
   Font = 32768,
+  WebBundle = 65536,
   Default = (1 << 24) - 1,
 };
 

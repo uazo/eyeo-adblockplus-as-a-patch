@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with eyeo Chromium SDK.  If not, see <http://www.gnu.org/licenses/>.
 
+// DEPRECATED: Prefer eyeoFilteringPrivate.
 // adblockPrivate API.
 // This is a private API exposing ability to control AdblockPlus.
 namespace adblockPrivate {
@@ -37,7 +38,7 @@ dictionary Subscription {
   DOMString installation_state;
   // Subscription title (may be empty)
   DOMString title;
-  // May be empty:
+  // Subscription version (may be empty)
   DOMString current_version;
   // Time of last successful installation or update, in ISO 8601 format.
   // May be passed directly to the Date constructor.
@@ -94,9 +95,9 @@ interface Functions {
   static void setEnabled(boolean enabled);
   // Returns whether Adblock is on.
   static void isEnabled(StateCallback callback);
-  // Allows to turn Acceptable ads on or off.
+  // Allows to turn Acceptable Ads on or off.
   static void setAcceptableAdsEnabled(boolean enabled);
-  // Returns whether Acceptable ads is on.
+  // Returns whether Acceptable Ads is on.
   static void isAcceptableAdsEnabled(StateCallback callback);
   // Gets the list of built-in subscriptions.
   static void getBuiltInSubscriptions(BuiltInSubscriptionsCallback callback);
@@ -179,6 +180,18 @@ interface Events {
 
   // Fired when a subscription has been updated.
   static void onSubscriptionUpdated(DOMString subscription_url);
+
+  // Fired when ad-filtering enable state changed
+  static void onEnabledStateChanged();
+
+  // Fired when subscription added or removed.
+  static void onFilterListsChanged();
+
+  // Fired when allowed domain list has been updated.
+  static void onAllowedDomainsChanged();
+
+  // Fired when custom filter added or removed.
+  static void onCustomFiltersChanged();
 };
 
 };

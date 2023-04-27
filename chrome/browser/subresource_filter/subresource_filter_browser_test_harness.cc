@@ -23,6 +23,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/safe_browsing/test_safe_browsing_database_helper.h"
 #include "chrome/browser/subresource_filter/subresource_filter_profile_context_factory.h"
+#include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/chrome_test_utils.h"
 #include "components/adblock/core/features.h"
@@ -73,10 +74,10 @@ MockSubresourceFilterObserver::MockSubresourceFilterObserver(
 MockSubresourceFilterObserver::~MockSubresourceFilterObserver() = default;
 
 SubresourceFilterBrowserTest::SubresourceFilterBrowserTest() {
-  // Disable kAdblockPlusFeature as it interferes with SubresourceFilter by
-  // design.
-  scoped_feature_list_.InitWithFeatures({kAdTagging},
-                                        {adblock::kAdblockPlusFeature});
+  scoped_feature_list_.InitWithFeatures(
+      /*enabled_features=*/{kAdTagging},
+      /*disabled_features=*/{features::kHttpsUpgrades,
+                             adblock::kAdblockPlusFeature});
 }
 
 SubresourceFilterBrowserTest::~SubresourceFilterBrowserTest() = default;

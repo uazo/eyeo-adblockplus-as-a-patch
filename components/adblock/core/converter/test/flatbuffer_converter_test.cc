@@ -2274,6 +2274,64 @@ TEST_F(AdblockFlatbufferConverterTest, RegexFilterNotLowercased) {
       SiteKey(), FilterCategory::Blocking));
 }
 
+TEST_F(AdblockFlatbufferConverterTest, PipeInURL) {
+  // See: https://github.com/gatling/gatling/issues/1272
+  // These | characters in the middle of the filter should match the literal
+  // | characters in the URL, not be treated as anchors.
+  auto subscription = ConvertAndLoadRules(R"(
+    /addyn|*|adtech;
+  )");
+  EXPECT_TRUE(subscription->HasUrlFilter(
+      GURL("http://adserver.adtech.de/"
+           "addyn|3.0|296|3872016|0|16|ADTECH;loc=100;target=_blank;misc="
+           "1043156433;rdclick=http://ba.ccm2.net/RealMedia/ads/click_lx.ads/"
+           "fr_ccm_hightech/news/L20/1043156433/Position3/OasDefault/"
+           "autopromo_keljob_ccm/autopromo_kelformation_1_ccm.html/"
+           "574b7276735648616451774141686f70?"),
+      "domain.com", ContentType::Image, SiteKey(), FilterCategory::Blocking));
+}
+
+TEST_F(AdblockFlatbufferConverterTest, MultiplePipeCharacters) {
+  // This filter combines | characters used as:
+  // - host anchor
+  // - normal text character
+  // - right anchor
+  auto subscription = ConvertAndLoadRules(R"(
+    ||example.com/abc|def*.jpg|
+  )");
+
+  // Correct match.
+  EXPECT_TRUE(subscription->HasUrlFilter(
+      GURL("http://subdomain.example.com/abc|def/content.jpg"), "domain.com",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+
+  // Incorrect, the URL does not end with .jpg, although .jpg occurs in the URL.
+  // Right anchor constraint not met.
+  EXPECT_FALSE(subscription->HasUrlFilter(
+      GURL("http://subdomain.example.com/abc|def/file.jpg/content"),
+      "domain.com", ContentType::Image, SiteKey(), FilterCategory::Blocking));
+
+  // Incorrect, the URL does not start with a subdomain of example.com.
+  // Host anchor constraint not met.
+  EXPECT_FALSE(subscription->HasUrlFilter(
+      GURL("http://notexample.com/abc|def/content.jpg"), "domain.com",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+
+  // Incorrect, the URL does not contain the | in the text.
+  EXPECT_FALSE(subscription->HasUrlFilter(
+      GURL("http://subdomain.example.com/abc/def/content.jpg"), "domain.com",
+      ContentType::Image, SiteKey(), FilterCategory::Blocking));
+}
+
+TEST_F(AdblockFlatbufferConverterTest, PipeEndsFilter) {
+  auto subscription = ConvertAndLoadRules(R"(
+    example*|
+  )");
+  EXPECT_TRUE(subscription->HasUrlFilter(GURL("http://example.com/"),
+                                         "domain.com", ContentType::Image,
+                                         SiteKey(), FilterCategory::Blocking));
+}
+
 // TODO(mpawlowski) support multiple CSP filters per URL + frame hierarchy:
 // DPD-1145.
 

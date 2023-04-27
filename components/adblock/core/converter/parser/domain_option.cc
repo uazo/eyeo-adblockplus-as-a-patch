@@ -17,11 +17,22 @@
 
 #include "components/adblock/core/converter/parser/content_filter.h"
 
+#include "base/logging.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 
 namespace adblock {
+
+namespace {
+
+void RemoveDuplicates(std::vector<std::string>& data) {
+  sort(data.begin(), data.end());
+  auto unique_end = unique(data.begin(), data.end());
+  data.erase(unique_end, data.end());
+}
+
+}  // namespace
 
 static constexpr char kExcludeSymbol = '~';
 
@@ -50,7 +61,8 @@ DomainOption DomainOption::FromString(base::StringPiece domains_list,
     base::RemoveChars(domain, base::StringPiece(&kExcludeSymbol), &domain);
   }
 
-  // TODO(DPD-1795): Don't allow duplicated domains
+  RemoveDuplicates(exclude_domains);
+  RemoveDuplicates(include_domains);
 
   return DomainOption(std::move(exclude_domains), std::move(include_domains));
 }
@@ -65,12 +77,23 @@ const std::vector<std::string>& DomainOption::GetIncludeDomains() const {
 
 void DomainOption::RemoveDomainsWithNoSubdomain() {
   exclude_domains_.erase(
-      base::ranges::remove_if(exclude_domains_, &HasSubdomainOrLocalhost),
+      base::ranges::remove_if(
+          exclude_domains_,
+          [](auto it) { return !HasSubdomainOrLocalhost(it); }),
       exclude_domains_.end());
 
   include_domains_.erase(
-      base::ranges::remove_if(include_domains_, &HasSubdomainOrLocalhost),
+      base::ranges::remove_if(
+          include_domains_,
+          [](auto it) { return !HasSubdomainOrLocalhost(it); }),
       include_domains_.end());
+}
+
+bool DomainOption::UnrestrictedByDomain() const {
+  return base::ranges::count_if(exclude_domains_, &HasSubdomainOrLocalhost) ==
+             0 &&
+         base::ranges::count_if(include_domains_, &HasSubdomainOrLocalhost) ==
+             0;
 }
 
 DomainOption::DomainOption(std::vector<std::string> exclude_domains,
@@ -85,8 +108,8 @@ DomainOption::~DomainOption() = default;
 
 // static
 bool DomainOption::HasSubdomainOrLocalhost(base::StringPiece domain) {
-  return (domain != "localhost") &&
-         (domain.find(".") == base::StringPiece::npos);
+  return (domain == "localhost") ||
+         (domain.find(".") != base::StringPiece::npos);
 }
 
 }  // namespace adblock

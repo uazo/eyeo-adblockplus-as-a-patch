@@ -26,14 +26,11 @@ SessionStatsImpl::SessionStatsImpl(
     ResourceClassificationRunner* classification_runner)
     : classification_runner_(classification_runner) {
   DCHECK(classification_runner_);
+  classification_runner_->AddObserver(this);
 }
 
 SessionStatsImpl::~SessionStatsImpl() {
   classification_runner_->RemoveObserver(this);
-}
-
-void SessionStatsImpl::StartCollectingStats() {
-  classification_runner_->AddObserver(this);
 }
 
 std::map<GURL, long> SessionStatsImpl::GetSessionAllowedAdsCount() const {

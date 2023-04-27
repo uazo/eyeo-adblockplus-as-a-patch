@@ -59,21 +59,24 @@ public class TestPagesSiteKeyTest {
     @LargeTest
     @Feature({"adblock"})
     public void testVerifySitekeyException() throws TimeoutException, InterruptedException {
-        mHelper.addCustomFilter("abptestpages.org##.testcase-sitekey-eh");
-        mHelper.addCustomFilter("||abptestpages.org/testfiles/sitekey/outofframe.png");
-        mHelper.addCustomFilter("||abptestpages.org/testfiles/sitekey/inframe.png");
+        mHelper.addCustomFilter(
+                String.format("%s#@#[data-adblockkey]", TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.addCustomFilter(
+                String.format("%s##.testcase-sitekey-eh", TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/sitekey/outofframe.png", TestPagesTestsHelper.TESTPAGES_DOMAIN));
+        mHelper.addCustomFilter(String.format(
+                "||%s/testfiles/sitekey/inframe.png", TestPagesTestsHelper.TESTPAGES_DOMAIN));
         mHelper.addCustomFilter(
                 "@@$document,sitekey=MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBANGtTstne7e8MbmDHDiMFkGbcuBgXmiVesGOG3gtYeM1EkrzVhBjGUvKXYE4GLFwqty3v5MuWWbvItUWBTYoVVsCAwEAAQ");
-        // DP testpages does not work.
-        final String TEST_URL = "https://abptestpages.org/exceptions/sitekey";
-        mHelper.loadUrl(TEST_URL);
+        mHelper.loadUrl(TestPagesTestsHelper.SITEKEY_TESTPAGES_TESTCASES_ROOT);
         Assert.assertEquals(1, mHelper.numBlocked());
         Assert.assertTrue(mHelper.isBlocked(
-                "https://abptestpages.org/testfiles/sitekey/outofframe.png"));
+                TestPagesTestsHelper.TESTPAGES_RESOURCES_ROOT + "sitekey/outofframe.png"));
         Assert.assertEquals(1, mHelper.numAllowed());
         Assert.assertTrue(mHelper.isAllowed(
-                "https://abptestpages.org/testfiles/sitekey/inframe.png"));
-        mHelper.verifyHiddenCount(1, "img");
-        mHelper.verifyHiddenCount(1, "div");
+                TestPagesTestsHelper.TESTPAGES_RESOURCES_ROOT + "sitekey/inframe.png"));
+        TestVerificationUtils.verifyHiddenCount(mActivityTestRule, 1, "img");
+        TestVerificationUtils.verifyHiddenCount(mActivityTestRule, 1, "div");
     }
 }

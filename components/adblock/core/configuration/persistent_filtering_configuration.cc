@@ -40,9 +40,10 @@ base::Value ReadFromPrefs(PrefService* pref_service,
   const auto& all_configurations =
       pref_service->GetValue(kConfigurationsPrefsPath);
   DCHECK(all_configurations.is_dict());
-  const auto* this_config = all_configurations.FindKey(configuration_name);
-  if (this_config && this_config->is_dict())
-    return this_config->Clone();
+  const auto* this_config =
+      all_configurations.GetIfDict()->FindDict(configuration_name);
+  if (this_config)
+    return base::Value(this_config->Clone());
   return base::Value{base::Value::Type::DICT};
 }
 

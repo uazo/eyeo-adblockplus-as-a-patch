@@ -43,7 +43,7 @@ bool Convert(base::FilePath input_path, GURL url, base::FilePath output_path) {
     LOG(ERROR) << "[eyeo] Could not open input file " << input_path;
     return false;
   }
-  if (input_path.MatchesFinalExtension(".gz")) {
+  if (input_path.MatchesFinalExtension(FILE_PATH_LITERAL(".gz"))) {
     if (!compression::GzipUncompress(content, &content)) {
       LOG(ERROR) << "[eyeo] Could not decompress input file " << input_path;
       return false;

@@ -27,6 +27,8 @@ const char kSiteKeyHeaderKey[] = "x-adblock-key";
 
 const char kAllowlistEverythingFilter[] = "@@*$document";
 
+const char kAdblockFilteringConfigurationName[] = "adblock";
+
 const char kBlankHtml[] =
     "data:text/html,<!DOCTYPE html><html><head></head><body></body></html>";
 

@@ -47,6 +47,8 @@ std::string ContentTypeToString(ContentType content_type) {
       return "MEDIA";
     case ContentType::Font:
       return "FONT";
+    case ContentType::WebBundle:
+      return "WEBBUNDLE";
     case ContentType::Default:
       return "DEFAULT";
   }
@@ -79,6 +81,8 @@ ContentType ContentTypeFromString(const std::string& content_type) {
     return ContentType::Media;
   } else if (content_type == "font") {
     return ContentType::Font;
+  } else if (content_type == "webbundle") {
+    return ContentType::WebBundle;
   } else {
     return ContentType::Unknown;
   }

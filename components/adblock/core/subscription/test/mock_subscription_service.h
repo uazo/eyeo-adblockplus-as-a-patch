@@ -46,6 +46,10 @@ class MockSubscriptionService : public NiceMock<SubscriptionService> {
               GetInstalledFilteringConfigurations,
               (),
               (override));
+  MOCK_METHOD(FilteringConfiguration*,
+              GetAdblockFilteringConfiguration,
+              (),
+              (override, const));
   void AddObserver(SubscriptionObserver* observer) final;
   void RemoveObserver(SubscriptionObserver* observer) final;
 

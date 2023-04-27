@@ -29,6 +29,7 @@ enum AbpResource : int8_t;
 
 extern const char kSiteKeyHeaderKey[];
 extern const char kAllowlistEverythingFilter[];
+extern const char kAdblockFilteringConfigurationName[];
 
 const std::string& CurrentSchemaVersion();
 const GURL& TestPagesSubscriptionUrl();

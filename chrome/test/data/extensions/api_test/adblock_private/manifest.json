@@ -23,6 +23,7 @@
   "description": "Test of chrome.adblockPrivate interface",
   "permissions": [
     "adblockPrivate",
+    "eyeoFilteringPrivate",
     "<all_urls>"
   ]
 }

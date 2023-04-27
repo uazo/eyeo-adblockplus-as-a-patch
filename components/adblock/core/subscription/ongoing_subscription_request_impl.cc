@@ -60,11 +60,15 @@ OngoingSubscriptionRequestImpl::OngoingSubscriptionRequestImpl(
     : backoff_entry_(std::make_unique<net::BackoffEntry>(backoff_policy)),
       url_loader_factory_(url_loader_factory),
       retry_timer_(std::make_unique<base::OneShotTimer>()),
-      number_of_redirects_(0) {}
+      number_of_redirects_(0) {
+  net::NetworkChangeNotifier::AddNetworkChangeObserver(this);
+}
 
 OngoingSubscriptionRequestImpl::~OngoingSubscriptionRequestImpl() {
-  if (!url_.is_empty())
+  if (!url_.is_empty()) {
     VLOG(1) << "[eyeo] Cancelling download of " << url_;
+  }
+  net::NetworkChangeNotifier::RemoveNetworkChangeObserver(this);
 }
 
 void OngoingSubscriptionRequestImpl::Start(GURL url,
@@ -75,7 +79,9 @@ void OngoingSubscriptionRequestImpl::Start(GURL url,
   url_ = std::move(url);
   method_ = method;
   response_callback_ = std::move(response_callback);
-  StartInternal();
+  if (IsConnectionAvailable(net::NetworkChangeNotifier::GetConnectionType())) {
+    StartInternal();
+  }
 }
 
 void OngoingSubscriptionRequestImpl::Retry() {
@@ -166,6 +172,28 @@ void OngoingSubscriptionRequestImpl::OnHeadersReceived(
 const char* OngoingSubscriptionRequestImpl::MethodToString() const {
   return method_ == Method::GET ? net::HttpRequestHeaders::kGetMethod
                                 : net::HttpRequestHeaders::kHeadMethod;
+}
+
+bool OngoingSubscriptionRequestImpl::IsConnectionAvailable(
+    net::NetworkChangeNotifier::ConnectionType connection_type) const {
+  return connection_type !=
+             net::NetworkChangeNotifier::ConnectionType::CONNECTION_NONE &&
+         connection_type !=
+             net::NetworkChangeNotifier::ConnectionType::CONNECTION_UNKNOWN;
+}
+
+bool OngoingSubscriptionRequestImpl::IsStarted() const {
+  return loader_ != nullptr || retry_timer_->IsRunning();
+}
+
+void OngoingSubscriptionRequestImpl::OnNetworkChanged(
+    net::NetworkChangeNotifier::ConnectionType connection_type) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!IsStarted() && !url_.is_empty() &&
+      IsConnectionAvailable(connection_type)) {
+    StartInternal();
+    DCHECK(IsStarted());
+  }
 }
 
 }  // namespace adblock
