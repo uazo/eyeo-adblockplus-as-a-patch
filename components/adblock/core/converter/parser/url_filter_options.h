@@ -18,6 +18,7 @@
 #ifndef COMPONENTS_ADBLOCK_CORE_CONVERTER_PARSER_URL_FILTER_OPTIONS_H_
 #define COMPONENTS_ADBLOCK_CORE_CONVERTER_PARSER_URL_FILTER_OPTIONS_H_
 
+#include <cstdint>
 #include <set>
 #include <string>
 #include <vector>
